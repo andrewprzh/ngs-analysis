@@ -56,6 +56,34 @@ def table_to_str(d):
     return res
 
 
+def dict_sum(d):
+    s = 0
+    for v in d.values():
+        s += v
+    return s
+
+def tables_to_str(keys_t, values_t):
+    vertical_keys = set()
+    horisontal_keys = set()
+    for k in sorted(keys_t.keys()):
+        vertical_keys.add(k[0])
+        horisontal_keys.add(k[1])
+
+    res = ""
+    s = '\t'
+    for x2 in horisontal_keys:
+        s += str(x2) + '\t'
+    res += s + '\n'
+    for x1 in vertical_keys:
+        s = str(x1)
+        for x2 in horisontal_keys:
+            v = values_t.get((x1,x2), 0)
+            s += '\t' + str(v)
+        res += s + '\n'
+
+    return res
+
+
 class CodonInfo:
     gene_id = ""
     start_codons = []
@@ -64,8 +92,10 @@ class CodonInfo:
 
     def __init__(self, gene_id, start_codon_line, stop_codon_line, codon_pairs_line):
         self.gene_id = gene_id
+        tokens = start_codon_line.strip().split('\t')
         self.start_codons = to_pairs(map(lambda x: int(x), start_codon_line.strip().split('\t')))
         self.stop_codons = to_pairs(map(lambda x: int(x), stop_codon_line.strip().split('\t')))
+
         tokens = codon_pairs_line.strip().split('\t')
         if len(tokens) > 0 and len(tokens) % 4 == 0:
             self.annotated_codon_pairs = to_pairs(to_pairs(map(lambda x: int(x), tokens)))
@@ -73,21 +103,34 @@ class CodonInfo:
             self.annotated_codon_pairs = []
 
     def get_gene_coords(self):
-        return (self.start_codons[0][0], self.stop_codons[-1][1])
+        start = self.start_codons[0][0]
+        end = self.stop_codons[-1][1]
+        return (start, end) if start < end else (end, start)
 
 
 class ChromosomeWideCodonStructure:
     gene_coords = []
     codon_infos = []
+    skipped_genes = 0
 
     def __init__(self):
         self.gene_coords = []
-        self.codon_info = []
+        self.codon_infos = []
+        self.skipped_genes = 0
 
 
-    def add_gene(self, codon):
-        self.gene_coords.append(codon.get_gene_coords())
-        self.codon_infos.append(codon)
+    def add_gene(self, gene):
+        coords = gene.get_gene_coords()
+
+        if len(self.gene_coords) > 0 and not right_of(coords, self.gene_coords[-1]):
+            self.skipped_genes += 1
+            return False
+
+        self.gene_coords.append(coords)
+        if len(self.gene_coords) > 1 and self.gene_coords[-2] > self.gene_coords[-1]:
+            sys.stderr.write("Unordered genes " + str(self.gene_coords[-2]) + " " + str(self.gene_coords[-1]))
+        self.codon_infos.append(gene)
+        return True
 
 
     def find_gene_index(self, to_find):
@@ -102,6 +145,13 @@ class ChromosomeWideCodonStructure:
             if overlaps(to_find, self.gene_coords[center]):
                 return self.detect_bounds(to_find, center)
             elif left >= right:
+                #print("Gene not found " + str(to_find))
+                #if center > 0:
+                #    print(self.gene_coords[center - 1])
+                #print(self.gene_coords[center])
+                #if center < len(self.gene_coords) - 1:
+                #    print(self.gene_coords[center + 1])
+                #x = raw_input()
                 return (-1, -1)
             elif left_of(to_find, self.gene_coords[center]):
                 right = center - 1
@@ -153,6 +203,11 @@ class ChromosomeWideCodonStructure:
 
             alignment_block_index += 1
 
+        #if len(covered_start_codons) == 0 and len(covered_stop_codons) == 0:
+            #print(alignment_blocks)
+            #print(start_codons)
+            #print(stop_codons)
+            #x = raw_input()
         return covered_start_codons, covered_stop_codons
 
 
@@ -164,6 +219,7 @@ class GenoWideCodonStructure:
         inf = open(inf_name)
 
         count = 0
+        gene_len = 0
         while True:
             l = inf.readline()
             if not l:
@@ -179,10 +235,12 @@ class GenoWideCodonStructure:
             stop_l = inf.readline()
             pairs_l = inf.readline()
             gene_info = CodonInfo(tokens[1], start_l, stop_l, pairs_l)
-            self.chr_dict[tokens[0]].add_gene(gene_info)
-            count += 1
+            gene_coords = gene_info.get_gene_coords()
+            if self.chr_dict[tokens[0]].add_gene(gene_info):
+                count += 1
+                gene_len += gene_coords[1] - gene_coords[0]
 
-        sys.stderr.write("loaded " + str(count) + " genes\n")
+        sys.stderr.write("loaded " + str(count) + " genes of total length " + str(gene_len) + "\n")
         #print(self.chr_dict['17'].gene_coords)
         #print(self.chr_dict['17'].codon_infos[0].gene_id)
         #print(self.chr_dict['17'].codon_infos[0].start_codons)
@@ -194,8 +252,11 @@ class ContigCodonStats:
     codon_table = {}
     annotated_codon_table = {}
 
-    def __init__(self):
+    def __init__(self, start_codons = [], stop_codons = []):
         self.codon_table = {}
+        for start_c in start_codons:
+            for stop_c in stop_codons:
+                self.codon_table[(start_c, stop_c)] = 0
         self.annotated_codon_table = {}
 
     def add_contig(self, start_codon, stop_codon, barcode_count = 1):
@@ -209,15 +270,23 @@ class ContigCodonStats:
 
 
 class Stats:
+
     cover_multiple_genes = 0
     cover_zero_genes = 0
     cover_zero_codons = 0
     cover_only_start_codon = 0
     cover_only_stop_codon = 0
-    cover_multiple_codons = 0
+    cover_multiple_start_codons = 0
+    cover_multiple_stop_codons = 0
+    cover_multiple_both_codons = 0
     cover_two_codons = 0
+    skipped_genes = 0
 
     codon_stat_tables = {}
+
+    def init_gene(self, gene_id, start_codons, stop_codons):
+        if gene_id not in self.codon_stat_tables:
+            self.codon_stat_tables[gene_id] = ContigCodonStats(start_codons, stop_codons)
 
     def add_contig(self, gene_id, start_codons, stop_codons, barcode_count = 1):
         if len(start_codons) == 0 and len(stop_codons) > 0:
@@ -228,33 +297,48 @@ class Stats:
             self.cover_zero_codons += 1
         else:
             if len(start_codons) * len(stop_codons) > 1:
-                self.cover_multiple_codons += 1
+                if len(start_codons) > 1 and len(stop_codons) > 1:
+                    self.cover_multiple_both_codons += 1
+                elif len(start_codons) == 1:
+                    self.cover_multiple_stop_codons += 1
+                else:
+                    self.cover_multiple_start_codons += 1
+
             else:
                 self.cover_two_codons += 1
+                self.codon_stat_tables[gene_id].add_contig(sorted(start_codons)[0], sorted(stop_codons)[-1], barcode_count)
             if gene_id not in self.codon_stat_tables:
                 self.codon_stat_tables[gene_id] = ContigCodonStats()
-            self.codon_stat_tables[gene_id].add_contig(sorted(start_codons)[0], sorted(stop_codons)[-1], barcode_count)
+
 
     def add_annotated_codons(self, gene_id, annotated_codon_pairs):
         if gene_id not in self.codon_stat_tables:
             self.codon_stat_tables[gene_id] = ContigCodonStats()
         self.codon_stat_tables[gene_id].add_annotated_codons(annotated_codon_pairs)
 
+    def count_skipped(self, genome_wide_codons):
+        for c in genome_wide_codons.chr_dict.values():
+            self.skipped_genes += c.skipped_genes
+
+
     def print_report(self):
-        print("Contigs covering multiple genes (ambiguous): " + str(self.cover_multiple_genes))
-        print("Contigs covering zero genes: " + str(self.cover_zero_genes))
-        print("Contigs covering only start codons: " + str(self.cover_only_start_codon))
-        print("Contigs covering only stop codons: " + str(self.cover_only_stop_codon))
-        print("Contigs covering no codons: " + str(self.cover_zero_codons))
-        print("Contigs covering multiple codons: " + str(self.cover_multiple_codons))
-        print("Contigs covering one pair of codons: " + str(self.cover_two_codons))
+        print("Skipped genes\t" + str(self.skipped_genes))
+        print("Contigs covering multiple genes (ambiguous)\t" + str(self.cover_multiple_genes))
+        print("Contigs covering zero genes\t" + str(self.cover_zero_genes))
+        print("Contigs covering only start codons\t" + str(self.cover_only_start_codon))
+        print("Contigs covering only stop codons\t" + str(self.cover_only_stop_codon))
+        print("Contigs covering no codons\t" + str(self.cover_zero_codons))
+        print("Contigs covering multiple start codons\t" + str(self.cover_multiple_start_codons))
+        print("Contigs covering multiple stop codons\t" + str(self.cover_multiple_stop_codons))
+        print("Contigs covering multiple start & stop codons\t" + str(self.cover_multiple_both_codons))
+        print("Contigs covering one pair of codons\t" + str(self.cover_two_codons))
 
         print("Exon coordination tables with barcode count")
         for k in self.codon_stat_tables.keys():
-            if len(self.codon_stat_tables[k].annotated_codon_table) > 1:
+            if dict_sum(self.codon_stat_tables[k].codon_table) > 0:
                 print(k)
                 print(table_to_str(self.codon_stat_tables[k].codon_table))
-                print(table_to_str(self.codon_stat_tables[k].annotated_codon_table))
+
 
 
 def get_barcode_map(sam_file_name):
@@ -282,14 +366,15 @@ def process_sam(samfile_in, codon_info, barcode_map):
         if r.reference_id == -1:
             continue
         chr_name = r.reference_name.strip()
-        blocks = sorted(r.get_blocks())
-
-        contig_coord_range = [blocks[0][0], blocks[-1][1]]
         if chr_name not in codon_info.chr_dict:
+            stats.cover_zero_genes += 1
             #sys.stderr.write("Wrong chromosome " + chr_name + "\n")
             continue
 
+        blocks = sorted(r.get_blocks())
+        contig_coord_range = [blocks[0][0], blocks[-1][1]]
         gene_index_range = codon_info.chr_dict[chr_name].find_gene_index(contig_coord_range)
+
         if gene_index_range == (-1, -1):
             stats.cover_zero_genes += 1
         elif gene_index_range[1] > gene_index_range[0]:
@@ -300,6 +385,8 @@ def process_sam(samfile_in, codon_info, barcode_map):
             barcode_count = len(barcode_map[contig_name])
             gene_id = codon_info.chr_dict[chr_name].get_gene_id(gene_index)
             start_codons, stop_codons =  codon_info.chr_dict[chr_name].find_exons(gene_index, blocks)
+
+            stats.init_gene(gene_id, codon_info.chr_dict[chr_name].codon_infos[gene_index].start_codons, codon_info.chr_dict[chr_name].codon_infos[gene_index].stop_codons)
             stats.add_contig(gene_id, start_codons, stop_codons, barcode_count)
             stats.add_annotated_codons(gene_id, codon_info.chr_dict[chr_name].get_annotated_codons(gene_index))
 
@@ -319,5 +406,6 @@ sys.stderr.write("done.\nProcessing SAM file...\n")
 samfile_in = pysam.AlignmentFile(sys.argv[2], "rb")
 stats = process_sam(samfile_in, codon_info, barcode_map)
 sys.stderr.write("\ndone.\nPrinting report... ")
+stats.count_skipped(codon_info)
 stats.print_report()
 sys.stderr.write(" done.\n")
