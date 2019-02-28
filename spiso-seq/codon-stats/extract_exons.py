@@ -65,7 +65,7 @@ class Feature:
 class Gene:
     chromosome = ""
     gene_id = ""
-    strans = "
+    strand = ""
     features = {}
 
     def __init__(self, feature = None):
