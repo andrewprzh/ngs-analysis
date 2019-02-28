@@ -86,12 +86,14 @@ def tables_to_str(keys_t, values_t):
 
 class CodonInfo:
     gene_id = ""
+    strand = ""
     start_codons = []
     stop_codons = []
     annotated_codon_pairs = []
 
-    def __init__(self, gene_id, start_codon_line, stop_codon_line, codon_pairs_line):
+    def __init__(self, gene_id, strand, start_codon_line, stop_codon_line, codon_pairs_line):
         self.gene_id = gene_id
+        self.strand = strand
         tokens = start_codon_line.strip().split('\t')
         self.start_codons = to_pairs(map(lambda x: int(x), start_codon_line.strip().split('\t')))
         self.stop_codons = to_pairs(map(lambda x: int(x), stop_codon_line.strip().split('\t')))
@@ -163,6 +165,9 @@ class ChromosomeWideCodonStructure:
     def get_gene_id(self, index):
         return self.codon_infos[index].gene_id
 
+    def get_strand(self, index):
+        return self.codon_infos[index].strand
+
     def get_annotated_codons(self, index):
         return self.codon_infos[index].annotated_codon_pairs
 
@@ -226,7 +231,7 @@ class GenoWideCodonStructure:
                 break
 
             tokens = l.strip().split('\t')
-            if len(tokens) != 2:
+            if len(tokens) != 3:
                 sys.stderr.write("Wrong format\n")
             if tokens[0] not in self.chr_dict:
                 self.chr_dict[tokens[0]] = ChromosomeWideCodonStructure()
@@ -234,7 +239,7 @@ class GenoWideCodonStructure:
             start_l = inf.readline()
             stop_l = inf.readline()
             pairs_l = inf.readline()
-            gene_info = CodonInfo(tokens[1], start_l, stop_l, pairs_l)
+            gene_info = CodonInfo(tokens[1], tokens[2], start_l, stop_l, pairs_l)
             gene_coords = gene_info.get_gene_coords()
             if self.chr_dict[tokens[0]].add_gene(gene_info):
                 count += 1
@@ -288,7 +293,7 @@ class Stats:
         if gene_id not in self.codon_stat_tables:
             self.codon_stat_tables[gene_id] = ContigCodonStats(start_codons, stop_codons)
 
-    def add_contig(self, gene_id, start_codons, stop_codons, barcode_count = 1):
+    def add_contig(self, gene_id, strand, start_codons, stop_codons, barcode_count = 1):
         if len(start_codons) == 0 and len(stop_codons) > 0:
             self.cover_only_stop_codon += 1
         elif len(start_codons) > 0 and len(stop_codons) == 0:
@@ -296,6 +301,9 @@ class Stats:
         elif len(start_codons) == 0 and len(stop_codons) == 0:
             self.cover_zero_codons += 1
         else:
+            if gene_id not in self.codon_stat_tables:
+                self.codon_stat_tables[gene_id] = ContigCodonStats()
+
             if len(start_codons) * len(stop_codons) > 1:
                 if len(start_codons) > 1 and len(stop_codons) > 1:
                     self.cover_multiple_both_codons += 1
@@ -303,12 +311,14 @@ class Stats:
                     self.cover_multiple_stop_codons += 1
                 else:
                     self.cover_multiple_start_codons += 1
-
             else:
                 self.cover_two_codons += 1
-                self.codon_stat_tables[gene_id].add_contig(sorted(start_codons)[0], sorted(stop_codons)[-1], barcode_count)
-            if gene_id not in self.codon_stat_tables:
-                self.codon_stat_tables[gene_id] = ContigCodonStats()
+            if strand == "+":
+                self.codon_stat_tables[gene_id].add_contig(sorted(start_codons)[0], sorted(stop_codons)[0], barcode_count)
+            elif strand == "-":
+                self.codon_stat_tables[gene_id].add_contig(sorted(start_codons)[-1], sorted(stop_codons)[-1], barcode_count)
+            else:
+                sys.stderr.write("Undefined strand")
 
 
     def add_annotated_codons(self, gene_id, annotated_codon_pairs):
@@ -384,10 +394,11 @@ def process_sam(samfile_in, codon_info, barcode_map):
             contig_name = r.query_name.strip()
             barcode_count = len(barcode_map[contig_name])
             gene_id = codon_info.chr_dict[chr_name].get_gene_id(gene_index)
+            strand = codon_info.chr_dict[chr_name].get_strand(gene_index)
             start_codons, stop_codons =  codon_info.chr_dict[chr_name].find_exons(gene_index, blocks)
 
             stats.init_gene(gene_id, codon_info.chr_dict[chr_name].codon_infos[gene_index].start_codons, codon_info.chr_dict[chr_name].codon_infos[gene_index].stop_codons)
-            stats.add_contig(gene_id, start_codons, stop_codons, barcode_count)
+            stats.add_contig(gene_id, strand, start_codons, stop_codons, barcode_count)
             stats.add_annotated_codons(gene_id, codon_info.chr_dict[chr_name].get_annotated_codons(gene_index))
 
     return stats

@@ -65,11 +65,13 @@ class Feature:
 class Gene:
     chromosome = ""
     gene_id = ""
+    strans = "
     features = {}
 
     def __init__(self, feature = None):
         self.gene_id = feature.gene_id if feature is not None else "N/A"
         self.chromosome = feature.chromosome if feature is not None else "0"
+        self.strand = feature.strand if feature is not None else "N/A"
         self.features = {}
 
     def add_feature(self, feature):
@@ -87,6 +89,7 @@ class Gene:
 class CodonInfo:
     chomosome = ""
     gene_id = ""
+    strand = ""
     start_codons = set()
     stop_codons = set()
     annotated_codon_pairs = set()
@@ -96,6 +99,7 @@ class CodonInfo:
     def __init__(self, gene):
         self.chromosome = gene.chromosome
         self.gene_id = gene.gene_id
+        self.strand = gene.strand
         self.start_codons = set()
         self.stop_codons = set()
         self.annotated_codon_pairs = set()
@@ -163,7 +167,7 @@ class CodonInfo:
     def to_string(self):
         if len(self.start_codons) * len(self.stop_codons) < 1:
             return ""
-        s = self.chromosome + '\t' + self.gene_id + '\n'
+        s = self.chromosome + '\t' + self.gene_id  + '\t' + self.strand + '\n'
         for c in sorted(self.start_codons):
             s += str(c[0]) + '\t' + str(c[1]) + '\t' 
         s += '\n'
