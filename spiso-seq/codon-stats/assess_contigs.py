@@ -62,23 +62,20 @@ def dict_sum(d):
         s += v
     return s
 
-def tables_to_str(keys_t, values_t):
+
+def table_to_simple_str(d):
     vertical_keys = set()
     horisontal_keys = set()
-    for k in sorted(keys_t.keys()):
+    for k in sorted(d.keys()):
         vertical_keys.add(k[0])
         horisontal_keys.add(k[1])
 
     res = ""
-    s = '\t'
-    for x2 in horisontal_keys:
-        s += str(x2) + '\t'
-    res += s + '\n'
     for x1 in vertical_keys:
-        s = str(x1)
+        s = ""
         for x2 in horisontal_keys:
-            v = values_t.get((x1,x2), 0)
-            s += '\t' + str(v)
+            v = d.get((x1,x2), 0)
+            s += str(v) + '\t'
         res += s + '\n'
 
     return res
@@ -165,12 +162,19 @@ class ChromosomeWideCodonStructure:
     def get_gene_id(self, index):
         return self.codon_infos[index].gene_id
 
+    def get_gene_coodrs(self, index):
+        return self.gene_coords[index]
+
     def get_strand(self, index):
         return self.codon_infos[index].strand
 
     def get_annotated_codons(self, index):
         return self.codon_infos[index].annotated_codon_pairs
 
+    def get_all_codons(self, index):
+        start_codons = self.codon_infos[index].start_codons
+        stop_codons = self.codon_infos[index].stop_codons
+        return start_codons, stop_codons
 
     def detect_bounds(self, to_find, overlap_coord):
         left = overlap_coord    
@@ -184,9 +188,9 @@ class ChromosomeWideCodonStructure:
         return (left, right)
 
 
-    def find_exons(self, gene_index, alignment_blocks):
-        start_codons = self.codon_infos[gene_index].start_codons
-        stop_codons = self.codon_infos[gene_index].stop_codons
+    def find_covered_codons(self, index, alignment_blocks):
+        start_codons = self.codon_infos[index].start_codons
+        stop_codons = self.codon_infos[index].stop_codons
 
         start_codon_index = 0
         stop_codon_index = 0
@@ -311,6 +315,8 @@ class Stats:
                     self.cover_multiple_stop_codons += 1
                 else:
                     self.cover_multiple_start_codons += 1
+                #remove this break to count ambiguous
+                return
             else:
                 self.cover_two_codons += 1
             if strand == "+":
@@ -346,8 +352,8 @@ class Stats:
         print("Exon coordination tables with barcode count")
         for k in self.codon_stat_tables.keys():
             if dict_sum(self.codon_stat_tables[k].codon_table) > 0:
-                print(k)
-                print(table_to_str(self.codon_stat_tables[k].codon_table))
+                print("=" + k)
+                print(table_to_simple_str(self.codon_stat_tables[k].codon_table))
 
 
 
@@ -395,7 +401,7 @@ def process_sam(samfile_in, codon_info, barcode_map):
             barcode_count = len(barcode_map[contig_name])
             gene_id = codon_info.chr_dict[chr_name].get_gene_id(gene_index)
             strand = codon_info.chr_dict[chr_name].get_strand(gene_index)
-            start_codons, stop_codons =  codon_info.chr_dict[chr_name].find_exons(gene_index, blocks)
+            start_codons, stop_codons =  codon_info.chr_dict[chr_name].find_covered_codons(gene_index, blocks)
 
             stats.init_gene(gene_id, codon_info.chr_dict[chr_name].codon_infos[gene_index].start_codons, codon_info.chr_dict[chr_name].codon_infos[gene_index].stop_codons)
             stats.add_contig(gene_id, strand, start_codons, stop_codons, barcode_count)
@@ -404,19 +410,24 @@ def process_sam(samfile_in, codon_info, barcode_map):
     return stats
 
 
+def main():
+    if len(sys.argv) < 3:
+        sys.stderr.write("Usage: " + sys.argv[0] + " <Codon coordinates file> <BAM/SAM file>\n")
+        exit(0)
 
-if len(sys.argv) < 3:
-    sys.stderr.write("Usage: " + sys.argv[0] + " <Codon coordinates file> <BAM/SAM file>")
-    exit(0)
+    sys.stderr.write("Reading codon structure... ")
+    codon_info = GenoWideCodonStructure(sys.argv[1])
+    sys.stderr.write("done.\nReading barcode file... ")
+    barcode_map = get_barcode_map(sys.argv[2])
+    sys.stderr.write("done.\nProcessing SAM file...\n")
+    samfile_in = pysam.AlignmentFile(sys.argv[2], "rb")
+    stats = process_sam(samfile_in, codon_info, barcode_map)
+    sys.stderr.write("\ndone.\nPrinting report... ")
+    stats.count_skipped(codon_info)
+    stats.print_report()
+    sys.stderr.write(" done.\n")
 
-sys.stderr.write("Reading codon structure... ")
-codon_info = GenoWideCodonStructure(sys.argv[1])
-sys.stderr.write("done.\nReading barcode file... ")
-barcode_map = get_barcode_map(sys.argv[2])
-sys.stderr.write("done.\nProcessing SAM file...\n")
-samfile_in = pysam.AlignmentFile(sys.argv[2], "rb")
-stats = process_sam(samfile_in, codon_info, barcode_map)
-sys.stderr.write("\ndone.\nPrinting report... ")
-stats.count_skipped(codon_info)
-stats.print_report()
-sys.stderr.write(" done.\n")
+if __name__ == "__main__":
+   # stuff only to run when not called via 'import' here
+   main()
+

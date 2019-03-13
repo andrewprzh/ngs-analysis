@@ -35,12 +35,12 @@ for l in gtf:
 
     if len(gene_info_list) > 1000:
         for c in gene_info_list:
-            out_f.write(c.to_string())
+            out_f.write(c.to_coords_string())
         del gene_info_list[:]
 
 gene_info_list.append(GeneInfo(current_gene))
 for c in gene_info_list:
-    out_f.write(c.to_string())
+    out_f.write(c.to_coords_string())
 
 sys.stderr.write("\n")
 out_f.close()
