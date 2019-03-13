@@ -41,6 +41,8 @@ for l in gtf:
 gene_info_list.append(GeneInfo(current_gene))
 for c in gene_info_list:
     out_f.write(c.to_string())
+
+sys.stderr.write("\n")
 out_f.close()
 
 

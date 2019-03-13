@@ -1,6 +1,6 @@
 import os
 import sys
-
+import copy
 
 def range_in(small_range, large_range):
     return small_range[0] > large_range[0] and small_range[1] < large_range[1]
@@ -109,10 +109,14 @@ class GeneInfo:
             cds = []
             start_codon = None
             stop_codon = None
+            transcript_coords = None
             for feature in gene.features[transcript]:
                 if feature.feature_type == "CDS":
                     cds.append(feature)
-                    self.gene_coords = (min(self.gene_coords[0], feature.coords[0]), max(self.gene_coords[1], feature.coords[1]))
+                    if transcript_coords is None:
+                        transcript_coords = (feature.coords[0], feature.coords[1])
+                    else:
+                        transcript_coords =  (min(transcript_coords[0], feature.coords[0]), max(transcript_coords[1], feature.coords[1]))
                 elif feature.feature_type == "start_codon":
                     start_codon = feature
                 elif feature.feature_type == "stop_codon":
@@ -121,31 +125,42 @@ class GeneInfo:
             cds = sorted(cds, key=lambda x: x.coords)
             if start_codon is None and infer_codons and len(cds) > 0:
                 if cds[0].strand == '+' and cds[-1].strand == '+':
-                    start_codon = cds[0]
+                    start_codon = copy.deepcopy(cds[0])
+                    start_codon.feature_type = "start_codon"
                     start_codon.coords = (start_codon.coords[0], start_codon.coords[0] + 2)
                 elif cds[0].strand == '-' and cds[-1].strand == '-':
-                    start_codon = cds[-1]
+                    start_codon = copy.deepcopy(cds[-1])
+                    start_codon.feature_type = "start_codon"
                     start_codon.coords = (start_codon.coords[1] - 2, start_codon.coords[1])
                 else:
                     print("Incompatible strands")
 
             if stop_codon is None and infer_codons and len(cds) > 0:
                 if cds[0].strand == '+' and cds[-1].strand == '+':
-                    stop_codon = cds[-1]
+                    stop_codon = copy.deepcopy(cds[-1])
+                    stop_codon.feature_type = "stop_codon"
                     stop_codon.coords = (stop_codon.coords[1] - 2, stop_codon.coords[1])
                 elif cds[0].strand == '-' and cds[-1].strand == '-':
-                    stop_codon = cds[0]
+                    stop_codon = copy.deepcopy(cds[0])
+                    stop_codon.feature_type = "stop_codon"
                     stop_codon.coords = (stop_codon.coords[0], stop_codon.coords[0] + 2)
                 else:
                     print("Incompatible strands")
 
-            self.features[transcript] = cds
-            if start_codon is not None:
-                self.features[transcript].append(start_codon)
-                start_codons.add(start_codon.coords)
-            if stop_codon is not None:
-                self.features[transcript].append(stop_codon)
-                stop_codons.add(stop_codon.coords)
+            if transcript_coords is not None and len(cds) > 0:
+                self.gene_coords = (min(self.gene_coords[0], transcript_coords[0]), max(self.gene_coords[1], transcript_coords[1]))
+                t_feature = copy.deepcopy(cds[0])
+                t_feature.coords = transcript_coords
+                t_feature.feature_type = "transcript"
+                self.features[transcript] = [t_feature]
+
+                self.features[transcript] += cds
+                if start_codon is not None:
+                    self.features[transcript].append(start_codon)
+                    start_codons.add(start_codon.coords)
+                if stop_codon is not None:
+                    self.features[transcript].append(stop_codon)
+                    stop_codons.add(stop_codon.coords)
 
             for c in cds:
                 all_cds.add(c.coords)
@@ -162,13 +177,17 @@ class GeneInfo:
                     self.has_inside_codons = True
                     break
 
+        for transcript in self.features.keys():
+            if len(self.features[transcript]) == 0:
+                del self.features[transcript]
+
     def to_string(self):
-        if len(self.features) == 0:
+        if len(self.features.keys()) == 0:
             return ""
-        s = "gene" + '\t' +  self.gene_id  + '\t' +  self.chromosome + '\t' + self.strand  + '\t'  + str(self.gene_coords[0]) + '\t'  + str(self.gene_coords[1]) + '\t' + str(len(self.features)) + '\t' + str(self.has_inside_codons) + '\n'
+        s = "gene" + '\t' +  self.gene_id  + '\t' +  self.chromosome + '\t' + self.strand  + '\t'  + str(self.gene_coords[0]) + '\t'  + str(self.gene_coords[1]) + '\t' + str(len(self.features.keys())) + '\t' + str(self.has_inside_codons) + '\n'
         for transcript in self.features.keys():
             for feature in self.features[transcript]:
-                s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[0]) + '\n'
+                s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\n'
         return s
 
 
@@ -209,20 +228,24 @@ class CodonInfo:
             cds = sorted(cds, key=lambda x: x.coords)
             if start_codon is None and len(cds) > 0:
                 if cds[0].strand == '+' and cds[-1].strand == '+':
-                    start_codon = cds[0]
+                    start_codon = copy.deepcopy(cds[0])
+                    start_codon.feature_type = "start_codon"
                     start_codon.coords = (start_codon.coords[0], start_codon.coords[0] + 2)
                 elif cds[0].strand == '-' and cds[-1].strand == '-':
-                    start_codon = cds[-1]
+                    start_codon = copy.deepcopy(cds[-1])
+                    start_codon.feature_type = "start_codon"
                     start_codon.coords = (start_codon.coords[1] - 2, start_codon.coords[1])
                 else:
                     print("Incompatible strands")
 
             if stop_codon is None and len(cds) > 0:
                 if cds[0].strand == '+' and cds[-1].strand == '+':
-                    stop_codon = cds[-1]
+                    stop_codon = copy.deepcopy(cds[-1])
+                    stop_codon.feature_type = "stop_codon"
                     stop_codon.coords = (stop_codon.coords[1] - 2, stop_codon.coords[1])
                 elif cds[0].strand == '-' and cds[-1].strand == '-':
-                    stop_codon = cds[0]
+                    stop_codon = copy.deepcopy(cds[0])
+                    stop_codon.feature_type = "stop_codon"
                     stop_codon.coords = (stop_codon.coords[0], stop_codon.coords[0] + 2)
                 else:
                     print("Incompatible strands")
