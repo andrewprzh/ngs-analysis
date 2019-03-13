@@ -5,103 +5,91 @@ import sys
 import cairo
 import math
 
-GENOME_START_POS = 1000
-GENOME_END_POS = 100000
-TOTAL_GENES = 10
-SPACE_BETWEEN_LEVELS = 10
-BASE_LEVEL = 3
+class GeneDrawer:
+    SPACE_BETWEEN_LEVELS = 10
+    BASE_LEVEL = 3
+    XMARGIN = 50
+    YMARGIN = 50
+    CODON_SIZE = 3
 
-CANVAS_WIDTH = min(2000, GENOME_END_POS - GENOME_START_POS)
-CANVAS_HEIGHT = max(300, SPACE_BETWEEN_LEVELS * (TOTAL_GENES + BASE_LEVEL))
+    def __init__(self, transcript_num, gene_coords, fname):
+        self.GENOME_START_POS = gene_coords[0]
+        self.GENOME_END_POS = gene_coords[1]
+        self.TOTAL_GENES = transcript_num
 
-XMARGIN = 50
-YMARGIN = 50
+        self.CANVAS_WIDTH = min(2000, self.GENOME_END_POS - self.GENOME_START_POS)
+        self.CANVAS_HEIGHT = max(300, self.SPACE_BETWEEN_LEVELS * (self.TOTAL_GENES + self.BASE_LEVEL))
 
-WIDTH = CANVAS_WIDTH + 2 * XMARGIN
-HEIGHT = CANVAS_HEIGHT + 2 * YMARGIN
+        self.WIDTH = self.CANVAS_WIDTH + 2 * self.XMARGIN
+        self.HEIGHT = self.CANVAS_HEIGHT + 2 * self.YMARGIN
 
-XSCALE = float(CANVAS_WIDTH) / float(GENOME_END_POS - GENOME_START_POS)
-YSCALE = float(CANVAS_HEIGHT) / float(TOTAL_GENES + BASE_LEVEL)
+        self.XSCALE = float(self.CANVAS_WIDTH) / float(self.GENOME_END_POS - self.GENOME_START_POS)
+        self.YSCALE = float(self.CANVAS_HEIGHT) / float(self.TOTAL_GENES + self.BASE_LEVEL)
 
-CODON_SIZE = 3
-
-
-def draw_element(contex, genome_coords, level):
-    x1 = XMARGIN + genome_coords[0] * XSCALE
-    x2 = XMARGIN + genome_coords[0] * XSCALE
-    y = YMARGIN + level * YSCALE
-    context.move_to(x1, y)
-    context.line_to(x2, y)
-    context.stroke()
-
-
-def draw_gene(contex, coords):
-    context.set_source_rgb(0.2, 0.2, 0.2)
-    context.set_line_width(2)
-    draw_element(contex, coords, 0)
+        self.surface = cairo.SVGSurface(fname + ".svg", self.WIDTH, self.HEIGHT)
+        self.context = cairo.Context(self.surface)
+        self.context.rectangle(0, 0, self.WIDTH, self.HEIGHT)
+        self.context.set_source_rgb(1, 1, 1)
+        self.context.fill()
+        self.context.stroke()
 
 
-def draw_transcript(contex, coords, transcript_num):
-    context.set_source_rgb(0.5, 0.5, 0.5)
-    context.set_line_width(3)
-    draw_element(contex, coords, transcript_num + BASE_LEVEL)
+    def draw_element(self, genome_coords, level):
+        x1 = self.XMARGIN + (genome_coords[0] - self.GENOME_START_POS)  * self.XSCALE
+        x2 = self.XMARGIN + (genome_coords[1] - self.GENOME_START_POS)  * self.XSCALE
+        y = self.YMARGIN + level * self.YSCALE
+        self.context.move_to(x1, y)
+        self.context.line_to(x2, y)
+        self.context.stroke()
+        #print(x1,x2,y)
 
 
-def draw_exon(contex, coords, transcript_num):
-    context.set_source_rgb(0.1, 0.1, 0.9)
-    context.set_line_width(3)
-    draw_element(contex, coords, transcript_num + BASE_LEVEL)
+    def draw_codon(self, genome_coords, level):
+        x = self.XMARGIN + (genome_coords[0] + genome_coords[1] - 2 * self.GENOME_START_POS) * self.XSCALE / 2
+        y = self.YMARGIN + level * self.YSCALE
+        self.context.arc(x, y, self.CODON_SIZE, 0, 2 * math.pi)
+        self.context.fill()
+        self.context.stroke()
 
 
-def draw_codon(contex, genome_coords, level):
-    x = XMARGIN + (genome_coords[0] + genome_coords[1]) * XSCALE / 2
-    y = YMARGIN + level * YSCALE
-    contex.arc(x, y, CODON_SIZE, 0, 2 * math.pi)
-    context.fill()
-    context.stroke()
+    def draw_gene(self, coords):
+        self.context.set_source_rgb(0.2, 0.2, 0.2)
+        self.context.set_line_width(3)
+        self.draw_element(coords, 0)
 
 
-#transcript_num = 0 for reference drawing
-def draw_start_codon(contex, coords, transcript_num = 0):
-    context.set_source_rgb(0.1, 0.9, 0.1)
-    draw_codon(contex, coords, transcript_num + BASE_LEVEL)
+    def draw_transcript(self, coords, transcript_num):
+        self.context.set_source_rgb(0.5, 0.5, 0.5)
+        self.context.set_line_width(1)
+        self.draw_element(coords, transcript_num + self.BASE_LEVEL)
 
 
-#transcript_num = 0 for reference drawing
-def draw_stop_codon(contex, coords, transcript_num = 0):
-    context.set_source_rgb(0.8, 0.1, 0.1)
-    draw_codon(contex, coords, transcript_num + BASE_LEVEL)
-
-def draw_coords(context):
-    pass
-
-def set_legend(context, gene_id, chromosome, coordinates):
-    pass
+    def draw_exon(self, coords, transcript_num):
+        self.context.set_source_rgb(0.1, 0.1, 0.9)
+        self.context.set_line_width(3)
+        self.draw_element(coords, transcript_num + self.BASE_LEVEL)
 
 
-def init(transcript_num, gene_coords):
-    GENOME_START_POS = gene_coords[0]
-    GENOME_END_POS = gene_coords[1]
-    TOTAL_GENES = transcript_num
 
-    CANVAS_WIDTH = min(5000, GENOME_END_POS - GENOME_START_POS)
-    CANVAS_HEIGHT = SPACE_BETWEEN_LEVELS * (TOTAL_GENES + BASE_LEVEL)
-
-    WIDTH = CANVAS_WIDTH + 2 * XMARGIN
-    HEIGHT = CANVAS_HEIGHT + 2 * YMARGIN
-
-    XSCALE = float(CANVAS_WIDTH) / float(GENOME_END_POS - GENOME_START_POS)
-    YSCALE = float(CANVAS_HEIGHT) / float(TOTAL_GENES + BASE_LEVEL)
+    #transcript_num = 0 for reference drawing
+    def draw_start_codon(self, coords, transcript_num = -1):
+        self.context.set_source_rgb(0.1, 0.9, 0.1)
+        self.draw_codon(coords, transcript_num + (1 if transcript_num == -1 else self.BASE_LEVEL))
 
 
-def init_context(fname):
-    surface = cairo.SVGSurface(fname + ".svg", WIDTH, HEIGHT)
-    context = cairo.Context(surface)
-    context.rectangle(0, 0, WIDTH, HEIGHT)
-    context.set_source_rgb(1, 1, 1)
-    context.fill()
-    context.stroke()
-    return context
+    #transcript_num = -self.BASE_LEVEL for reference drawing
+    def draw_stop_codon(self, coords, transcript_num = -1):
+        self.context.set_source_rgb(0.8, 0.1, 0.1)
+        self.draw_codon(coords, transcript_num + (1 if transcript_num == -1 else self.BASE_LEVEL))
+
+    def draw_coords(self):
+        pass
+
+    def set_legend(self, gene_id, chromosome, coordinates):
+        pass
+
+
+
 
 
 
