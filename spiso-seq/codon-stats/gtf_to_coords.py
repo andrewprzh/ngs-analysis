@@ -1,6 +1,6 @@
 import os
 import sys
-import extract_exons
+from extract_exons import Gene, GeneInfo, Feature
 
 
 if len(sys.argv) < 3:
@@ -14,6 +14,8 @@ out_f = open(out_name, 'w')
 gene_info_list = []
 current_gene = None
 count = 0
+
+sys.stderr.write("Converting GTF to coords format...\n")
 
 for l in gtf:
     count += 1
@@ -31,14 +33,13 @@ for l in gtf:
     else:
         current_gene.add_feature(feature)
 
-    if len(codon_info_list) > 1000:
-        for c in codon_info_list:
+    if len(gene_info_list) > 1000:
+        for c in gene_info_list:
             out_f.write(c.to_string())
-        del codon_info_list[:]
+        del gene_info_list[:]
 
-codon_info_list.append(CodonInfo(current_gene))
-stats.add_stats(codon_info_list)
-for c in codon_info_list:
+gene_info_list.append(GeneInfo(current_gene))
+for c in gene_info_list:
     out_f.write(c.to_string())
 out_f.close()
 

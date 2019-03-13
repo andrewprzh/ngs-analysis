@@ -103,6 +103,8 @@ class GeneInfo:
         self.features = {}
 
         all_cds = set()
+        start_codons = set()
+        stop_codons = set()
         for transcript in gene.features.keys():
             cds = []
             start_codon = None
@@ -110,22 +112,14 @@ class GeneInfo:
             for feature in gene.features[transcript]:
                 if feature.feature_type == "CDS":
                     cds.append(feature)
-                    self.gene_coords = (min(self.gene_coords[0], cds.coords[0]), max(self.gene_coords[1], cds.coords[1]))
+                    self.gene_coords = (min(self.gene_coords[0], feature.coords[0]), max(self.gene_coords[1], feature.coords[1]))
                 elif feature.feature_type == "start_codon":
                     start_codon = feature
                 elif feature.feature_type == "stop_codon":
                     stop_codon = feature
 
-            if not infer_codons:
-                self.features[transcript] = cds
-                if start_codon is not None:
-                    self.features[transcript].append(start_codon)
-                if stop_codon is not None:
-                    self.features[transcript].append(stop_codon)
-                continue
-
             cds = sorted(cds, key=lambda x: x.coords)
-            if start_codon is None and len(cds) > 0:
+            if start_codon is None and infer_codons and len(cds) > 0:
                 if cds[0].strand == '+' and cds[-1].strand == '+':
                     start_codon = cds[0]
                     start_codon.coords = (start_codon.coords[0], start_codon.coords[0] + 2)
@@ -135,7 +129,7 @@ class GeneInfo:
                 else:
                     print("Incompatible strands")
 
-            if stop_codon is None and len(cds) > 0:
+            if stop_codon is None and infer_codons and len(cds) > 0:
                 if cds[0].strand == '+' and cds[-1].strand == '+':
                     stop_codon = cds[-1]
                     stop_codon.coords = (stop_codon.coords[1] - 2, stop_codon.coords[1])
@@ -145,27 +139,35 @@ class GeneInfo:
                 else:
                     print("Incompatible strands")
 
-            self.features[transcript] = cds + [start_codon] + [stop_codon]
+            self.features[transcript] = cds
+            if start_codon is not None:
+                self.features[transcript].append(start_codon)
+                start_codons.add(start_codon.coords)
+            if stop_codon is not None:
+                self.features[transcript].append(stop_codon)
+                stop_codons.add(stop_codon.coords)
 
             for c in cds:
                 all_cds.add(c.coords)
 
-        for codon in self.start_codons:
+        for codon in start_codons:
             for c in all_cds:
                 if range_in(codon, c):
                     self.has_inside_codons = True
                     break
 
-        for codon in self.stop_codons:
+        for codon in stop_codons:
             for c in all_cds:
                 if range_in(codon, c):
                     self.has_inside_codons = True
                     break
 
     def to_string(self):
+        if len(self.features) == 0:
+            return ""
         s = "gene" + '\t' +  self.gene_id  + '\t' +  self.chromosome + '\t' + self.strand  + '\t'  + str(self.gene_coords[0]) + '\t'  + str(self.gene_coords[1]) + '\t' + str(len(self.features)) + '\t' + str(self.has_inside_codons) + '\n'
-        for transcript in gene.features.keys():
-            for feature in gene.features[transcript]:
+        for transcript in self.features.keys():
+            for feature in self.features[transcript]:
                 s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[0]) + '\n'
         return s
 
@@ -303,52 +305,52 @@ class Stats:
         print("Number of stop codons within exons")
         print(self.stop_codons_in_exons)
 
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: " + sys.argv[0] + " <GTF> <output codon list file> > <statistics>")
+        exit(0)
 
-if len(sys.argv) < 3:
-    print("Usage: " + sys.argv[0] + " <GTF> <output codon list file> > <statistics>")
-    exit(0)
+    gtf = open(sys.argv[1])
+    out_name = sys.argv[2]
+    out_f = open(out_name, 'w')
 
-gtf = open(sys.argv[1])
-out_name = sys.argv[2]
-out_f = open(out_name, 'w')
+    codon_info_list = []
+    current_gene = None
+    count = 0
+    stats = Stats()
 
-codon_info_list = []
-current_gene = None
-count = 0
-stats = Stats()
+    for l in gtf:
+        count += 1
+        if count % 10000 == 0:
+            sys.stderr.write("\r   " + str(count) + " lines processed")
 
-for l in gtf:
-    count += 1
-    if count % 10000 == 0:
-        sys.stderr.write("\r   " + str(count) + " lines processed")
+        if l.startswith("#"):
+            continue
+        feature = Feature(l)
 
-    if l.startswith("#"):
-        continue
-    feature = Feature(l)
+        if feature.feature_type == "gene":
+            if current_gene is not None:
+                codon_info_list.append(CodonInfo(current_gene))
+            current_gene = Gene(feature)
+        else:
+            current_gene.add_feature(feature)
 
-    if feature.feature_type == "gene":
-        if current_gene is not None:
-            codon_info_list.append(CodonInfo(current_gene))
-        current_gene = Gene(feature)
-    else:
-        current_gene.add_feature(feature)
+        if len(codon_info_list) > 1000:
+            stats.add_stats(codon_info_list)
+            for c in codon_info_list:
+                out_f.write(c.to_string())
+            del codon_info_list[:]
 
-    if len(codon_info_list) > 1000:
-        stats.add_stats(codon_info_list)
-        for c in codon_info_list:
-            out_f.write(c.to_string())
-        del codon_info_list[:]
+    codon_info_list.append(CodonInfo(current_gene))
+    stats.add_stats(codon_info_list)
+    for c in codon_info_list:
+        out_f.write(c.to_string())
+    out_f.close()
+    stats.print_report()
 
-codon_info_list.append(CodonInfo(current_gene))
-stats.add_stats(codon_info_list)
-for c in codon_info_list:
-    out_f.write(c.to_string())
-out_f.close()
-stats.print_report()
-
-
-
-
+if __name__ == "__main__":
+   # stuff only to run when not called via 'import' here
+   main()
 
 
 
