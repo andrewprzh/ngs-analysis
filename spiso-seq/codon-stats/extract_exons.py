@@ -86,6 +86,91 @@ class Gene:
         self.features[feature.transcript_id].append(feature)
 
 
+class GeneInfo:
+    chomosome = ""
+    gene_id = ""
+    strand = ""
+    gene_coords = (0,0)
+    has_inside_codons = False
+    features = {}
+
+    def __init__(self, gene, infer_codons = True):
+        self.chromosome = gene.chromosome
+        self.gene_id = gene.gene_id
+        self.strand = gene.strand
+        self.gene_coords = (10000000000,0)
+        self.has_inside_codons = False
+        self.features = {}
+
+        all_cds = set()
+        for transcript in gene.features.keys():
+            cds = []
+            start_codon = None
+            stop_codon = None
+            for feature in gene.features[transcript]:
+                if feature.feature_type == "CDS":
+                    cds.append(feature)
+                    self.gene_coords = (min(self.gene_coords[0], cds.coords[0]), max(self.gene_coords[1], cds.coords[1]))
+                elif feature.feature_type == "start_codon":
+                    start_codon = feature
+                elif feature.feature_type == "stop_codon":
+                    stop_codon = feature
+
+            if not infer_codons:
+                self.features[transcript] = cds
+                if start_codon is not None:
+                    self.features[transcript].append(start_codon)
+                if stop_codon is not None:
+                    self.features[transcript].append(stop_codon)
+                continue
+
+            cds = sorted(cds, key=lambda x: x.coords)
+            if start_codon is None and len(cds) > 0:
+                if cds[0].strand == '+' and cds[-1].strand == '+':
+                    start_codon = cds[0]
+                    start_codon.coords = (start_codon.coords[0], start_codon.coords[0] + 2)
+                elif cds[0].strand == '-' and cds[-1].strand == '-':
+                    start_codon = cds[-1]
+                    start_codon.coords = (start_codon.coords[1] - 2, start_codon.coords[1])
+                else:
+                    print("Incompatible strands")
+
+            if stop_codon is None and len(cds) > 0:
+                if cds[0].strand == '+' and cds[-1].strand == '+':
+                    stop_codon = cds[-1]
+                    stop_codon.coords = (stop_codon.coords[1] - 2, stop_codon.coords[1])
+                elif cds[0].strand == '-' and cds[-1].strand == '-':
+                    stop_codon = cds[0]
+                    stop_codon.coords = (stop_codon.coords[0], stop_codon.coords[0] + 2)
+                else:
+                    print("Incompatible strands")
+
+            self.features[transcript] = cds + [start_codon] + [stop_codon]
+
+            for c in cds:
+                all_cds.add(c.coords)
+
+        for codon in self.start_codons:
+            for c in all_cds:
+                if range_in(codon, c):
+                    self.has_inside_codons = True
+                    break
+
+        for codon in self.stop_codons:
+            for c in all_cds:
+                if range_in(codon, c):
+                    self.has_inside_codons = True
+                    break
+
+    def to_string(self):
+        s = "gene" + '\t' +  self.gene_id  + '\t' +  self.chromosome + '\t' + self.strand  + '\t'  + str(self.gene_coords[0]) + '\t'  + str(self.gene_coords[1]) + '\t' + str(len(self.features)) + '\t' + str(self.has_inside_codons) + '\n'
+        for transcript in gene.features.keys():
+            for feature in gene.features[transcript]:
+                s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[0]) + '\n'
+        return s
+
+
+
 class CodonInfo:
     chomosome = ""
     gene_id = ""
