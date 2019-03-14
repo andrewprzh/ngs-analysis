@@ -34,7 +34,7 @@ class Gene:
         self.contigs_info = []
 
 
-    def add_contig_to_gene(self, contig_feature, start_codons, stop_codons, contig_alignment):
+    def add_contig_to_gene(self, contig_feature, covered_start_codons, covered_stop_codons, contig_alignment):
         contig_id = contig_feature.feature_id
         if contig_id not in self.features:
             self.features[contig_id] = []
@@ -45,12 +45,12 @@ class Gene:
         blocks = sorted(contig_alignment.get_blocks())
         for b in blocks:
             contig.append(Feature("block_" + str(b[0]), "block", strand, b))
-        for c in self.start_codons:
+        for c in covered_start_codons:
             contig.append(Feature("start_" + str(c[0]), "start_codon", strand, c))
-        for c in stop_codons:
+        for c in covered_stop_codons:
             contig.append(Feature("stop_" + str(c[0]), "stop_codon", strand, c))
 
-        self.contigs_info.append((start_codons[0][0], stop_codons[0][0], contig_id))
+        self.contigs_info.append((covered_start_codons[0][0], covered_stop_codons[0][0], blocks[0][0], blocks[-1][1], contig_id))
 
 
     def to_string(self):
@@ -59,7 +59,7 @@ class Gene:
             s += "start_codon"  + '\t' + str(c[0])  + '\t' +  str(c[1]) + '\n'
         for c in self.stop_codons:
             s += "stop_codon"  + '\t' + str(c[0])  + '\t' +  str(c[1]) + '\n'
-        for start_c, stop_c, contig_id in sorted(self.contigs_info):
+        for start_c, stop_c, start_coord, stop_coord, contig_id in sorted(self.contigs_info):
             for feature in self.features[contig_id]:
                 if feature.feature_type == "contig":
                     s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\t' + str(feature.coverage) + '\n'
