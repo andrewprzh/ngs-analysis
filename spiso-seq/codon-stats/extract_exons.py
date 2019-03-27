@@ -207,7 +207,10 @@ class GeneInfo:
         s = "gene" + '\t' +  self.gene_id  + '\t' +  self.chromosome + '\t' + self.strand  + '\t'  + str(self.gene_coords[0]) + '\t'  + str(self.gene_coords[1]) + '\t' + str(len(self.features.keys())) + '\t' + str(self.has_inside_codons) + '\n'
         for transcript in self.features.keys():
             for feature in self.features[transcript]:
-                s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\n'
+                if feature.feature_type == "transcript":
+                    s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\t' + transcript + '\n'
+                else:
+                    s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\n'
         return s
 
 

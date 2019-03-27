@@ -62,7 +62,7 @@ class Gene:
         for start_c, stop_c, start_coord, stop_coord, contig_id in sorted(self.contigs_info):
             for feature in self.features[contig_id]:
                 if feature.feature_type == "contig":
-                    s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\t' + str(feature.coverage) + '\n'
+                    s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\t' + str(feature.coverage) + '\t' + contig_id + '\n'
                 else:
                     s += feature.feature_type  + '\t' + str(feature.coords[0])  + '\t' +  str(feature.coords[1]) + '\n'
         return s
