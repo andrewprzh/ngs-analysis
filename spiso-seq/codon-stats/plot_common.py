@@ -12,6 +12,8 @@ class GeneDrawer:
     XMARGIN = 100
     YMARGIN = 50
     CODON_SIZE = 3
+    LABEL_X_MARGIN = 10
+    LABEL_Y_MARGIN = 5
 
     def __init__(self, transcript_num, contig_num, gene_coords, fname):
         self.GENOME_START_POS = gene_coords[0]
@@ -53,6 +55,31 @@ class GeneDrawer:
         self.context.stroke()
         #print(x1,x2,y)
 
+
+    def label_alignment(self, coords, level, label):
+        self.context.set_source_rgb(0.1, 0.1, 0.1)
+        x = self.XMARGIN + (genome_coords[1] - self.GENOME_START_POS)  * self.XSCALE + LABEL_X_MARGIN
+        y = 0
+        if level < 0:
+            y = self.YMARGIN + self.GENE_LEVEL + level * self.GENE_YSCALE
+        else:
+            y = self.YMARGIN + self.GENE_LEVEL + level * self.CONTIG_YSCALE
+        self.context.move_to(x, y)
+        self.context.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        self.context.set_font_size(10)
+        self.context.show_text(label)
+        self.context.stroke()
+
+
+    def label_genome(self, coords, gene_id, chr_id):
+        self.context.set_source_rgb(0.1, 0.1, 0.1)
+        x = self.XMARGIN + ((genome_coords[1] + genome_coords[0]) / 2 - self.GENOME_START_POS)  * self.XSCALE + LABEL_X_MARGIN
+        y = - LABEL_Y_MARGIN
+        self.context.move_to(x, y)
+        self.context.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        self.context.set_font_size(12)
+        self.context.show_text(chr_id + ": " + str(genome_coords[0]) + "-" + str(genome_coords[1]) + "," + )
+        self.context.stroke()
 
     def draw_codon(self, genome_coords, level):
         x = self.XMARGIN + (genome_coords[0] + genome_coords[1] - 2 * self.GENOME_START_POS) * self.XSCALE / 2
@@ -105,8 +132,7 @@ class GeneDrawer:
         self.context.set_source_rgb(0.8, 0.1, 0.1)
         self.draw_codon(coords, level_sign * (level_num + self.BASE_LEVEL))
 
-    def draw_coords(self):
-        pass
+
 
     def set_legend(self, gene_id, chromosome, coordinates):
         pass

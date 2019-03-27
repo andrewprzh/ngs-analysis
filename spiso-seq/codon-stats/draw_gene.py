@@ -36,6 +36,7 @@ if not found_gene and not found_contigs:
 total_contigs = 0
 total_transcripts = 0
 gene_coords = (0, 0)
+chr_id = ""
 if found_contigs:
     tokens = lc.strip().split('\t')
     if len(tokens) != 7:
@@ -43,6 +44,7 @@ if found_contigs:
         exit(0)
     gene_coords = (int(tokens[4]), int(tokens[5]))
     total_contigs = int(tokens[6])
+    chr_id = tokens[2]
 
 if found_gene:
     tokens = lg.strip().split('\t')
@@ -51,10 +53,12 @@ if found_gene:
         exit(0)
     gene_coords = (int(tokens[4]), int(tokens[5]))
     total_transcripts = int(tokens[6])
+    chr_id = tokens[2]
 
 
 drawer = GeneDrawer(total_transcripts, total_contigs, gene_coords, out_name)
 drawer.draw_gene(gene_coords)
+drawer.label_genome(gene_coords, gene_id, chr_id)
 
 lg = gene_coord_file.readline()
 transcript_num = 0
@@ -67,6 +71,7 @@ while lg and not lg.startswith("gene"):
     if tokens[0] == "transcript":
         transcript_num += 1
         drawer.draw_transcript(coords, transcript_num)
+        drawer.label_alignment(coords, transcript_num, tokens[-1])
     elif tokens[0] == "CDS":
         drawer.draw_exon(coords, transcript_num)        
     elif tokens[0] == "start_codon":
@@ -90,6 +95,7 @@ while lc and not lc.startswith("gene"):
         contig_num += 1
         cov = int(tokens[3])
         drawer.draw_contig(coords, contig_num)
+        drawer.label_alignment(coords, contig_num, tokens[-1])
     elif tokens[0] == "block":
         drawer.draw_block(coords, contig_num, cov)        
     elif tokens[0] == "start_codon":
