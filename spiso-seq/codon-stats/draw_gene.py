@@ -4,13 +4,28 @@ from plot_common import *
 
 
 if len(sys.argv) < 4:
-    print("Usage: " + sys.argv[0] + " <gene id> <gene coord file> <contig coord file> [output figure name = gene_id]")
+    print("Usage: " + sys.argv[0] + " <gene id> <gene coord file> <contig coord file> [CRBB output] [output figure name = gene_id]")
     exit(0)
 
 gene_id = sys.argv[1]
 gene_coord_file = open(sys.argv[2])
 contig_coord_file = open(sys.argv[3])
-out_name = sys.argv[4] if len(sys.argv) > 4 else gene_id
+out_name = sys.argv[5] if len(sys.argv) > 5 else gene_id
+
+contigs2genes = {}
+gene2color = {}
+if len(sys.argv) > 4:
+    crbb_file = open(sys.argv[4])
+    for l in crbb_file:
+        tokens = l.strip().split('\t')
+        if len(tokens) < 2:
+            continue
+        contigs2genes[tokens[0]] = tokens[1]
+    genes = sorted(list(set(contigs2genes.values())))
+    count = 1
+    for g in genes:
+        gene2color[g] = count
+        count += 1
 
 found_gene = False
 lg = gene_coord_file.readline()
@@ -62,6 +77,7 @@ drawer.label_genome(gene_coords, gene_id, chr_id)
 
 lg = gene_coord_file.readline()
 transcript_num = 0
+current_color = 1
 while lg and not lg.startswith("gene"):
     tokens = lg.strip().split('\t')
     if len(tokens) < 3:
@@ -70,10 +86,12 @@ while lg and not lg.startswith("gene"):
     coords = (int(tokens[1]), int(tokens[2]))
     if tokens[0] == "transcript":
         transcript_num += 1
-        drawer.draw_transcript(coords, transcript_num)
-        drawer.label_alignment(coords, transcript_num, tokens[-1])
+        transcript_id = tokens[-1]
+        if len(gene2color) > 0:
+            current_color = 0 if transcript_id not in gene2color else gene2color[transcript_id]
+        drawer.draw_transcript(coords, transcript_num, transcript_id)
     elif tokens[0] == "CDS":
-        drawer.draw_exon(coords, transcript_num)        
+        drawer.draw_exon(coords, transcript_num, current_color)        
     elif tokens[0] == "start_codon":
         drawer.draw_start_codon(coords, transcript_num, -1)
         drawer.draw_start_codon(coords)                
@@ -85,6 +103,7 @@ while lg and not lg.startswith("gene"):
 lc = contig_coord_file.readline()
 contig_num = 0
 cov = 1
+current_color = 1
 while lc and not lc.startswith("gene"):
     tokens = lc.strip().split('\t')
     if len(tokens) < 3:
@@ -94,10 +113,12 @@ while lc and not lc.startswith("gene"):
     if tokens[0] == "contig":
         contig_num += 1
         cov = int(tokens[3])
-        drawer.draw_contig(coords, contig_num)
-        drawer.label_alignment(coords, contig_num, tokens[-1])
+        contig_id = tokens[-1]
+        if len(contigs2genes) > 0:
+            current_color = 0 if contig_id not in contigs2genes else gene2color[contigs2genes[contig_id]]
+        drawer.draw_contig(coords, contig_num, contig_id.split("_cov")[0])
     elif tokens[0] == "block":
-        drawer.draw_block(coords, contig_num, cov)        
+        drawer.draw_block(coords, contig_num, cov, current_color)        
     elif tokens[0] == "start_codon":
         if contig_num == 0:
             drawer.draw_start_codon(coords)                
