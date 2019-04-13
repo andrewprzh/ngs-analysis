@@ -16,14 +16,10 @@ head(countData)
 samples = names(countData)
 
 #use this only for taking CC and OC taking subsamples
-
 oc_samples <- samples[startsWith(samples, "OC")]
-gs_samples <- samples[startsWith(samples, "GS")]
-yl_samples <- samples[startsWith(samples, "YL")]
-cc_samples <- samples[startsWith(samples, "CC")]
-sub_samples <- c(gs_samples, yl_samples, cc_samples, oc_samples)
+c_samples <- samples[startsWith(samples, "CC")]
+sub_samples <- c(cc_samples, oc_samples)
 countData <- countData[, sub_samples]
-
 
 head(countData)
 samples = names(countData)
@@ -57,75 +53,63 @@ total_conditions <- length(unique(condition))
 fit <- glmQLFit(dgList, designMat)
 qlf <- glmQLFTest(fit, coef=2:total_conditions)
 
+
 #OR
 #fit2 <- glmFit(dgList, designMat)
 #lrt <- glmLRT(fit2, coef=2:total_conditions)
 
-# === Check plots ===
-plot_adj_pvalue_cutoff <- 0.01 #~ same as FDR
-plot_lfc_cutoff <- 2
+# === Choosing DE genes 1 TO 1===
+res1vs2 <- glmLRT(fit, coef=2)
+res2vs3 <- glmLRT(fit, contrast=c(0,-1,1,0,0,0,0))
+res3vs4 <- glmLRT(fit, contrast=c(0,0,-1,1,0,0,0))
+res4vs5 <- glmLRT(fit, contrast=c(0,0,0,-1,1,0,0))
+res5vs6 <- glmLRT(fit, contrast=c(0,0,0,0,-1,1,0))
+res6vs7 <- glmLRT(fit, contrast=c(0,0,0,0,0,-1,1))
+all_res <- c(res1vs2, res2vs3, res3vs4, res4vs5, res5vs6, res6vs7)
 
-simpleTable <- NULL
-log_fc_cols <- which(substr(colnames(qlf$table), 1, 5) == "logFC")
-for (i in 1:nrow(qlf$table)) {
-  lfcs <- qlf$table[i, log_fc_cols]
-  lfc <- max(0, max(lfcs)) - min(0, min(lfcs))
-  simpleTable <- rbind(simpleTable,c(lfc, qlf$table[i,]$PValue, qlf$table[i,]$logCPM))  
-}
-row.names(simpleTable) <- row.names(qlf$table)
-colnames(simpleTable) <- c("LFC", "pvalue", "logCPM")
-simpleTable <- as.matrix(simpleTable)
-summary(simpleTable)
+deGenes1to1 <- NULL
 
-#plot volcano
-plot(simpleTable[,"LFC"], -log10(simpleTable[,"pvalue"]),
-     xlim=c(0, 25), ylim=c(0, 25),
-     xlab="log2 fold change", ylab="-log10 p-value",
-     type="n")
-# then add the points
-sel <- which(simpleTable[,"LFC"] <= plot_lfc_cutoff | simpleTable[,"pvalue"] >= plot_adj_pvalue_cutoff) 
-points(simpleTable[sel,"LFC"], -log10(simpleTable[sel,"pvalue"]),col="black")
-sel <- which(simpleTable[,"LFC"] > plot_lfc_cutoff & simpleTable[,"pvalue"] < plot_adj_pvalue_cutoff) 
-points(simpleTable[sel,"LFC"], -log10(simpleTable[sel,"pvalue"]),col="red")
-
-#plot smear
-plot(simpleTable[,"logCPM"], simpleTable[,"LFC"],
-     xlim=c(-10, 10), ylim=c(0, 15),
-     xlab="logCPM", ylab="log2 fold change",
-     type="n")
-# then add the points
-sel <- which(simpleTable[,"pvalue"] >= plot_adj_pvalue_cutoff) 
-points(simpleTable[sel,"logCPM"], simpleTable[sel,"LFC"],col="black")
-sel <- which(simpleTable[,"pvalue"] < plot_adj_pvalue_cutoff)
-points(simpleTable[sel,"logCPM"], simpleTable[sel,"LFC"],col="red")
-
-# === Choosing DE genes ===
 adj_pvalue_cutoff <- 0.01 #~ same as FDR
 lfc_cutoff <- 2
 
-sigTable <- topTags(qlf, p.value = adj_pvalue_cutoff, n = length(row.names(qlf$table)))
-sigTable <- sigTable$table
+for (res in list(res1vs2, res2vs3, res3vs4, res4vs5, res5vs6, res6vs7)) {
+  sigTable <- topTags(res, p.value = adj_pvalue_cutoff,  n = length(row.names(res$table)))
+  sigTable <- as.data.frame(sigTable$table)
+  sigTable <- sigTable[abs(sigTable$logFC) > lfc_cutoff, ]
 
-deTable <- NULL
-log_fc_cols <- which(substr(colnames(sigTable), 1, 5) == "logFC")
-for (i in 1:nrow(sigTable)) {
-  lfcs <- sigTable[i, log_fc_cols]
-  lfc <- max(0, max(lfcs)) - min(0, min(lfcs))
-  if (lfc > lfc_cutoff) {
-    deTable <- rbind(deTable, sigTable[i,])  
-  }
+  summary(sigTable$FDR)
+  summary(sigTable$PValue)
+  summary(abs(sigTable$logFC))
+  
+  deGenes <-sigTable[, c("genes","FDR")]
+  deGenes1to1 <- rbind(deGenes1to1, deGenes)
+  print(length(deGenes[,1]))
 }
 
-summary(deTable$FDR)
-summary(deTable$PValue)
+length(deGenes1to1[,1])
+unique_genes <- unique(deGenes1to1$genes)
+for (g in unique_genes) {
+  sub_genes <- subset(deGenes1to1, deGenes1to1$genes == toString(g))
+  if (length(sub_genes[,2]) > 1) {
+    fdr <- min(sub_genes[,2])
+    for (i in row.names(sub_genes)) {
+      deGenes1to1[i,2] <- fdr
+    }
+  }
+}
+deGenes1to1 <- deGenes1to1[unique_genes,]
+length(deGenes1to1[,1])
 
-deGenes <- row.names(deTable)
-length(deGenes)
 
 #output DE genes
 #write.table(deTable, file="output/DE_cap_genes_data.tsv", quote=FALSE, sep='\t')
-write.table(deGenes, file="output/DE_genes.list.txt", quote=FALSE, sep='\t', row.names = FALSE)
+write.table(deGenes1to1$genes, file="output_1to1/DE_genes_1to1.list.txt", quote=FALSE, sep='\t', row.names = FALSE)
 
+all_DE_genes <- row.names(deGenes1to1)
+top_1to1 <- deGenes1to1[order(deGenes1to1$FDR),]
+topN <- 100
+top_1to1 <- top_1to1[c(1:topN),]
+top_DE_genes <- top_1to1$genes
 
 # === HEAT MAP ===
 
@@ -163,11 +147,9 @@ for (c in colnames(normalized_counts)) {
   normalized_counts[,c] <- normalized_counts[,c] - norm_fact[c]
 }
 
-#select DE genes -- select a way
+#select DE genes
 #de_normalized_counts <- subset(normalized_counts, startsWith(row.names(normalized_counts), "novel"))
-#mod_genes <-read.table("input/new_ann/updated_genes.txt", sep="\t", row.names = NULL, header = FALSE)
-#de_normalized_counts <- subset(normalized_counts, row.names(normalized_counts) %in% mod_genes[,1])
-de_normalized_counts <- subset(normalized_counts, row.names(normalized_counts) %in% deGenes)
+de_normalized_counts <- subset(normalized_counts, row.names(normalized_counts) %in% all_DE_genes)
 
 vals = as.matrix(de_normalized_counts)
 
@@ -181,7 +163,7 @@ vals = jitter(vals, factor = 1, amount=0.00001)
 score = NULL
 for (i in 1:nrow(vals)) {
   row=vals[i,]
-  zscore=(row-mean(row)) #/sd(row)
+  zscore=(row-mean(row)) #/ sd(row)
   score =rbind(score,zscore)
 }
 zscore=score
@@ -192,13 +174,19 @@ mat = as.matrix(zscore)
 
 #nice sample names
 
-clust_map <- aheatmap(mat, Colv = NA, scale = "none")
+clust_map <- aheatmap(mat, Colv = NA, scale="none")
 sorted_mat <- mat[clust_map$rowInd,]
 sorted_mat <- merge_matrix(sorted_mat)
 
 #colnames(mat) <- sapply(strsplit(colnames(mat), "_"), function(x) x[1])
 
 #color scheme
+top_colors <- 50
+mid_colors <- 50
+top_stop <- 5
+low_stop <- - top_stop
+bottom_colors <- max(1, top_colors * abs((min(sorted_mat) - low_stop)/(max(sorted_mat) - top_stop)))
+
 breaks_mid = seq(low_stop,top_stop,length.out=2 * mid_colors)
 breaks_top = seq(top_stop,max(sorted_mat),length.out=top_colors)
 breaks_low = seq(min(sorted_mat),low_stop,length.out=bottom_colors)
@@ -208,31 +196,13 @@ gradient_low = colorpanel( sum( breaks_low[-1]<=0 ), "#000080", "blue" )
 gradient_top = colorpanel( sum( breaks_mid[-1]>0 ), "red", "#800000" )
 h_colors = c(gradient_low,gradient_mid_low,gradient_mid_top,gradient_top)
 
-
 #colors = colorRampPalette(c("blue","white","red"),space="rgb")(256)
 aheatmap(sorted_mat, color = h_colors, labCol = colnames(sorted_mat), Colv=NA, labRow = NA, 
-         legend=TRUE, fontsize = 7, scale="none", filename = "TPM/all_heatmap.pdf")
+         legend=TRUE, fontsize = 6, scale="none", filename = "TPM//cap_heatmap.pdf")
 dev.off()
 
 
-
 #=== Supplementary functions for heatmaps ===
-frequent_terms <- function(descr, freq = 10) {
-  res <- NULL
-  uni_descr <- sapply(unique(descr[,2]), function(x) which(descr[,2] == x))
-  
-  for (i in 1:length(uni_descr)) {
-    index_list <- uni_descr[[i]]
-    if (length(index_list) > freq) {
-      for (j in 1:length(index_list)) {
-        res <- rbind(res, descr[index_list[[j]],])
-      }
-    }
-  }
-  res
-}
-
-
 side_colors <- c("#A52A2A", "#D2691E", "#1122F5", "#FFFF00", "#FFE4C4", "#3CB371", "#A9A9A9", "#4169E1", "#008B8B", "#6B8E23", "#F00FF0", "#FF4500",
              "#11FF50", "#333333", "#7FFFD4", "#ADFF2F", "#FFA500", "#9F1AF0", "#000080?", "#FFE4B5", "#DAA520", "#F4A460", "#BDB76B", "#DB7093",
              "#7FFF00", "#9932CC", "#B8860B", "red", "#006400", "#483D8B", "#FA8072", "#C0C0C0", "#D3D3D3", "#40E0D0", "#F08080", "#FAF0E6", "#DDA0DD",
@@ -261,16 +231,25 @@ gcolors <- function(group_colors, uni, colors) {
 
 # ================= ANNOTATION HEATMAPS  =========================
 
-description <-read.table("input/new_ann/terpenes_for_heatmap_new.genes.txt", sep="\t", row.names = NULL, header = FALSE)
-description <-read.table("input/new_ann/phenilpropanoids_for_heatmap_new.genes.txt", sep="\t", row.names = NULL, header = FALSE)
-description <-read.table("input/new_ann/terpenes.genes.short.txt", sep="\t", row.names = NULL, header = FALSE)
-description <-read.table("input/new_ann/phenilpropanoids.genes.short.txt", sep="\t", row.names = NULL, header = FALSE)
+description <-read.table("input/new_ann/TF_blast_list.txt", sep="\t", row.names = NULL, header = TRUE)
+#description <-read.table("input/new_ann/flowering_blast_list.txt", sep="\t", row.names = NULL, header = TRUE)
+description <- description[,c("SeqName", "Description")]
 colnames(description) <- c("gene_id", "description")
 
+selected_genes <- subset(deGenes1to1, deGenes1to1$genes %in% description$gene_id)
+top_selected <- selected_genes[order(selected_genes$FDR),]
+topN <- 100
+#topN <- length(top_selected$genes)
+top_selected <- top_selected[c(1:topN),]
+top_selected_genes <- top_selected$genes
+
 row.names(description) <- description$gene_id
+description <- description[top_selected_genes,]
+head(description)
+length(description[,1])
 length(unique(description$description))
 #description <- frequent_terms(description, 30)
-length(unique(description$description))
+#length(unique(description$description))
 
 sub_mat <- subset(mat, rownames(mat) %in% description$gene_id)
 clust_map <- aheatmap(sub_mat, Colv = NA, scale = "none")
@@ -299,8 +278,13 @@ length(unique(genes_term))
 annotation = data.frame(Descritpion = factor(genes_term))
 ann_colors = list(Descritpion = side_colors)
 
-
 #color scheme
+top_colors <- 50
+mid_colors <- 50
+top_stop <- 5
+low_stop <- - top_stop
+bottom_colors <- max(1, top_colors * abs((min(sorted_mat) - low_stop)/(max(sorted_mat) - top_stop)))
+
 breaks_mid = seq(low_stop,top_stop,length.out=2 * mid_colors)
 breaks_top = seq(top_stop,max(sorted_mat),length.out=top_colors)
 breaks_low = seq(min(sorted_mat),low_stop,length.out=bottom_colors)
@@ -310,10 +294,10 @@ gradient_low = colorpanel( sum( breaks_low[-1]<=0 ), "#000080", "blue" )
 gradient_top = colorpanel( sum( breaks_mid[-1]>0 ), "red", "#800000" )
 h_colors = c(gradient_low,gradient_mid_low,gradient_mid_top,gradient_top)
 
-
-aheatmap(new_mat, color = h_colors, annRow = annotation, annColors = ann_colors, labRow = row.names(new_mat), labCol = colnames(new_mat),
-         Colv=NA, Rowv = NA, legend=TRUE, border_color = "white", cellwidth = 15, cellheight = 8, fontsize = 8, scale="none", 
-         filename = "TPM/phenilpropanoids_all.pdf")
+aheatmap(new_mat, color = h_colors, annRow = annotation, annColors = ann_colors, 
+         labRow = row.names(new_mat), labCol = colnames(new_mat),
+         Colv=NA, Rowv = NA, legend=TRUE, fontsize = 7, scale="none",
+         filename = "TPM/TF.top100.pdf")
 dev.off()
 
 
