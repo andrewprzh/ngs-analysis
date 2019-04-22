@@ -15,19 +15,6 @@ countData = read.table("input/gene_count_matrix.csv", header=TRUE, sep=",", row.
 head(countData)
 samples = names(countData)
 
-#use this only for taking CC and OC taking subsamples
-
-oc_samples <- samples[startsWith(samples, "OC")]
-gs_samples <- samples[startsWith(samples, "GS")]
-yl_samples <- samples[startsWith(samples, "YL")]
-cc_samples <- samples[startsWith(samples, "CC")]
-sub_samples <- c(gs_samples, yl_samples, cc_samples, oc_samples)
-countData <- countData[, sub_samples]
-
-
-head(countData)
-samples = names(countData)
-
 #samples grouping
 samplesData = read.table("input/pheno_data.tsv", header=TRUE, sep="\t", row.names=1 )
 head(samplesData)
@@ -146,6 +133,32 @@ merge_matrix <- function(m) {
   newm
 }
 
+get_color_gradient <- function(m) {
+  #color scheme
+  def_stop <- 5.0
+  mmax <- abs(max(m))
+  mmin <- abs(min(m))
+  absmax <- max(15.0, mmax)
+  absmin <- max(15.0, mmin)
+  color_resolution <- 0.1
+
+  low_gradient <- colorpanel( (absmin - def_stop) / color_resolution , "#000080", "blue" )
+  mid_low_gradient <- colorpanel( def_stop / color_resolution, "blue", "white" )
+  #mid_low_gradient <- mid_low_gradient[2:length(mid_low_gradient)]
+  mid_top_gradient <- colorpanel( def_stop / color_resolution, "white", "red" )
+  #mid_top_gradient <- mid_top_gradient[2:length(mid_top_gradient)]
+  top_gradient <- colorpanel( (absmax - def_stop) / color_resolution, "red", "#800000" )
+  #top_gradient <- top_gradient[2:length(top_gradient)]
+  
+  full_gradient <- c(low_gradient, mid_low_gradient, mid_top_gradient, top_gradient)
+  
+  center_coord <- absmin / color_resolution
+  lower_bound <- center_coord - (mmin / color_resolution)
+  upper_bound <- center_coord + (mmax / color_resolution)
+ 
+  full_gradient[lower_bound:upper_bound]
+}
+
 #normalized counts
 #normalized_counts <- cpm(dgList, normalized.lib.sizes=TRUE, log = TRUE)
 
@@ -168,9 +181,20 @@ for (c in colnames(normalized_counts)) {
 #mod_genes <-read.table("input/new_ann/updated_genes.txt", sep="\t", row.names = NULL, header = FALSE)
 #de_normalized_counts <- subset(normalized_counts, row.names(normalized_counts) %in% mod_genes[,1])
 de_normalized_counts <- subset(normalized_counts, row.names(normalized_counts) %in% deGenes)
+de_normalized_counts <- normalized_counts
 
-vals = as.matrix(de_normalized_counts)
+#use this only for taking CC and OC taking subsamples
+oc_samples <- samples[startsWith(samples, "OC")]
+gs_samples <- samples[startsWith(samples, "GS")]
+yl_samples <- samples[startsWith(samples, "YL")]
+cc_samples <- samples[startsWith(samples, "CC")]
+sub_samples <- c(gs_samples, yl_samples, cc_samples, oc_samples)
+de_normalized_counts <- de_normalized_counts[, sub_samples]
+head(de_normalized_counts)
 
+merged_counts <- merge_matrix(de_normalized_counts)
+head(merged_counts)
+vals = as.matrix(merged_counts)
 #heatmap
 # Adds a little noise to each element
 # To avoid the clusteing function failing on zero
@@ -180,40 +204,31 @@ vals = jitter(vals, factor = 1, amount=0.00001)
 # Calculate zscore
 score = NULL
 for (i in 1:nrow(vals)) {
-  row=vals[i,]
-  zscore=(row-mean(row)) #/sd(row)
-  score =rbind(score,zscore)
+  row=vals[i, ]
+  zscore = (row - mean(row)) #/sd(row)
+  score = rbind(score, zscore)
 }
-zscore=score
-row.names(zscore) = row.names(de_normalized_counts)
+row.names(score) = row.names(merged_counts)
 
 # Generate heatmap
-mat = as.matrix(zscore)
+mat = as.matrix(score)
+head(mat)
+sum(mat[1,])
 
-#nice sample names
-
-clust_map <- aheatmap(mat, Colv = NA, scale = "none")
-sorted_mat <- mat[clust_map$rowInd,]
-sorted_mat <- merge_matrix(sorted_mat)
-
-#colnames(mat) <- sapply(strsplit(colnames(mat), "_"), function(x) x[1])
+draw_tree <- TRUE #NA
+sorted_mat <- mat
+if (is.na(draw_tree)) {
+  clust_map <- aheatmap(mat, Colv = NA, scale = "none")
+  sorted_mat <- mat[clust_map$rowInd,]
+}
+sum(sorted_mat[3,])
 
 #color scheme
-breaks_mid = seq(low_stop,top_stop,length.out=2 * mid_colors)
-breaks_top = seq(top_stop,max(sorted_mat),length.out=top_colors)
-breaks_low = seq(min(sorted_mat),low_stop,length.out=bottom_colors)
-gradient_mid_low = colorpanel( sum( breaks_mid[-1]<=0 ), "blue", "white" )
-gradient_mid_top = colorpanel( sum( breaks_mid[-1]>0 ), "white", "red" )
-gradient_low = colorpanel( sum( breaks_low[-1]<=0 ), "#000080", "blue" )
-gradient_top = colorpanel( sum( breaks_mid[-1]>0 ), "red", "#800000" )
-h_colors = c(gradient_low,gradient_mid_low,gradient_mid_top,gradient_top)
-
+h_colors <- get_color_gradient(sorted_mat)
 
 #colors = colorRampPalette(c("blue","white","red"),space="rgb")(256)
-aheatmap(sorted_mat, color = h_colors, labCol = colnames(sorted_mat), Colv=NA, labRow = NA, 
-         legend=TRUE, fontsize = 7, scale="none", filename = "TPM/all_heatmap.pdf")
-dev.off()
-
+aheatmap(sorted_mat, color = h_colors, labCol = colnames(sorted_mat), Colv=NA, labRow = NA, Rowv = draw_tree,
+         legend=TRUE, fontsize = 7, scale="none", filename = "TPM/modified_genes_heatmap.pdf")
 
 
 #=== Supplementary functions for heatmaps ===
@@ -265,8 +280,8 @@ description <-read.table("input/new_ann/terpenes_for_heatmap_new.genes.txt", sep
 description <-read.table("input/new_ann/phenilpropanoids_for_heatmap_new.genes.txt", sep="\t", row.names = NULL, header = FALSE)
 description <-read.table("input/new_ann/terpenes.genes.short.txt", sep="\t", row.names = NULL, header = FALSE)
 description <-read.table("input/new_ann/phenilpropanoids.genes.short.txt", sep="\t", row.names = NULL, header = FALSE)
-colnames(description) <- c("gene_id", "description")
 
+colnames(description) <- c("gene_id", "description")
 row.names(description) <- description$gene_id
 length(unique(description$description))
 #description <- frequent_terms(description, 30)
@@ -292,30 +307,16 @@ for (i in 1:length(sorted_descr[,1])) {
 row.names(new_mat) <- genes
 length(sorted_descr[,1])
 length(new_mat[,1])
-
-new_mat <- merge_matrix(new_mat)
 length(unique(genes_term))
 
-annotation = data.frame(Descritpion = factor(genes_term))
-ann_colors = list(Descritpion = side_colors)
+annotation = data.frame(Description = factor(genes_term))
+ann_colors = list(Description = side_colors)
 
-
-#color scheme
-breaks_mid = seq(low_stop,top_stop,length.out=2 * mid_colors)
-breaks_top = seq(top_stop,max(sorted_mat),length.out=top_colors)
-breaks_low = seq(min(sorted_mat),low_stop,length.out=bottom_colors)
-gradient_mid_low = colorpanel( sum( breaks_mid[-1]<=0 ), "blue", "white" )
-gradient_mid_top = colorpanel( sum( breaks_mid[-1]>0 ), "white", "red" )
-gradient_low = colorpanel( sum( breaks_low[-1]<=0 ), "#000080", "blue" )
-gradient_top = colorpanel( sum( breaks_mid[-1]>0 ), "red", "#800000" )
-h_colors = c(gradient_low,gradient_mid_low,gradient_mid_top,gradient_top)
-
+h_colors <- get_color_gradient(new_mat)
 
 aheatmap(new_mat, color = h_colors, annRow = annotation, annColors = ann_colors, labRow = row.names(new_mat), labCol = colnames(new_mat),
          Colv=NA, Rowv = NA, legend=TRUE, border_color = "white", cellwidth = 15, cellheight = 8, fontsize = 8, scale="none", 
-         filename = "TPM/phenilpropanoids_all.pdf")
-dev.off()
-
+         filename = "updated_description_out/phenilpropanoids_selected.pdf")
 
 # ================= GO HEATMAPS WITHOUT DESCTIPTION  =========================
 

@@ -12,9 +12,9 @@ library(pheatmap)
 theme_set(theme_bw())
 
 #read data
-countData = read.table("gene_count_matrix.csv", header=TRUE, sep=",", row.names=1 )
+countData = read.table("input/gene_count_matrix.csv", header=TRUE, sep=",", row.names=1 )
 samples = names(countData)
-samplesData = read.table("pheno_data.tsv", header=TRUE, sep="\t", row.names=1 )
+samplesData = read.table("input/pheno_data.tsv", header=TRUE, sep="\t", row.names=1 )
 head(samplesData)
 
 # Build the dataframe from the conditions
@@ -125,6 +125,7 @@ row.names(zscore) = row.names(gene)
 
 # Generate new heatmap
 mat = as.matrix(zscore)
+aheatmap(mat, Colv = NA)
 
 plot(hclust(logDist),labels=colnames(logNormCounts),main=" log transformed read counts distance : Pearson correlation ")
 colors = colorRampPalette(c("yellow","black","red"),space="rgb")(256)
