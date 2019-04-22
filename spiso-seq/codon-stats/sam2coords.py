@@ -50,7 +50,14 @@ class Gene:
         for c in covered_stop_codons:
             contig.append(Feature("stop_" + str(c[0]), "stop_codon", strand, c))
 
-        self.contigs_info.append((covered_start_codons[0][0], covered_stop_codons[0][0], blocks[0][0], blocks[-1][1], contig_id))
+        cov_start = -1
+        if len(covered_start_codons) > 0:
+            cov_start = covered_start_codons[0][0]
+        cov_stop = -1
+        if len(covered_stop_codons) > 0:
+            cov_stop = covered_stop_codons[0][0]
+            
+        self.contigs_info.append((cov_start, cov_stop, blocks[0][0], blocks[-1][1], contig_id))
 
 
     def to_string(self):
@@ -137,8 +144,8 @@ def convert_sam(samfile_in, codon_info, barcode_map):
             features.init_gene(gene_feature, chr_name, start_codons, stop_codons)
 
             covered_start_codons, covered_stop_codons = codon_info.chr_dict[chr_name].find_covered_codons(gene_index, blocks)
-            if len(covered_start_codons) > 0 and len(covered_stop_codons) > 0:
-                features.add_contig(gene_id, r, covered_start_codons, covered_stop_codons, barcode_count)
+            #if len(covered_start_codons) > 0 and len(covered_stop_codons) > 0:
+            features.add_contig(gene_id, r, covered_start_codons, covered_stop_codons, barcode_count)
 
     return features
 
