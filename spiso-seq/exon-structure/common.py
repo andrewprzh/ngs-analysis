@@ -104,9 +104,24 @@ def overlaps(range1, range2):
 def left_of(range1, range2):
     return range1[1] < range2[0]
 
+def equal_ranges(range1, range2):
+    return abs(range1[0] - range2[0]) <= 1 and abs(range1[1] - range2[1]) <= 1 
+
+def covers_end(bigger_range, smaller_range):
+    return bigger_range[1] <= smaller_range[1] and bigger_range[0] <= smaller_range[0]
+
+def covers_start(bigger_range, smaller_range):
+    return bigger_range[0] >= smaller_range[0] and bigger_range[1] >= smaller_range[1]
 
 def contains(bigger_range, smaller_range):
     return bigger_range[1] >= smaller_range[1] and bigger_range[0] <= smaller_range[0]
+
+
+def overlaps_to_left(bigger_range, smaller_range):
+    return smaller_range[1] >= bigger_range[0] and smaller_range[1] <= bigger_range[1]
+
+def overlaps_to_right(bigger_range, smaller_range):
+    return smaller_range[0] >= bigger_range[0] and smaller_range[0] <= bigger_range[1]
 
 def hamming(l1, l2):
     if len(l1) != len(l2):
@@ -130,7 +145,8 @@ def diff_only_present(l1, l2):
             d += 1
     return d
 
-
+def sign(i):
+    return 0 if i == 0 else (-1 if i < 0 else 1)
 
 class BarcodeStats:
     contig_alignment_count = 0
