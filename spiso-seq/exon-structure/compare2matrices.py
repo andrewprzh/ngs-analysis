@@ -22,10 +22,9 @@ print("Total barcodes in  " + m1 + " : " + str(len(d1)))
 print("Total barcodes in  " + m2 + " : " + str(len(d2)))
 
 common = []
-for i in d1.keys():
-    if i in d2.keys():
+for i in d2.keys():
+    if i in d1.keys():
         common.append(i)
-
 print("Common: ", len(common))
 
 equal = []

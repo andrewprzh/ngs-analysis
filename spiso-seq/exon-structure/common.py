@@ -145,6 +145,19 @@ def diff_only_present(l1, l2):
             d += 1
     return d
 
+
+def count_diff(cov_profile, sign_profile):
+    if len(cov_profile) != len(sign_profile):
+        return -1
+    d = 0
+    for i in range(len(sign_profile)):
+        if cov_profile[i] == 0 or sign_profile[i] == 0:
+            continue
+        if cov_profile[i] * sign_profile[i] < 0:
+            d += abs(cov_profile[i])
+    return d
+
+
 def sign(i):
     return 0 if i == 0 else (-1 if i < 0 else 1)
 

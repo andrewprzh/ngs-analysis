@@ -5,13 +5,25 @@ import pysam
 from common import *
 
 
+def print_ints(l):
+    print("\t".join(map(str,l)))
+
+
+def list_by_indices(indices, l):
+    sublist = []
+    for i in indices:
+        sublist.append(l[i])
+    return sublist
+
 class FeatureVector:
     profile = []
+    reads = 0
     strategy = ""
     strategies = {"exact" : equal_ranges, "end" : overlaps_to_right, "start" : overlaps_to_left }
     
     def __init__(self, num, strategy = "start"):
         self.profile = [0 for i in range(0, num)]  
+        self.reads = 0
         self.strategy = strategy    
 
     def add_from_blocks(self, read_features, known_features): 
@@ -49,6 +61,7 @@ class FeatureVector:
                
         #if self.strategy == "exact": 
         #    features_present = self.fill_gaps(features_present)
+        self.reads += 1
         for i in range(0, len(self.profile)):
             self.profile[i] += features_present[i]
 
@@ -183,18 +196,17 @@ class GeneBarcodeInfo:
             self.barcodes[barcode_id] = BacrodeInfo(barcode_id, len(self.junctions), len(self.five_prime_utrs), len(self.three_prime_utrs), self.gene_db.strand)
         self.barcodes[barcode_id].add_read(alignment, self.junctions, self.five_prime_utrs, self.three_prime_utrs)
 
-    def assign_isoform(self, barcode_id):
+
+
+    def assign_isoform(self, barcode_id, coverage_cutoff = 10, use_only_unique = False):
         barcode_info = self.barcodes[barcode_id]
-        print(barcode_info.junctions_counts.profile)
-        cov = sum(map(abs, barcode_info.junctions_counts.profile))
-        if cov < len(barcode_info.junctions_counts.profile):
-            print("Low covered")
-            return ""
+        if barcode_info.junctions_counts.reads < coverage_cutoff:
+            return ""            
 
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
 
         f = open("matrix.txt", "a+")
-        matrix_exons = [7, 8, 10, 11, 12, 20]
+        matrix_exons = [8, 10, 18]#[7, 8, 10, 11, 12, 20]
 
         print(bacrode_jprofile)
         matched_isoforms = set()
@@ -207,22 +219,59 @@ class GeneBarcodeInfo:
 
         if len(matched_isoforms) == 0:
             print("Contraditory profile")
+            #for r in barcode_info.junctions_counts.reads:
+            #    print_ints(r[1])
+            #print_ints(barcode_info.junctions_counts.profile)
+
+            min_score = 1000
+            best_match = []
+            best_isoform = None
+            for t in self.isoform_profiles.keys():
+                isoform_jprofile = self.isoform_profiles[t]
+
+                score = count_diff(barcode_info.junctions_counts.profile, isoform_jprofile)
+                if score < min_score:
+                    min_score = score
+                    best_isoform = t
+                    best_match = isoform_jprofile
+            if best_isoform is not None:
+                print("Close profile with diff " + str(min_score))
+                print_ints(best_match)
+                counts = filter(lambda x : x != 0, map(abs, barcode_info.junctions_counts.profile))
+                if min_score <  sum(counts)/len(counts):
+                    print("Matched")
+                    t = best_isoform
+                    exon_profile = self.isoform_exon_profiles[t]
+                    sublist = list_by_indices(matrix_exons, exon_profile)
+                    #f.write(barcode_id + "\t" + "\t".join(map(str, sublist)) + "\n")
+                     
         elif len(matched_isoforms) > 1:
             print("Ambigous match")
+            t = list(matched_isoforms)[0]
+            exon_profile = self.isoform_exon_profiles[t]
+            sublist_0 = list_by_indices(matrix_exons, exon_profile)
+            all_equal = True
+            for t in matched_isoforms:
+                exon_profile = self.isoform_exon_profiles[t]
+                sublist = list_by_indices(matrix_exons, exon_profile)
+                if sublist_0 != sublist:
+                    all_equal = False
+                    break
+
+#            if all_equal:
+                #f.write(barcode_id + "\t" + "\t".join(map(str, sublist_0)) + "\n")
         else:
             print("Unique match")
             t = list(matched_isoforms)[0]
             exon_profile = self.isoform_exon_profiles[t]
-            sublist = []
-            for i in matrix_exons:
-                sublist.append(exon_profile[i])
+            sublist = list_by_indices(matrix_exons, exon_profile)
             f.write(barcode_id + "\t" + "\t".join(map(str, sublist)) + "\n")
 
         f.close()
     
 
 def test_BIN1(db, samfile_in):
-    gene_db = db["ENSG00000136717"]
+    gene_db = db["ENSG00000186868"]
     gene_info = GeneBarcodeInfo(gene_db, db)
     print(gene_db.seqid, gene_db.start, gene_db.end, gene_db.strand)
     counter = 0
@@ -250,6 +299,7 @@ def test_BIN1(db, samfile_in):
 #        print(gene_info.barcodes[b].junctions_counts.profile)
 #        print(gene_info.barcodes[b].five_utrs_counts.profile)
 #        print(gene_info.barcodes[b].three_utrs_counts.profile)
+    sys.stderr.write("\nDone\n")
 
     
 def main():
