@@ -80,8 +80,15 @@ mapf.close()
 write_fasta(short_id_contigs_name, new_fasta)
 
 alignment_sam_path = os.path.join(output_dir, contigs_name)
-star_path = '/home/ebushmanova/tools/STAR-2.5.1b/bin/Linux_x86_64_static/STARlong'
-command = '{star} --runThreadN 8 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM  --outFileNamePrefix {alignment_out}'.format(star=star_path, ref_index_name=star_index, transcripts=short_id_contigs_name, alignment_out=alignment_sam_path)
+star_path = '/Bmo/prjbel/tools/STAR-2.7.0f/bin/Linux_x86_64/STARlong'
+#Simple 
+#command = '{star} --runThreadN 8 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM  --outFileNamePrefix {alignment_out}'.format(star=star_path, ref_index_name=star_index, transcripts=short_id_contigs_name, alignment_out=alignment_sam_path)
+#Hagen options
+command = '{star} --runThreadN 8 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM --outSAMattributes NH HI NM MD --outFilterMultimapScoreRange 1 \
+           --outFilterMismatchNmax 2000 --scoreGapNoncan -20 --scoreGapGCAG -4 --scoreGapATAC -8 --scoreDelOpen -1 --scoreDelBase -1 --scoreInsOpen -1 --scoreInsBase -1 \
+           --alignEndsType Local --seedSearchStartLmax 50 --seedPerReadNmax 100000 --seedPerWindowNmax 1000 --alignTranscriptsPerReadNmax 100000 --alignTranscriptsPerWindowNmax 10000 \
+           --outFileNamePrefix {alignment_out}'.format(star=star_path, ref_index_name=star_index, transcripts=short_id_contigs_name, alignment_out=alignment_sam_path)
+
 exit_code = os.system(command)
 os.system('mv ' + alignment_sam_path + 'Aligned.out.sam ' + alignment_sam_path + '.sam')
 

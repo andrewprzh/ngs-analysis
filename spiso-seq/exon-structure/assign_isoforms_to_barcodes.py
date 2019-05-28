@@ -149,8 +149,8 @@ class GeneBarcodeInfo:
                 cur_exon = e
         self.junctions = sorted(list(self.junctions))
         self.exons = sorted(list(self.exons))
-        print(self.junctions)
-        print(self.exons)
+        #print(self.junctions)
+        #print(self.exons)
 
         self.isoform_profiles = {}
         self.isoform_exon_profiles = {}
@@ -163,25 +163,29 @@ class GeneBarcodeInfo:
             for e in i_exons[t.id]:
                 pos = self.exons.index(e)
                 self.isoform_exon_profiles[t.id][pos] = 1
-            print(self.isoform_profiles[t.id])
-            print(self.isoform_exon_profiles[t.id])
+            #print(self.isoform_profiles[t.id])
+            #print(self.isoform_exon_profiles[t.id])
 
         self.five_prime_utrs = set()
         for u in self.db.children(self.gene_db, featuretype = 'five_prime_utr', order_by='start'):
             self.five_prime_utrs.add((u.start, u.end))
         self.five_prime_utrs = sorted(list(self.five_prime_utrs))
-        print(self.five_prime_utrs)
+        #print(self.five_prime_utrs)
 
         self.three_prime_utrs = set()
         for u in self.db.children(self.gene_db, featuretype = 'three_prime_utr', order_by='start'):
             self.three_prime_utrs.add((u.start, u.end))
         self.three_prime_utrs = sorted(list(self.three_prime_utrs))
-        print(self.three_prime_utrs)
+        #print(self.three_prime_utrs)
+
+
+    def get_gene_region(self):
+        return self.gene_db.seqid, self.gene_db.start, self.gene_db.end       
 
 
     def add_read(self, alignment, barcode_id):
         chr_name = alignment.reference_name.strip()
-        if chr_name !=self.gene_db.seqid:
+        if chr_name != self.gene_db.seqid:
             return
         blocks = sorted(alignment.get_blocks())
         if len(blocks) == 0:
@@ -197,85 +201,170 @@ class GeneBarcodeInfo:
         self.barcodes[barcode_id].add_read(alignment, self.junctions, self.five_prime_utrs, self.three_prime_utrs)
 
 
-
-    def assign_isoform(self, barcode_id, coverage_cutoff = 10, use_only_unique = False):
+    def assign_isoform(self, barcode_id, coverage_cutoff = 10):
         barcode_info = self.barcodes[barcode_id]
         if barcode_info.junctions_counts.reads < coverage_cutoff:
-            return ""            
+            #print("Low covered")
+            return None            
 
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
 
-        f = open("matrix.txt", "a+")
-        matrix_exons = [8, 10, 18]#[7, 8, 10, 11, 12, 20]
-
-        print(bacrode_jprofile)
+        #print(bacrode_jprofile)
         matched_isoforms = set()
         for t in self.isoform_profiles.keys():
             isoform_jprofile = self.isoform_profiles[t]
             if diff_only_present(isoform_jprofile, bacrode_jprofile) == 0:
-                print("Matched " + t)
-                print(isoform_jprofile)
+                #print("Matched " + t)
+                #print(isoform_jprofile)
                 matched_isoforms.add(t)
 
+        res = None
         if len(matched_isoforms) == 0:
-            print("Contraditory profile")
-            #for r in barcode_info.junctions_counts.reads:
-            #    print_ints(r[1])
-            #print_ints(barcode_info.junctions_counts.profile)
-
-            min_score = 1000
-            best_match = []
-            best_isoform = None
-            for t in self.isoform_profiles.keys():
-                isoform_jprofile = self.isoform_profiles[t]
-
-                score = count_diff(barcode_info.junctions_counts.profile, isoform_jprofile)
-                if score < min_score:
-                    min_score = score
-                    best_isoform = t
-                    best_match = isoform_jprofile
-            if best_isoform is not None:
-                print("Close profile with diff " + str(min_score))
-                print_ints(best_match)
-                counts = filter(lambda x : x != 0, map(abs, barcode_info.junctions_counts.profile))
-                if min_score <  sum(counts)/len(counts):
-                    print("Matched")
-                    t = best_isoform
-                    exon_profile = self.isoform_exon_profiles[t]
-                    sublist = list_by_indices(matrix_exons, exon_profile)
-                    #f.write(barcode_id + "\t" + "\t".join(map(str, sublist)) + "\n")
-                     
+            pass #print("Contraditory profile")
         elif len(matched_isoforms) > 1:
-            print("Ambigous match")
-            t = list(matched_isoforms)[0]
-            exon_profile = self.isoform_exon_profiles[t]
-            sublist_0 = list_by_indices(matrix_exons, exon_profile)
-            all_equal = True
-            for t in matched_isoforms:
-                exon_profile = self.isoform_exon_profiles[t]
-                sublist = list_by_indices(matrix_exons, exon_profile)
-                if sublist_0 != sublist:
-                    all_equal = False
-                    break
-
-#            if all_equal:
-                #f.write(barcode_id + "\t" + "\t".join(map(str, sublist_0)) + "\n")
+            pass #print("Ambigous match")
         else:
-            print("Unique match")
-            t = list(matched_isoforms)[0]
-            exon_profile = self.isoform_exon_profiles[t]
-            sublist = list_by_indices(matrix_exons, exon_profile)
-            f.write(barcode_id + "\t" + "\t".join(map(str, sublist)) + "\n")
+            #print("Unique match")
+            res = list(matched_isoforms)[0]
+        return res
 
-        f.close()
-    
 
-def test_BIN1(db, samfile_in):
-    gene_db = db["ENSG00000186868"]
+def get_barcode_map(sam_file_name):
+    barcode_map = {}
+    contigs_name, ext = os.path.splitext(sam_file_name)
+    barcode_map_file = contigs_name + "_map.txt"
+    for line in open(barcode_map_file):
+        tokens = line.strip().split("_barcodeIDs_")
+        if len(tokens) != 2:    
+            print("Wrong format, _barcodeIDs_ was not found in " + line)
+            continue
+        barcode_map[tokens[0]] = tokens[1].replace("_", "-").split(',')
+    return barcode_map
+
+#needs changing
+def get_id(query_name, is_reads_sam = True):
+    if is_reads_sam:
+        tokens = query_name.strip().split("___")
+        if len(tokens) != 2:
+            return ""
+
+        return tokens[1]
+    else:
+        return query_name.strip()
+
+
+def get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam = True):
+    samfile_in = pysam.AlignmentFile(samfile_name, "rb")
+    gene_db = db[gene_name] 
+    gene_info = GeneBarcodeInfo(gene_db, db)
+    gene_chr, gene_start, gene_end = gene_info.get_gene_region()
+
+    sys.stderr.write("Processing gene " + gene_name + "\n")
+
+    counter = 0
+    for alignment in samfile_in.fetch(gene_chr, gene_start, gene_end):
+        counter += 1
+        if counter % 10000 == 0:
+           sys.stderr.write("\r   " + str(counter) + " lines processed")
+
+        if alignment.reference_id == -1:
+            continue
+        seq_id = get_id(alignment.query_name, is_reads_sam)
+        gene_info.add_read(alignment, seq_id)
+
+    bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
+    barcodes = {}
+    for b in gene_info.barcodes.keys():
+        cutoff = 10 if is_reads_sam else 0
+        isoform = gene_info.assign_isoform(b, cutoff)
+        if isoform is not None:
+            if bc_map is None:
+                barcodes[b] = isoform
+            else:
+                for bc in bc_map[b]:
+                    barcodes[bc] = isoform
+
+    sys.stderr.write("\nDone\n")
+    return barcodes
+
+def table_to_str(d):
+    vertical_keys = set()
+    horisontal_keys = set()
+    for k in sorted(d.keys()):
+        vertical_keys.add(k[0])
+        horisontal_keys.add(k[1])
+
+    res = ""
+    for x1 in vertical_keys:
+        s = ""
+        for x2 in horisontal_keys:
+            v = d.get((x1,x2), 0)
+            s += str(v) + '\t'
+        res += s[:-1] + '\n'
+    return res
+
+
+def write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats):
+    #writing TSV with barcode -> isoform id
+    outf = open(out_tsv, "a+")
+    outf.write(gene_name + "\t" + str(len(barcodes)) + "\n")
+    for b in barcodes.keys():
+        if b != "":
+            outf.write(b + "\t" + barcodes[b] + "\n")
+    outf.close()
+
+    #writing codon stats
+    gene_db = db[gene_name]
+    transcript_codons = {}
+    for t in db.children(gene_db, featuretype='transcript', order_by='start'):
+        start_codon = -1
+        stop_codon = -1
+        for s in db.children(t, featuretype='start_codon', order_by='start'):
+            start_codon = s.start
+        for s in db.children(t, featuretype='stop_codon', order_by='start'):
+            stop_codon = s.start
+
+        if start_codon != -1 and stop_codon != -1:
+            transcript_codons[t.id] = (start_codon, stop_codon)
+
+    codon_count_table = {}
+    for b in transcript_codons:
+        codon_count_table[transcript_codons[b]] = 0
+
+    for b in barcodes.keys():
+        if barcodes[b] not in transcript_codons:
+            continue
+        codon_pair = transcript_codons[barcodes[b]]
+        codon_count_table[codon_pair] += 1
+
+    outf = open(out_codon_stats, "a+")
+    outf.write("====" + gene_name + "\n")
+    outf.write(table_to_str(codon_count_table))
+    outf.close()
+
+
+def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
+    out_tsv = outf_prefix + ".barcodes.tsv"
+    outf = open(out_tsv, "w")
+    outf.close()
+    out_codon_stats = outf_prefix + ".codon_stats.tsv"
+    outf = open(out_codon_stats, "w")
+    outf.close()
+
+    for g in db.features_of_type('gene', order_by='start'):
+        gene_name = g.id
+        barcodes = get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam)
+        write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats)
+
+
+def test_gene(db, samfile_name, out_tsv):
+    samfile_in = pysam.AlignmentFile(samfile_name, "rb")
+    #gene_db = db["ENSG00000136717"] 
+    gene_db =  db["ENSG00000186868"]
     gene_info = GeneBarcodeInfo(gene_db, db)
     print(gene_db.seqid, gene_db.start, gene_db.end, gene_db.strand)
     counter = 0
-    for alignment in samfile_in:
+    for alignment in samfile_in.fetch():
         counter += 1
         if counter % 10000 == 0:
            sys.stderr.write("\r   " + str(counter) + " lines processed")
@@ -289,16 +378,52 @@ def test_BIN1(db, samfile_in):
         barcode_id = tokens[1]
         gene_info.add_read(alignment, barcode_id)
 
-    f = open("matrix.txt", "w")
-    f.close()
+    barcodes = {}
+    for b in gene_info.barcodes.keys():
+        #print(b)
+        isoform = gene_info.assign_isoform(b)
+        if isoform is not None:
+            barcodes[b] = isoform
+
+    outf = open(out_tsv, "w")
+    for b in barcodes.keys():
+        outf.write(b + "\t" + barcodes[b] + "\n")
+    outf.close()
+
+    sys.stderr.write("\nDone\n")
+
+
+def test_contigs(db, samfile_name, out_tsv):
+    samfile_in = pysam.AlignmentFile(samfile_name, "rb")
+    #gene_db = db["ENSG00000136717"] 
+    gene_db =  db["ENSG00000186868"]
+    gene_info = GeneBarcodeInfo(gene_db, db)
+    print(gene_db.seqid, gene_db.start, gene_db.end, gene_db.strand)
     counter = 0
+    for alignment in samfile_in:
+        counter += 1
+        if counter % 10000 == 0:
+           sys.stderr.write("\r   " + str(counter) + " lines processed")
+
+        if alignment.reference_id == -1:
+            continue
+        contig_id = alignment.query_name.strip()
+        gene_info.add_read(alignment, contig_id)
+
+    bc_map = get_barcode_map(samfile_name)
+    barcodes = {}
     for b in gene_info.barcodes.keys():
         print(b)
-        gene_info.assign_isoform(b)
+        isoform = gene_info.assign_isoform(b, 0)
+        if isoform is not None:
+            for bc in bc_map[b]:
+                barcodes[bc] = isoform
 
-#        print(gene_info.barcodes[b].junctions_counts.profile)
-#        print(gene_info.barcodes[b].five_utrs_counts.profile)
-#        print(gene_info.barcodes[b].three_utrs_counts.profile)
+    outf = open(out_tsv, "w")
+    for b in barcodes.keys():
+        outf.write(b + "\t" + barcodes[b] + "\n")
+    outf.close()
+
     sys.stderr.write("\nDone\n")
 
     
@@ -307,8 +432,7 @@ def main():
         sys.stderr.write("Usage: " + sys.argv[0] + " <gene DB> <BAM/SAM file> <output.tsv>\n")
         exit(0)
     db = gffutils.FeatureDB(sys.argv[1], keep_order=True)
-    samfile_in = pysam.AlignmentFile(sys.argv[2], "rb")
-    test_BIN1(db, samfile_in)
+    process_all_genes(db, sys.argv[2], sys.argv[3])
 
 
 if __name__ == "__main__":
