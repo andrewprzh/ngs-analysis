@@ -353,6 +353,26 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
 
     for g in db.features_of_type('gene', order_by='start'):
         gene_name = g.id
+
+        #checking codons
+        gene_db = db[gene_name]
+        start_codons = set()
+        stop_codons = set()
+        for t in db.children(gene_db, featuretype='transcript', order_by='start'):
+            start_codon = -1
+            stop_codon = -1
+            for s in db.children(t, featuretype='start_codon', order_by='start'):
+                start_codon = s.start
+            for s in db.children(t, featuretype='stop_codon', order_by='start'):
+                stop_codon = s.start
+
+            if start_codon != -1 and stop_codon != -1:
+                start_codons.add(start_codon)
+                stop_codons.add(stop_codon)
+
+        if len(start_codons) <= 1 or len(stop_codons) <= 1:
+            continue
+
         barcodes = get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam)
         write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats)
 
