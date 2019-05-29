@@ -381,7 +381,7 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
     out_codon_stats = outf_prefix + ".codon_stats.tsv"
     outf = open(out_codon_stats, "w")
     outf.close()
-
+    stats = BarcodeAssignmentStats()
     for g in db.features_of_type('gene', order_by='start'):
         gene_name = g.id
 
@@ -404,11 +404,11 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
         if len(start_codons) <= 1 or len(stop_codons) <= 1:
             continue
 
-        stats = BarcodeAssignmentStats()
-        barcodes = get_gene_barcodes(db, gene_name, samfile_name, stats, is_reads_sam)
-        sys.stderr.write("\nFinished. Total stats " + stats.to_str() + "\n")
 
+        barcodes = get_gene_barcodes(db, gene_name, samfile_name, stats, is_reads_sam)
         write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats)
+
+    sys.stderr.write("\nFinished. Total stats " + stats.to_str() + "\n")
 
 
 def test_gene(db, samfile_name, out_tsv):
