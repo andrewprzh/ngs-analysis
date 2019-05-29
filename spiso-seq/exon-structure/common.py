@@ -105,7 +105,7 @@ def left_of(range1, range2):
     return range1[1] < range2[0]
 
 def equal_ranges(range1, range2):
-    return abs(range1[0] - range2[0]) <= 1 and abs(range1[1] - range2[1]) <= 1 
+    return abs(range1[0] - range2[0]) <= 2 and abs(range1[1] - range2[1]) <= 2 
 
 def covers_end(bigger_range, smaller_range):
     return bigger_range[1] <= smaller_range[1] and bigger_range[0] <= smaller_range[0]

@@ -110,6 +110,29 @@ class BacrodeInfo:
         self.three_utrs_counts.add_from_blocks(blocks, known_three_utrs)
 
 
+class BarcodeAssignmentStats:
+    low_covered = 0
+    contradictory = 0
+    ambiguous = 0
+    unique = 0
+
+    def __init__(self):
+        self.low_covered = 0
+        self.contradictory = 0
+        self.ambiguous = 0
+        self.unique = 0
+
+    def merge(self, stat):
+        self.low_covered += stat.low_covered
+        self.contradictory += stat.contradictory
+        self.ambiguous += stat.ambiguous
+        self.unique += stat.unique
+
+    def to_str(self):
+        total_bc = self.low_covered + self.contradictory + self.ambiguous + self.unique
+        return "low covered/contradictory/ambiguous/unique/total: % d / % d / % d / % d / % d" % (self.low_covered, self.contradictory, self.ambiguous, self.unique, total_bc)
+         
+
 class GeneBarcodeInfo:
     gene_db = None
     db = None
@@ -166,6 +189,9 @@ class GeneBarcodeInfo:
             #print(self.isoform_profiles[t.id])
             #print(self.isoform_exon_profiles[t.id])
 
+        #check for identical profiles
+        #for t in 
+
         self.five_prime_utrs = set()
         for u in self.db.children(self.gene_db, featuretype = 'five_prime_utr', order_by='start'):
             self.five_prime_utrs.add((u.start, u.end))
@@ -201,10 +227,10 @@ class GeneBarcodeInfo:
         self.barcodes[barcode_id].add_read(alignment, self.junctions, self.five_prime_utrs, self.three_prime_utrs)
 
 
-    def assign_isoform(self, barcode_id, coverage_cutoff = 10):
+    def assign_isoform(self, barcode_id, stat, coverage_cutoff = 10):
         barcode_info = self.barcodes[barcode_id]
         if barcode_info.junctions_counts.reads < coverage_cutoff:
-            #print("Low covered")
+            stat.low_covered += 1
             return None            
 
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
@@ -220,10 +246,13 @@ class GeneBarcodeInfo:
 
         res = None
         if len(matched_isoforms) == 0:
-            pass #print("Contraditory profile")
+            stat.contradictory += 1
+            #print("Contraditory profile")
         elif len(matched_isoforms) > 1:
-            pass #print("Ambigous match")
+            stat.ambiguous += 1
+            #print("Ambigous match")
         else:
+            stat.unique += 1
             #print("Unique match")
             res = list(matched_isoforms)[0]
         return res
@@ -253,7 +282,7 @@ def get_id(query_name, is_reads_sam = True):
         return query_name.strip()
 
 
-def get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam = True):
+def get_gene_barcodes(db, gene_name, samfile_name, total_stats, is_reads_sam = True):
     samfile_in = pysam.AlignmentFile(samfile_name, "rb")
     gene_db = db[gene_name] 
     gene_info = GeneBarcodeInfo(gene_db, db)
@@ -274,9 +303,10 @@ def get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam = True):
 
     bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
     barcodes = {}
+    stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
         cutoff = 10 if is_reads_sam else 0
-        isoform = gene_info.assign_isoform(b, cutoff)
+        isoform = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
             if bc_map is None:
                 barcodes[b] = isoform
@@ -284,7 +314,8 @@ def get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam = True):
                 for bc in bc_map[b]:
                     barcodes[bc] = isoform
 
-    sys.stderr.write("\nDone\n")
+    sys.stderr.write("\nDone. Barcodes stats " + stats.to_str() + "\n")
+    total_stats.merge(stats)
     return barcodes
 
 def table_to_str(d):
@@ -373,7 +404,10 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
         if len(start_codons) <= 1 or len(stop_codons) <= 1:
             continue
 
-        barcodes = get_gene_barcodes(db, gene_name, samfile_name, is_reads_sam)
+        stats = BarcodeAssignmentStats()
+        barcodes = get_gene_barcodes(db, gene_name, samfile_name, stats, is_reads_sam)
+        sys.stderr.write("\nFinished. Total stats " + stats.to_str() + "\n")
+
         write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats)
 
 
