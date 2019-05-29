@@ -305,7 +305,7 @@ def get_gene_barcodes(db, gene_name, samfile_name, total_stats, is_reads_sam = T
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
-        cutoff = 10 if is_reads_sam else 0
+        cutoff = 5 if is_reads_sam else 0
         isoform = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
             if bc_map is None:
