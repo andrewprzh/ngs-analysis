@@ -6,7 +6,7 @@ from common import *
 
 DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
-
+READS_CUTOFF = 10
 
 def print_ints(l):
     print("\t".join(map(str,l)))
@@ -372,7 +372,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam):
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
-        cutoff = 100 if is_reads_sam else 0
+        cutoff = READS_CUTOFF if is_reads_sam else 0
         isoform, codons = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
             if bc_map is None:
