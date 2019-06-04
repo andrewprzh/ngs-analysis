@@ -7,6 +7,7 @@ from common import *
 DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
+MIN_CODON_COUNT = 2
 
 def print_ints(l):
     print("\t".join(map(str,l)))
@@ -413,18 +414,23 @@ def write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats):
 
     #writing codon stats
     codon_count_table = {}
+    start_codons = set()
+    stop_codons = set()
     for b in barcodes.keys():
         codon_pair = barcodes[b][1]
         if codon_pair[0] is None or codon_pair[1] is None:
             continue
+        start_codons.add(codon_pair[0])
+        stop_codons.add(codon_pair[1])
         if codon_pair not in codon_count_table:
             codon_count_table[codon_pair] = 0
         codon_count_table[codon_pair] += 1
 
-    outf = open(out_codon_stats, "a+")
-    outf.write("====" + gene_name + "\n")
-    outf.write(table_to_str(codon_count_table))
-    outf.close()
+    if len(start_codons) >= MIN_CODON_COUNT and len(stop_codons) >= MIN_CODON_COUNT:
+        outf = open(out_codon_stats, "a+")
+        outf.write("====" + gene_name + "\n")
+        outf.write(table_to_str(codon_count_table))
+        outf.close()
 
 
 def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
@@ -443,18 +449,18 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
         start_codons = set()
         stop_codons = set()
         for t in db.children(gene_db, featuretype='transcript', order_by='start'):
-            start_codon = -1
-            stop_codon = -1
+            start_codon = None
+            stop_codon = None
             for s in db.children(t, featuretype='start_codon', order_by='start'):
                 start_codon = s.start
             for s in db.children(t, featuretype='stop_codon', order_by='start'):
                 stop_codon = s.start
 
-            if start_codon != -1 and stop_codon != -1:
+            if start_codon is not None and stop_codon is not None:
                 start_codons.add(start_codon)
                 stop_codons.add(stop_codon)
 
-        if len(start_codons) <= 1 or len(stop_codons) <= 1:
+        if len(start_codons) < MIN_CODON_COUNT or len(stop_codons) < MIN_CODON_COUNT:
             continue
 
         gene_db = db[gene_name] 
