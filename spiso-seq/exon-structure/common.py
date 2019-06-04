@@ -117,6 +117,9 @@ def contains(bigger_range, smaller_range):
     return bigger_range[1] >= smaller_range[1] and bigger_range[0] <= smaller_range[0]
 
 
+def contains_approx(bigger_range, smaller_range):
+    return bigger_range[1] + 2 >= smaller_range[1] and bigger_range[0] - 2 <= smaller_range[0]
+
 def overlaps_to_left(bigger_range, smaller_range):
     return smaller_range[1] >= bigger_range[0] and smaller_range[1] <= bigger_range[1]
 
