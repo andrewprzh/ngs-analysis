@@ -354,14 +354,14 @@ def get_id(query_name, is_reads_sam = True):
         return query_name.strip()
 
 
-def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam):
+def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc_map):
     samfile_in = pysam.AlignmentFile(samfile_name, "rb")
     gene_chr, gene_start, gene_end = gene_info.get_gene_region()
 
     counter = 0
     for alignment in samfile_in.fetch(gene_chr, gene_start, gene_end):
         counter += 1
-        if counter % 10000 == 0:
+        if counter % 100 == 0:
            sys.stderr.write("\r   " + str(counter) + " lines processed")
 
         if alignment.reference_id == -1:
@@ -369,7 +369,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam):
         seq_id = get_id(alignment.query_name, is_reads_sam)
         gene_info.add_read(alignment, seq_id)
 
-    bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
+    #bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
@@ -441,6 +441,8 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
     outf = open(out_codon_stats, "w")
     outf.close()
     stats = BarcodeAssignmentStats()
+    bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
+
     for g in db.features_of_type('gene', order_by='start'):
         gene_name = g.id
 
@@ -467,7 +469,7 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
         gene_info = GeneBarcodeInfo(gene_db, db)
         sys.stderr.write("Processing gene " + gene_name + "\n")
 
-        barcodes = get_gene_barcodes(db, gene_info, samfile_name, stats, is_reads_sam)
+        barcodes = get_gene_barcodes(db, gene_info, samfile_name, stats, is_reads_sam, bc_map)
         write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats)
 
     sys.stderr.write("\nFinished. Total stats " + stats.to_str() + "\n")
