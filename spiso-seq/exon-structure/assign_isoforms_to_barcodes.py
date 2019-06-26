@@ -139,7 +139,7 @@ class BarcodeAssignmentStats:
         self.unique += stat.unique
 
     def to_str(self):
-        total_bc = self.low_covered + self.contradictory + self.ambiguous + self.unique
+        total_bc = self.low_covered + self.contradictory + self.ambiguous + self.unique + self.ambiguous_assigned
         return "low covered/contradictory/ambiguous/ambiguous_assigned/unique/total: %d / % d / % d / % d / % d / % d" % \
             (self.low_covered, self.contradictory, self.ambiguous, self.ambiguous_assigned, self.unique, total_bc)
          

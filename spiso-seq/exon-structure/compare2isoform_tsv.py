@@ -10,8 +10,8 @@ with open(m1, "r") as infile:
     print("Duplicates in " + m1)
     for line in infile.readlines():
         bc = line.strip().split("\t")[0].split("-")[0]
-        if bc in d1:
-            print(bc)
+#        if bc in d1:
+#            print(bc)
         d1[bc] = line.strip().split("\t")[1]
 
 with open(m2, "r") as infile:
@@ -25,8 +25,8 @@ print("Found in " + m2 + ", but not in " + m1)
 for i in d2.keys():
     if i in d1.keys():
         common.append(i)
-    else:
-        print(i)
+#    else:
+#        print(i)
 
 equal = []
 for i in common:
