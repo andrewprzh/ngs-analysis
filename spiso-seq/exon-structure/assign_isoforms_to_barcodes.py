@@ -174,10 +174,12 @@ class BarcodeAssignmentStats:
 class ProfileStorage:
     isoform_profiles = {}
     isoform_exon_profiles = {}
+    empty = set()
 
     def __init__(self):
         self.isoform_profiles = {}
         self.isoform_exon_profiles = {}
+        self.empty = set()
          
 
 class GeneBarcodeInfo:
@@ -282,9 +284,10 @@ class GeneBarcodeInfo:
             print(profile_storage.isoform_profiles[t.id])
             print(profile_storage.isoform_exon_profiles[t.id])
 
-            if all(x == -1 for x in profile_storage.isoform_profiles):
+            if all(x == -1 for x in profile_storage.isoform_profiles[t.id]):
                 del profile_storage.isoform_profiles[t.id]
                 del profile_storage.isoform_exon_profiles[t.id]
+                profile_storage.empty.add(t.id)
 
 
     def set_codon_pairs(self):
@@ -429,10 +432,12 @@ class GeneBarcodeInfo:
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
         for t in matched_isoforms:
             matched_positions = find_matching_positions(profile_storage.isoform_profiles[t], bacrode_jprofile)
+            print(matched_positions)
+            print(profile_storage.isoform_profiles[t])
             
             all_junctions_detected = True
             for i in range(len(matched_positions)):
-                if matched_positions == 0 and profile_storage.isoform_profiles[t] != -1:
+                if matched_positions[i] == 0 and profile_storage.isoform_profiles[t][i] != -1:
                     all_junctions_detected = False
                     break
 
@@ -498,6 +503,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
                 stats.correctly_assigned += 1
             elif b in gene_isoform_ids:
                 stats.incorrectly_assigned_same_gene += 1
+                print("WRONG")
             else:
                 stats.incorrectly_assigned_other_gene += 1
                 
@@ -509,7 +515,8 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
         else:
             if b in gene_isoform_ids:
                 stats.unassigned += 1
-            else:
+                print("UNASSIGNED")
+            elif b not in gene_info.all_rna_profiles.empty:
                 stats.mismapped += 1
             
 
