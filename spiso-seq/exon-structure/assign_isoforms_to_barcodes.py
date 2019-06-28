@@ -257,8 +257,8 @@ class GeneBarcodeInfo:
             
         self.junctions = sorted(list(self.junctions))
         self.exons = sorted(list(self.exons))
-        print(self.junctions)
-        print(self.exons)
+        #print(self.junctions)
+        #print(self.exons)
 
         return i_junctions, i_exons
 
@@ -280,9 +280,9 @@ class GeneBarcodeInfo:
                 pos = self.exons.index(e)
                 profile_storage.isoform_exon_profiles[t.id][pos] = 1
 
-            print("Isoform " + t.id)
-            print(profile_storage.isoform_profiles[t.id])
-            print(profile_storage.isoform_exon_profiles[t.id])
+            #print("Isoform " + t.id)
+            #print(profile_storage.isoform_profiles[t.id])
+            #print(profile_storage.isoform_exon_profiles[t.id])
 
             if all(x == -1 for x in profile_storage.isoform_profiles[t.id]):
                 del profile_storage.isoform_profiles[t.id]
@@ -309,9 +309,9 @@ class GeneBarcodeInfo:
 
         self.set_codon_pairs()
         i_junctions, i_exons = self.get_junctions_and_exons(True)
-        print("Coding isoforms")
+        #print("Coding isoforms")
         self.set_junction_profiles(self.coding_rna_profiles, i_junctions, i_exons)
-        print("NC isoforms")
+        #print("NC isoforms")
         self.set_junction_profiles(self.all_rna_profiles, i_junctions, i_exons, True)
 
         #check for identical profiles
@@ -348,15 +348,15 @@ class GeneBarcodeInfo:
         for t in profile_storage.isoform_profiles.keys():
             isoform_jprofile = profile_storage.isoform_profiles[t]
             if diff_only_present(isoform_jprofile, bacrode_jprofile) == 0:
-                print("Matched " + t)
+                #print("Matched " + t)
                 matched_isoforms.add(t)
         return matched_isoforms
 
 
     def is_empty_alignment(self, barcode_info):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
-        print(barcode_info.barcode)
-        print(bacrode_jprofile)
+        #print(barcode_info.barcode)
+        #print(bacrode_jprofile)
 
         if all(el != 1 for el in bacrode_jprofile):
             return True
@@ -385,7 +385,7 @@ class GeneBarcodeInfo:
             
             if len(matched_isoforms) == 1:
                 stat.ambiguous_subisoform_assigned += 1
-                print("Unique match after resolution")
+                #print("Unique match after resolution")
                 transcript_id = list(matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
             else:
@@ -398,10 +398,10 @@ class GeneBarcodeInfo:
                     transcript_id = list(matched_isoforms)[0]
                 else:                
                     stat.ambiguous += 1
-                print("Ambigous match")
+                #print("Ambigous match")
         else:
             stat.uniquely_assigned += 1
-            print("Unique match")
+            #print("Unique match")
             transcript_id = list(matched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
         return transcript_id, codon_pair
@@ -412,10 +412,10 @@ class GeneBarcodeInfo:
         transcript_id = None
         if len(matched_isoforms) == 0:
             stat.contradictory += 1
-            print("Contraditory profile")
+            #print("Contraditory profile")
         elif len(matched_isoforms) == 1:
             stat.assigned_to_ncrna += 1
-            print("Non-coding assigned")
+            #print("Non-coding assigned")
             transcript_id = list(matched_isoforms)[0]
         else:
             matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.all_rna_profile)
@@ -432,8 +432,8 @@ class GeneBarcodeInfo:
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
         for t in matched_isoforms:
             matched_positions = find_matching_positions(profile_storage.isoform_profiles[t], bacrode_jprofile)
-            print(matched_positions)
-            print(profile_storage.isoform_profiles[t])
+            #print(matched_positions)
+            #print(profile_storage.isoform_profiles[t])
             
             all_junctions_detected = True
             for i in range(len(matched_positions)):
@@ -442,10 +442,10 @@ class GeneBarcodeInfo:
                     break
 
             if all_junctions_detected:
-                print("Ambiguity resolved")
-                print(profile_storage.isoform_profiles[t])
-                print(matched_positions)
-                print(bacrode_jprofile)
+                #print("Ambiguity resolved")
+                #print(profile_storage.isoform_profiles[t])
+                #print(matched_positions)
+                #print(bacrode_jprofile)
                 return set([t])
 
         return matched_isoforms
@@ -458,7 +458,7 @@ def get_barcode_map(sam_file_name):
     for line in open(barcode_map_file):
         tokens = line.strip().split("_barcodeIDs_")
         if len(tokens) != 2:    
-            print("Wrong format, _barcodeIDs_ was not found in " + line)
+            #print("Wrong format, _barcodeIDs_ was not found in " + line)
             continue
         barcode_map[tokens[0]] = tokens[1].replace("_", "-").split(',')
     return barcode_map
@@ -495,7 +495,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
-        print(" ===== ")
+        #print(" ===== ")
         cutoff = READS_CUTOFF if is_reads_sam else 0
         isoform, codons = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
@@ -503,7 +503,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
                 stats.correctly_assigned += 1
             elif b in gene_isoform_ids:
                 stats.incorrectly_assigned_same_gene += 1
-                print("WRONG")
+                #print("WRONG")
             else:
                 stats.incorrectly_assigned_other_gene += 1
                 
@@ -515,7 +515,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
         else:
             if b in gene_isoform_ids:
                 stats.unassigned += 1
-                print("UNASSIGNED")
+                #print("UNASSIGNED")
             elif b not in gene_info.all_rna_profiles.empty:
                 stats.mismapped += 1
             
