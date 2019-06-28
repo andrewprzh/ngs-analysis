@@ -149,6 +149,16 @@ def diff_only_present(l1, l2):
     return d
 
 
+def find_matching_positions(l1, l2):
+    if len(l1) != len(l2):
+        return -1
+    matches = [0 for i in range(len(l1))]
+    for i in range(len(l1)):
+        if l1[i] == l2[i]:
+            matches[i] = 1
+    return matches
+
+
 def count_diff(cov_profile, sign_profile):
     if len(cov_profile) != len(sign_profile):
         return -1

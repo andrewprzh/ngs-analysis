@@ -8,6 +8,7 @@ DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
+ASSIGN_CODONS_WHEN_AMBIGUOUS = True
 
 def print_ints(l):
     print("\t".join(map(str,l)))
@@ -112,33 +113,39 @@ class BacrodeInfo:
 
 class BarcodeAssignmentStats:
     low_covered = 0
-    contradictory = 0
+    uniquely_assigned = 0
     assigned_to_ncrna = 0
+    contradictory = 0
+    empty = 0
     ambiguous = 0
+    ambiguous_codon_assigned = 0
     ambiguous_subisoform_assigned = 0
-    ambiguous_subisoform_unassigned = 0
-    ambiguous_assigned = 0
-    unique = 0
 
     def __init__(self):
         self.low_covered = 0
+        self.uniquely_assigned = 0
+        self.assigned_to_ncrna = 0
         self.contradictory = 0
+        self.empty = 0
         self.ambiguous = 0
-        self.ambiguous_assigned = 0
-        self.unique = 0
+        self.ambiguous_codon_assigned = 0
+        self.ambiguous_subisoform_assigned = 0
 
     def merge(self, stat):
         self.low_covered += stat.low_covered
+        self.uniquely_assigned += stat.uniquely_assigned
+        self.assigned_to_ncrna += stat.assigned_to_ncrna
         self.contradictory += stat.contradictory
+        self.empty += stat.empty
         self.ambiguous += stat.ambiguous
-        self.ambiguous_assigned += stat.ambiguous_assigned 
-        self.unique += stat.unique
+        self.ambiguous_codon_assigned += stat.ambiguous_codon_assigned
+        self.ambiguous_subisoform_assigned += stat.ambiguous_subisoform_assigned
 
     def to_str(self):
-        total_bc = self.low_covered + self.contradictory + self.ambiguous + self.unique + self.ambiguous_assigned
-        return "low covered/contradictory/ambiguous/ambiguous_assigned/unique/total: %d / % d / % d / % d / % d / % d" % \
-            (self.low_covered, self.contradictory, self.ambiguous, self.ambiguous_assigned, self.unique, total_bc)
-
+        total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned
+        s = "\nTotal\tlow_covered\tunique\tncrna\tcontradictory\tempty\tambiguous\tambiguous_codon\tambiguous_assigned:\n"
+        return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t" % \
+            (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned)
 
 class ProfileStorage:
     isoform_profiles = {}
@@ -251,7 +258,7 @@ class GeneBarcodeInfo:
             print(profile_storage.isoform_profiles[t.id])
             print(profile_storage.isoform_exon_profiles[t.id])
 
-            if len(filter(lambda x: x != -1, profile_storage.isoform_profiles)) == 0:
+            if all(x == -1 for x in profile_storage.isoform_profiles):
                 del profile_storage.isoform_profiles[t.id]
                 del profile_storage.isoform_exon_profiles[t.id]
 
@@ -310,9 +317,6 @@ class GeneBarcodeInfo:
 
     def find_matches(self, barcode_info, profile_storage):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
-
-        print(barcode_info.barcode)
-        print(bacrode_jprofile)
         matched_isoforms = set()
         for t in profile_storage.isoform_profiles.keys():
             isoform_jprofile = profile_storage.isoform_profiles[t]
@@ -322,10 +326,24 @@ class GeneBarcodeInfo:
         return matched_isoforms
 
 
+    def is_empty_alignment(self, barcode_info):
+        bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
+        print(barcode_info.barcode)
+        print(bacrode_jprofile)
+
+        if all(el != 1 for el in bacrode_jprofile):
+            return True
+        return False
+
+
     def assign_isoform(self, barcode_id, stat, coverage_cutoff):
         barcode_info = self.barcodes[barcode_id]
         if barcode_info.total_reads < coverage_cutoff:
             stat.low_covered += 1
+            return None, None          
+
+        if self.is_empty_alignment(barcode_info):
+            stat.empty += 1
             return None, None          
 
         matched_isoforms = self.find_matches(barcode_info, self.coding_rna_profiles)
@@ -333,33 +351,70 @@ class GeneBarcodeInfo:
         transcript_id = None
         codon_pair = None
         if len(matched_isoforms) == 0:
-            stat.contradictory += 1
-            print("Contraditory profile")
+            self.resolve_contradictory(barcode_info, stat)
+
         elif len(matched_isoforms) > 1:
-            codons = set()
-            for t in matched_isoforms:
-                codons.add(self.codon_pairs[t])
-            if len(codons) == 1:
-                codon_pair = list(codons)[0]
-                stat.ambiguous_assigned += 1   
+            matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.coding_rna_profiles)
+            
+            if len(matched_isoforms) == 1:
+                stat.ambiguous_subisoform_assigned += 1
+                print("Unique match after resolution")
                 transcript_id = list(matched_isoforms)[0]
-            else:                
-                stat.ambiguous += 1
-            print("Ambigous match")
+                codon_pair = self.codon_pairs[transcript_id]
+            else:
+                codons = set()
+                for t in matched_isoforms:
+                    codons.add(self.codon_pairs[t])
+                if ASSIGN_CODONS_WHEN_AMBIGUOUS and len(codons) == 1:
+                    codon_pair = list(codons)[0]
+                    stat.ambiguous_codon_assigned += 1   
+                    transcript_id = list(matched_isoforms)[0]
+                else:                
+                    stat.ambiguous += 1
+                print("Ambigous match")
         else:
-            stat.unique += 1
+            stat.uniquely_assigned += 1
             print("Unique match")
             transcript_id = list(matched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
         return transcript_id, codon_pair
 
 
-    def resolve_contradictory(self, barcode_id, stat):
+    def resolve_contradictory(self, barcode_info, stat):
         matched_isoforms = self.find_matches(barcode_info, self.all_rna_profiles)
+        if len(matched_isoforms) == 0:
+            stat.contradictory += 1
+            print("Contraditory profile")
+        elif len(matched_isoforms) == 1:
+            stat.assigned_to_ncrna += 1
+            print("Non-coding assigned")
+        else:
+            matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.all_rna_profile)
+            if len(matched_isoforms) == 1:
+                stat.assigned_to_ncrna += 1
+            else:
+                stat.ambiguous += 1
 
 
-    def resolve_ambiguous(self, barcode_info, matched_isoforms):
-        pass
+    def resolve_ambiguous(self, barcode_info, matched_isoforms, profile_storage):
+        bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
+        for t in matched_isoforms:
+            matched_positions = find_matching_positions(profile_storage.isoform_profiles[t], bacrode_jprofile)
+            
+            all_junctions_detected = True
+            for i in range(len(matched_positions)):
+                if matched_positions == 0 and profile_storage.isoform_profiles[t] != -1:
+                    all_junctions_detected = False
+                    break
+
+            if all_junctions_detected:
+                print("Ambiguity resolved")
+                print(profile_storage.isoform_profiles[t])
+                print(matched_positions)
+                print(bacrode_jprofile)
+                return set([t])
+
+        return matched_isoforms
 
 
 def get_barcode_map(sam_file_name):
@@ -405,6 +460,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
+        print(" ===== ")
         cutoff = READS_CUTOFF if is_reads_sam else 0
         isoform, codons = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
