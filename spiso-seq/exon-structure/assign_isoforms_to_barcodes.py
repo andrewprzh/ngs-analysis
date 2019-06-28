@@ -8,7 +8,7 @@ DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
-ASSIGN_CODONS_WHEN_AMBIGUOUS = True
+ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 
 def print_ints(l):
     print("\t".join(map(str,l)))
@@ -121,6 +121,12 @@ class BarcodeAssignmentStats:
     ambiguous_codon_assigned = 0
     ambiguous_subisoform_assigned = 0
 
+    correctly_assigned = 0
+    unassigned = 0
+    mismapped = 0
+    incorrectly_assigned_same_gene = 0
+    incorrectly_assigned_other_gene = 0
+
     def __init__(self):
         self.low_covered = 0
         self.uniquely_assigned = 0
@@ -130,6 +136,12 @@ class BarcodeAssignmentStats:
         self.ambiguous = 0
         self.ambiguous_codon_assigned = 0
         self.ambiguous_subisoform_assigned = 0
+
+        self.correctly_assigned = 0
+        self.unassigned = 0
+        self.mismapped = 0
+        self.incorrectly_assigned_same_gene = 0
+        self.incorrectly_assigned_other_gene = 0
 
     def merge(self, stat):
         self.low_covered += stat.low_covered
@@ -141,9 +153,21 @@ class BarcodeAssignmentStats:
         self.ambiguous_codon_assigned += stat.ambiguous_codon_assigned
         self.ambiguous_subisoform_assigned += stat.ambiguous_subisoform_assigned
 
+        self.correctly_assigned += stat.correctly_assigned
+        self.unassigned += stat.unassigned
+        self.mismapped += stat.mismapped
+        self.incorrectly_assigned_same_gene += stat.incorrectly_assigned_same_gene
+        self.incorrectly_assigned_other_gene += stat.incorrectly_assigned_other_gene
+
+    def isoform_stats(self):
+        total = self.correctly_assigned+self.unassigned+self.mismapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene
+        s = "\nTotal  correct  wrong_same  wrong_other  unassigned  mismapped\n"
+        return s + "%d\t%d\t%d\t%d\t%d\t%d" % \
+            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped)
+
     def to_str(self):
         total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned
-        s = "\nTotal\tlow_covered\tunique\tncrna\tcontradictory\tempty\tambiguous\tambiguous_codon\tambiguous_assigned:\n"
+        s = "\nTotal  low_covered  unique  ncrna  contradictory  empty  ambiguous  ambiguous_codon  ambiguous_assigned:\n"
         return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t" % \
             (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned)
 
@@ -351,7 +375,7 @@ class GeneBarcodeInfo:
         transcript_id = None
         codon_pair = None
         if len(matched_isoforms) == 0:
-            self.resolve_contradictory(barcode_info, stat)
+            transcript_id = self.resolve_contradictory(barcode_info, stat)
 
         elif len(matched_isoforms) > 1:
             matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.coding_rna_profiles)
@@ -382,18 +406,23 @@ class GeneBarcodeInfo:
 
     def resolve_contradictory(self, barcode_info, stat):
         matched_isoforms = self.find_matches(barcode_info, self.all_rna_profiles)
+        transcript_id = None
         if len(matched_isoforms) == 0:
             stat.contradictory += 1
             print("Contraditory profile")
         elif len(matched_isoforms) == 1:
             stat.assigned_to_ncrna += 1
             print("Non-coding assigned")
+            transcript_id = list(matched_isoforms)[0]
         else:
             matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.all_rna_profile)
             if len(matched_isoforms) == 1:
                 stat.assigned_to_ncrna += 1
+                transcript_id = list(matched_isoforms)[0]
             else:
                 stat.ambiguous += 1
+
+        return transcript_id
 
 
     def resolve_ambiguous(self, barcode_info, matched_isoforms, profile_storage):
@@ -457,6 +486,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
         gene_info.add_read(alignment, seq_id)
 
     #bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
+    gene_isoform_ids = set(gene_info.all_rna_profiles.isoform_profiles.keys())
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
@@ -464,13 +494,27 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
         cutoff = READS_CUTOFF if is_reads_sam else 0
         isoform, codons = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
+            if b == isoform:
+                stats.correctly_assigned += 1
+            elif b in gene_isoform_ids:
+                stats.incorrectly_assigned_same_gene += 1
+            else:
+                stats.incorrectly_assigned_other_gene += 1
+                
             if bc_map is None:
                 barcodes[b] = (isoform, codons)
             else:
                 for bc in bc_map[b]:
                     barcodes[bc] = (isoform, codons)
+        else:
+            if b in gene_isoform_ids:
+                stats.unassigned += 1
+            else:
+                stats.mismapped += 1
+            
 
     sys.stderr.write("\nDone. Barcodes stats " + stats.to_str() + "\n")
+    sys.stderr.write("\nDone. Isoform stats " + stats.isoform_stats() + "\n")
     total_stats.merge(stats)
     return barcodes
 
@@ -506,7 +550,7 @@ def write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats):
     stop_codons = set()
     for b in barcodes.keys():
         codon_pair = barcodes[b][1]
-        if codon_pair[0] is None or codon_pair[1] is None:
+        if codon_pair is None or codon_pair[0] is None or codon_pair[1] is None:
             continue
         start_codons.add(codon_pair[0])
         stop_codons.add(codon_pair[1])
@@ -564,6 +608,7 @@ def process_all_genes(db, samfile_name, outf_prefix, is_reads_sam = True):
         write_gene_stats(db, gene_name, barcodes, out_tsv, out_codon_stats)
 
     sys.stderr.write("\nFinished. Total stats " + stats.to_str() + "\n")
+    sys.stderr.write("\nFinished. Isoform stats " + stats.isoform_stats() + "\n")
 
     
 def main():
