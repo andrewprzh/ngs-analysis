@@ -207,18 +207,21 @@ class GeneBarcodeInfo:
             return start_codon, stop_codon
 
         if start_codon is None:
-            for s in self.db.children(transcript, featuretype='CDS', order_by='start'):
-                if s.strand == "+":
+            if s.strand == "+":
+                for s in self.db.children(transcript, featuretype='CDS', order_by='start'):
                     start_codon = s.start
-                else:
+                    break
+            else:
+                for s in self.db.children(transcript, featuretype='CDS', order_by='start'):
                     start_codon = s.end
-                break
         if stop_codon is None:
-            for s in self.db.children(transcript, featuretype='CDS', order_by='start'):
-                if s.strand == "+":
+            if s.strand == "+":
+                for s in self.db.children(transcript, featuretype='CDS', order_by='start'):
                     stop_codon = s.end + 1
-                else:
+            else:
+                for s in self.db.children(transcript, featuretype='CDS', order_by='start'):
                     stop_codon = s.start - 2
+                    break
         return start_codon, stop_codon
 
 
