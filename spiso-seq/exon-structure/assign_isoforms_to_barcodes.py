@@ -418,7 +418,7 @@ class GeneBarcodeInfo:
             #print("Non-coding assigned")
             transcript_id = list(matched_isoforms)[0]
         else:
-            matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.all_rna_profile)
+            matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.all_rna_profiles)
             if len(matched_isoforms) == 1:
                 stat.assigned_to_ncrna += 1
                 transcript_id = list(matched_isoforms)[0]
@@ -495,13 +495,17 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
+        barcode_id = b
+        if bc_map is not None:
+            barcode_id = list(bc_map[b])[0]
+
         #print(" ===== ")
         cutoff = READS_CUTOFF if is_reads_sam else 0
         isoform, codons = gene_info.assign_isoform(b, stats, cutoff)
         if isoform is not None:
-            if b == isoform:
+            if barcode_id == isoform:
                 stats.correctly_assigned += 1
-            elif b in gene_isoform_ids:
+            elif barcode_id in gene_isoform_ids:
                 stats.incorrectly_assigned_same_gene += 1
                 #print("WRONG")
             else:
@@ -513,10 +517,10 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
                 for bc in bc_map[b]:
                     barcodes[bc] = (isoform, codons)
         else:
-            if b in gene_isoform_ids:
+            if barcode_id in gene_isoform_ids:
                 stats.unassigned += 1
                 #print("UNASSIGNED")
-            elif b not in gene_info.all_rna_profiles.empty:
+            elif barcode_id not in gene_info.all_rna_profiles.empty:
                 stats.mismapped += 1
             
 
