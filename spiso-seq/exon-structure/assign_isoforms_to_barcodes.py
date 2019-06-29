@@ -64,7 +64,7 @@ class FeatureVector:
             else:
                 read_pos +=1
                
-        self.fill_gaps(features_present)
+        #self.fill_gaps(features_present)
 
         self.reads += 1
         for i in range(0, len(self.profile)):
@@ -381,26 +381,26 @@ class GeneBarcodeInfo:
         transcript_id = None
         codon_pair = None
         if len(matched_isoforms) == 0:
-            transcript_id = self.resolve_contradictory(barcode_info, stat)
-
+            #transcript_id = self.resolve_contradictory(barcode_info, stat)
+            stat.contradictory += 1
         elif len(matched_isoforms) > 1:
-            matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.coding_rna_profiles)
+            #matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.coding_rna_profiles)
             
-            if len(matched_isoforms) == 1:
-                stat.ambiguous_subisoform_assigned += 1
-                #print("Unique match after resolution")
+            #if len(matched_isoforms) == 1:
+            #    stat.ambiguous_subisoform_assigned += 1
+            #    #print("Unique match after resolution")
+            #    transcript_id = list(matched_isoforms)[0]
+            #    codon_pair = self.codon_pairs[transcript_id]
+            #else:
+            codons = set()
+            for t in matched_isoforms:
+                codons.add(self.codon_pairs[t])
+            if ASSIGN_CODONS_WHEN_AMBIGUOUS and len(codons) == 1:
+                codon_pair = list(codons)[0]
+                stat.ambiguous_codon_assigned += 1   
                 transcript_id = list(matched_isoforms)[0]
-                codon_pair = self.codon_pairs[transcript_id]
-            else:
-                codons = set()
-                for t in matched_isoforms:
-                    codons.add(self.codon_pairs[t])
-                if ASSIGN_CODONS_WHEN_AMBIGUOUS and len(codons) == 1:
-                    codon_pair = list(codons)[0]
-                    stat.ambiguous_codon_assigned += 1   
-                    transcript_id = list(matched_isoforms)[0]
-                else:                
-                    stat.ambiguous += 1
+            else:                
+                stat.ambiguous += 1
                 #print("Ambigous match")
         else:
             stat.uniquely_assigned += 1
@@ -494,7 +494,8 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
         gene_info.add_read(alignment, seq_id)
 
     #bc_map = get_barcode_map(samfile_name) if not is_reads_sam else None
-    gene_isoform_ids = set(gene_info.all_rna_profiles.isoform_profiles.keys())
+    gene_isoform_ids = set(gene_info.coding_rna_profiles.isoform_profiles.keys())
+    gene_all_isoform_ids = set(gene_info.all_rna_profiles.isoform_profiles.keys())
     barcodes = {}
     stats = BarcodeAssignmentStats()
     for b in gene_info.barcodes.keys():
@@ -511,6 +512,8 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
             elif barcode_id in gene_isoform_ids:
                 stats.incorrectly_assigned_same_gene += 1
                 #print("WRONG")
+            elif barcode_id in gene_all_isoform_ids:
+                pass
             else:
                 stats.incorrectly_assigned_other_gene += 1
                 
@@ -523,6 +526,8 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
             if barcode_id in gene_isoform_ids:
                 stats.unassigned += 1
                 #print("UNASSIGNED")
+            elif barcode_id in gene_all_isoform_ids:
+                pass
             elif barcode_id not in gene_info.all_rna_profiles.empty:
                 stats.mismapped += 1
 
