@@ -14,5 +14,5 @@ output_dir = sys.argv[3]
 
 contigs_name, short_id_contigs_name = convert_fasta_with_barcodes(contigs_file, output_dir, get_spades_barcode)
 
-align_fasta(contigs_name, short_id_contigs_name, star_index, "star")
+align_fasta(output_dir, contigs_name, short_id_contigs_name, star_index, "star")
 

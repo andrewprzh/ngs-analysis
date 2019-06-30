@@ -1,3 +1,5 @@
+import os
+import sys
 from Bio import SeqIO
 
 
@@ -16,9 +18,9 @@ def convert_fasta_with_barcodes(contigs_file, output_dir, barcode_from_id_functi
     map_file_name = os.path.join(output_dir, contigs_name + "_map.txt")
     mapf = open(map_file_name, "w")
 
-    contigs = read_fasta(contigs_file)
     new_fasta = []
-    for record in SeqIO.index(contigs_file, "fasta"):
+    for record in SeqIO.parse(contigs_file, "fasta"):
+        name = record.id
         record.id, bc = barcode_from_id_function(name)
         new_fasta.append(record)
         mapf.write(record.id + "_barcodeIDs_" + bc + "\n")
@@ -28,7 +30,7 @@ def convert_fasta_with_barcodes(contigs_file, output_dir, barcode_from_id_functi
     return contigs_name, short_id_contigs_name
 
 
-def align_fasta(contigs_name, short_id_contigs_name, index, method = "gmap"):
+def align_fasta(output_dir, contigs_name, short_id_contigs_name, index, method = "gmap"):
     alignment_name = os.path.join(output_dir, contigs_name)
     alignment_sam_path = alignment_name + '.sam'
     if method.lower() == "gmap":

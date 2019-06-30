@@ -4,7 +4,7 @@ import sys
 from common import *
 
 def get_transcript_name(contig_id):
-    tokens = name.split(" ")
+    tokens = contig_id.split(" ")
     return tokens[0], tokens[0]
 
 if len(sys.argv) < 4:
@@ -17,5 +17,5 @@ output_dir = sys.argv[3]
 
 contigs_name, short_id_contigs_name = convert_fasta_with_barcodes(contigs_file, output_dir, get_transcript_name)
 
-align_fasta(contigs_name, short_id_contigs_name, gmap_index)
+align_fasta(output_dir, contigs_name, short_id_contigs_name, gmap_index, "star")
 
