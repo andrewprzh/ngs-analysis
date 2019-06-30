@@ -128,6 +128,7 @@ class BarcodeAssignmentStats:
     incorrectly_assigned_same_gene = 0
     incorrectly_assigned_other_gene = 0
 
+
     def __init__(self):
         self.low_covered = 0
         self.uniquely_assigned = 0
@@ -142,6 +143,9 @@ class BarcodeAssignmentStats:
         self.unassigned = 0
         self.mismapped = 0
         self.unmapped = 0
+        self.empty = 0
+        self.incorrectly_assigned_nc = 0
+        self.unassigned_nc = 0
         self.incorrectly_assigned_same_gene = 0
         self.incorrectly_assigned_other_gene = 0
 
@@ -159,14 +163,17 @@ class BarcodeAssignmentStats:
         self.unassigned += stat.unassigned
         self.mismapped += stat.mismapped
         self.unmapped += stat.unmapped
+        self.empty += stat.empty
+        self.incorrectly_assigned_nc += stat.incorrectly_assigned_nc
+        self.unassigned_nc += stat.unassigned_nc
         self.incorrectly_assigned_same_gene += stat.incorrectly_assigned_same_gene
         self.incorrectly_assigned_other_gene += stat.incorrectly_assigned_other_gene
 
     def isoform_stats(self):
-        total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene
-        s = "\nTotal  correct  wrong_same  wrong_other  unassigned  mismapped unmapped\n"
-        return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d" % \
-            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped, self.unmapped)
+        total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene +  self.empty+ self.incorrectly_assigned_nc + self.unassigned_nc
+        s = "\nTotal  correct  wrong_same  wrong_other  unassigned  mismapped unmapped empty wrong_nc unassigned_nc\n"
+        return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d" % \
+            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped, self.unmapped, self.empty, self.incorrectly_assigned_nc, self.unassigned_nc)
 
     def to_str(self):
         total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned
@@ -518,7 +525,7 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
                 stats.incorrectly_assigned_same_gene += 1
                 #print("WRONG")
             elif barcode_id in gene_all_isoform_ids:
-                pass
+                stats.incorrectly_assigned_nc += 1
             else:
                 stats.incorrectly_assigned_other_gene += 1
                 
@@ -532,8 +539,10 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
                 stats.unassigned += 1
                 #print("UNASSIGNED")
             elif barcode_id in gene_all_isoform_ids:
-                pass
-            elif barcode_id not in gene_info.all_rna_profiles.empty:
+                stats.unassigned_nc += 1
+            elif barcode_id in gene_info.all_rna_profiles.empty:
+                stats.empty += 1
+            else:
                 stats.mismapped += 1
 
     for t in gene_isoform_ids:
