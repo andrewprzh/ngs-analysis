@@ -125,6 +125,9 @@ class BarcodeAssignmentStats:
     unassigned = 0
     mismapped = 0
     unmapped = 0
+    empty_bc = 0
+    incorrectly_assigned_nc = 0
+    unassigned_nc = 0
     incorrectly_assigned_same_gene = 0
     incorrectly_assigned_other_gene = 0
 
@@ -170,16 +173,16 @@ class BarcodeAssignmentStats:
         self.incorrectly_assigned_other_gene += stat.incorrectly_assigned_other_gene
 
     def isoform_stats(self):
-        total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene +  self.empty+ self.incorrectly_assigned_nc + self.unassigned_nc
+        total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene +  self.empty_bc+ self.incorrectly_assigned_nc + self.unassigned_nc
         s = "\nTotal  correct  wrong_same  wrong_other  unassigned  mismapped unmapped empty wrong_nc unassigned_nc\n"
         return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d" % \
-            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped, self.unmapped, self.empty, self.incorrectly_assigned_nc, self.unassigned_nc)
+            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped, self.unmapped, self.empty_bc, self.incorrectly_assigned_nc, self.unassigned_nc)
 
     def to_str(self):
-        total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty_bc + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned
+        total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned
         s = "\nTotal  low_covered  unique  ncrna  contradictory  empty  ambiguous  ambiguous_codon  ambiguous_assigned:\n"
         return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t" % \
-            (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty_bc, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned)
+            (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned)
 
 class ProfileStorage:
     isoform_profiles = {}
