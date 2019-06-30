@@ -1,4 +1,4 @@
-setwd("~/Desktop/rna_fischer/")
+setwd("~/Desktop/ngs-analysis/rna_fischer/")
 library("Matrix")
 pvalues <- c()
 matrix <- matrix()
@@ -9,7 +9,7 @@ gene_names <- c()
 gene_name <- ""
 processTable = function(table, uncompressed_table, gene_id) {
   
-  if ( sum(table) < 100)  {
+  if ( sum(table) < 50)  {
     return(0)
   }
   if ( nrow(table) < 2)  {
@@ -107,5 +107,10 @@ processFile = function(filepath) {
   close(con)
 }
 
-processFile("whole_dataset.codon_stats.tsv")
+processFile("reads.wd.codon_stats.tsv")
+sorted_pvalues_2 <- sort(pvalues, index.return=TRUE, decreasing=FALSE)
 #CTCF
+a <- p.adjust(sorted_pvalues_2$x, method = "BH")
+df <- data.frame(gene_names = gene_names[sorted_pvalues_2$ix])
+df$pvalues <- a
+write.table(df, file = "reads.csv",row.names=FALSE, col.names = FALSE)
