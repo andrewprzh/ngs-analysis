@@ -8,7 +8,7 @@ DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
-ASSIGN_CODONS_WHEN_AMBIGUOUS = False
+ASSIGN_CODONS_WHEN_AMBIGUOUS = True
 
 def print_ints(l):
     print("\t".join(map(str,l)))
@@ -387,9 +387,9 @@ class GeneBarcodeInfo:
             stat.low_covered += 1
             return None, None          
 
-        if self.is_empty_alignment(barcode_info):
-            stat.empty += 1
-            return None, None          
+#        if self.is_empty_alignment(barcode_info):
+#            stat.empty += 1
+#            return None, None          
 
         matched_isoforms = self.find_matches(barcode_info, self.coding_rna_profiles)
 
