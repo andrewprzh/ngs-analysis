@@ -4,7 +4,7 @@ import gffutils
 import pysam
 from common import *
 
-DEDUCE_CODONS_FROM_CDS = True
+DEDUCE_CODONS_FROM_CDS = False
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
@@ -495,6 +495,7 @@ def get_id(query_name, is_reads_sam = True):
 
 def get_gene_barcodes(db, gene_info, total_stats):
     gene_isoform_ids = set(gene_info.coding_rna_profiles.isoform_profiles.keys())
+    barcodes = {}
     for t in gene_isoform_ids:
         barcodes[t] = (t, gene_info.codon_pairs[t])
             
@@ -593,7 +594,7 @@ def process_all_genes(db, outf_prefix):
 
     
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         sys.stderr.write("Usage: " + sys.argv[0] + " <gene DB> <output.tsv> \n")
         exit(0)
 
