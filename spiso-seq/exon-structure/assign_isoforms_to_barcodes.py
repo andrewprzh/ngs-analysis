@@ -43,26 +43,32 @@ class FeatureVector:
 
         while read_pos < len(read_features) and ref_pos < len(known_features):
             while read_pos < len(read_features) and left_of(read_features[read_pos], known_features[ref_pos]):
+                features_present[0] = 1
                 read_pos += 1
             if read_pos == len(read_features):
                 break
 
-            while  ref_pos < len(known_features) and left_of(known_features[ref_pos], read_features[read_pos]):
+            while ref_pos < len(known_features) and left_of(known_features[ref_pos], read_features[read_pos]):
                 ref_pos += 1
             if ref_pos == len(known_features):
                 break
 
             if self.strategies[self.strategy](known_features[ref_pos], read_features[read_pos]):
-                features_present[ref_pos] = 1
+                features_present[ref_pos + 1] = 1
                 ref_pos += 1
                 #read_pos += 1
             elif overlaps(known_features[ref_pos], read_features[read_pos]):
-                features_present[ref_pos] = -1
+                features_present[ref_pos + 1] = -1
                 ref_pos += 1
             elif known_features[ref_pos] < read_features[read_pos]:
                 ref_pos += 1
             else:
                 read_pos +=1
+
+        if read_pos < len(read_features):
+            if not right_of(read_features[-1], known_features[-1]):
+                sys.stderr.write("\nRead last feature is not right of known feature\n")
+            features_present[-1] = 1
                
         #self.fill_gaps(features_present)
 
@@ -88,15 +94,11 @@ class BacrodeInfo:
     barcode = ""
     total_reads = 0
     junctions_counts = None
-    #five_utrs_counts = None
-    #three_utrs_counts = None
 
     def __init__(self, bc, junctions_num, gene_strand):
         self.barcode = bc
         self.total_reads = 0
         self.junctions_counts = FeatureVector(junctions_num, "exact")
-        #self.five_utrs_counts = FeatureVector(five_utrs_num, "end" if gene_strand == '+' else "start")
-        #self.three_utrs_counts = FeatureVector(three_utrs_num, "start" if gene_strand == '+' else "end")
 
     def add_read(self, alignment, known_junctions):
         self.total_reads += 1
@@ -106,10 +108,6 @@ class BacrodeInfo:
             for i in range(0, len(blocks) - 1):
                 read_junctions.append((blocks[i][1], blocks[i+1][0]))
             self.junctions_counts.add_from_blocks(read_junctions, known_junctions)
-
-        #self.five_utrs_counts.add_from_blocks(blocks, known_five_utrs)
-        #self.three_utrs_counts.add_from_blocks(blocks, known_three_utrs)
-
 
 class BarcodeAssignmentStats:
     low_covered = 0
@@ -290,15 +288,15 @@ class GeneBarcodeInfo:
             if not keep_isoforms_without_codons and not self.isoform_is_coding(t):
                 continue
 
-            profile_storage.isoform_profiles[t.id] = [-1 for i in range(0, len(self.junctions))]
-            profile_storage.isoform_exon_profiles[t.id] = [-1 for i in range(0, len(self.exons))]
+            profile_storage.isoform_profiles[t.id] = [-1 for i in range(0, len(self.junctions) + 2)]
+            profile_storage.isoform_exon_profiles[t.id] = [-1 for i in range(0, len(self.exons) + 2)]
             for j in i_junctions[t.id]:
                 pos = self.junctions.index(j)
-                profile_storage.isoform_profiles[t.id][pos] = 1
+                profile_storage.isoform_profiles[t.id][pos + 1] = 1
             for e in i_exons[t.id]:
                 pos = self.exons.index(e)
-                profile_storage.isoform_exon_profiles[t.id][pos] = 1
-
+                profile_storage.isoform_exon_profiles[t.id][pos + 1] = 1
+ 
             #print("Isoform " + t.id)
             #print(profile_storage.isoform_profiles[t.id])
             #print(profile_storage.isoform_exon_profiles[t.id])
