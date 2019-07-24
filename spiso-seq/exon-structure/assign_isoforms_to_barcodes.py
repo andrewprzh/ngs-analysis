@@ -173,6 +173,7 @@ class BarcodeAssignmentStats:
         self.incorrectly_assigned_other_gene += stat.incorrectly_assigned_other_gene
 
     def isoform_stats(self):
+
         total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene +  self.empty_bc+ self.incorrectly_assigned_nc + self.unassigned_nc
         s = "\nTotal  correct  wrong_same  wrong_other  unassigned  mismapped unmapped empty wrong_nc unassigned_nc\n"
         return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d" % \
@@ -362,11 +363,12 @@ class GeneBarcodeInfo:
 
     def find_matches(self, barcode_info, profile_storage):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
+        #print(bacrode_jprofile)
         matched_isoforms = set()
         for t in profile_storage.isoform_profiles.keys():
             isoform_jprofile = profile_storage.isoform_profiles[t]
             if diff_only_present(isoform_jprofile, bacrode_jprofile) == 0:
-                #print("Matched " + t)
+        #        print("Matched " + t)
                 matched_isoforms.add(t)
         return matched_isoforms
 
@@ -382,6 +384,7 @@ class GeneBarcodeInfo:
 
 
     def assign_isoform(self, barcode_id, stat, coverage_cutoff):
+        #print('=== ' + barcode_id + ' ===')
         barcode_info = self.barcodes[barcode_id]
         if barcode_info.total_reads < coverage_cutoff:
             stat.low_covered += 1
@@ -500,8 +503,8 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
     counter = 0
     for alignment in samfile_in.fetch(gene_chr, gene_start, gene_end):
         counter += 1
-        if counter % 100 == 0:
-           sys.stderr.write("\r   " + str(counter) + " lines processed")
+#        if counter % 100 == 0:
+#           sys.stderr.write("\r   " + str(counter) + " lines processed")
 
         if alignment.reference_id == -1:
             continue
@@ -526,12 +529,12 @@ def get_gene_barcodes(db, gene_info, samfile_name, total_stats, is_reads_sam, bc
                 stats.correctly_assigned += 1
             elif barcode_id in gene_isoform_ids:
                 stats.incorrectly_assigned_same_gene += 1
-                #print("WRONG")
+                print("Incorrect assignment: isoform = " + isoform + " ; sequence = " + barcode_id + "\n")
             elif barcode_id in gene_all_isoform_ids:
                 stats.incorrectly_assigned_nc += 1
             else:
                 stats.incorrectly_assigned_other_gene += 1
-                
+                print("Alien assignment: isoform = " + isoform + " ; sequence = " + barcode_id + "\n")
             if bc_map is None:
                 barcodes[b] = (isoform, codons)
             else:
