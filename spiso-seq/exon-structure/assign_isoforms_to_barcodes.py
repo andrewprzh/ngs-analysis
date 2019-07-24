@@ -297,8 +297,8 @@ class GeneBarcodeInfo:
                 pos = self.exons.index(e)
                 profile_storage.isoform_exon_profiles[t.id][pos + 1] = 1
  
-            #print("Isoform " + t.id)
-            #print(profile_storage.isoform_profiles[t.id])
+            print("Isoform " + t.id)
+            print(profile_storage.isoform_profiles[t.id])
             #print(profile_storage.isoform_exon_profiles[t.id])
 
             if all(x == -1 for x in profile_storage.isoform_profiles[t.id]):
@@ -361,12 +361,15 @@ class GeneBarcodeInfo:
 
     def find_matches(self, barcode_info, profile_storage):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
-        #print(bacrode_jprofile)
+        print(barcode_info.barcode)
+        print(bacrode_jprofile)
+
+
         matched_isoforms = set()
         for t in profile_storage.isoform_profiles.keys():
             isoform_jprofile = profile_storage.isoform_profiles[t]
             if diff_only_present(isoform_jprofile, bacrode_jprofile) == 0:
-        #        print("Matched " + t)
+                print("Matched " + t)
                 matched_isoforms.add(t)
         return matched_isoforms
 
