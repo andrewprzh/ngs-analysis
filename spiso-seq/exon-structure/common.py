@@ -171,6 +171,27 @@ def count_diff(cov_profile, sign_profile):
     return d
 
 
+def is_subprofile(short_isoform_profile, long_isoform_profile):
+    if len(short_isoform_profile) != len(long_isoform_profile):
+        return None
+
+    if all(el == -1 for el in short_isoform_profile):
+        return None
+
+    short_range_start = None
+    short_range_end = None
+    for i in range(len(short_isoform_profile)):
+        if short_isoform_profile[i] == 1:
+            if short_range_start is None:
+                short_range_start = i
+            short_range_end = i
+
+    for i in range(short_range_start, short_range_end + 1):
+        if short_isoform_profile[i] != long_isoform_profile[i]:
+            return False
+    return True
+
+
 def sign(i):
     return 0 if i == 0 else (-1 if i < 0 else 1)
 
