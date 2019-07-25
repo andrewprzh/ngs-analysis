@@ -36,14 +36,20 @@ class FeatureVector:
         ref_pos = 0
         
         #if self.strategy == "start":
-        #print read_features
-        #print known_features
+        print " === "
+        print read_features
+        print known_features
 
-        features_present = [0 for i in range(0, len(known_features))]
+        features_present = [0 for i in range(0, len(known_features) + 2)]
+
+        if len(read_features) > 0 and left_of(read_features[0], known_features[0]):
+            features_present[0] = 1
+
+        if left_of(known_features[-1], read_features[-1]):
+            features_present[-1] = 1
 
         while read_pos < len(read_features) and ref_pos < len(known_features):
             while read_pos < len(read_features) and left_of(read_features[read_pos], known_features[ref_pos]):
-                features_present[0] = 1
                 read_pos += 1
             if read_pos == len(read_features):
                 break
@@ -65,11 +71,9 @@ class FeatureVector:
             else:
                 read_pos +=1
 
-        if read_pos < len(read_features):
-            if not right_of(read_features[-1], known_features[-1]):
-                sys.stderr.write("\nRead last feature is not right of known feature\n")
-            features_present[-1] = 1
+
                
+        print features_present
         #self.fill_gaps(features_present)
 
         self.reads += 1
@@ -173,14 +177,14 @@ class BarcodeAssignmentStats:
     def isoform_stats(self):
 
         total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene +  self.empty_bc+ self.incorrectly_assigned_nc + self.unassigned_nc
-        s = "\nTotal  correct  wrong_same  wrong_other  unassigned  mismapped unmapped empty wrong_nc unassigned_nc\n"
-        return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d" % \
+        s = "\nTotal\tcorrect\twrong_same\twrong_other\tunassigned\tmismapped\tunmapped\tempty\t\twrong_nc\tunassigned_nc\n"
+        return s + "%d\t%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d" % \
             (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped, self.unmapped, self.empty_bc, self.incorrectly_assigned_nc, self.unassigned_nc)
 
     def to_str(self):
         total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned
-        s = "\nTotal  low_covered  unique  ncrna  contradictory  empty  ambiguous  ambiguous_codon  ambiguous_assigned:\n"
-        return s + "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t" % \
+        s = "\nTotal\t\tlow_covered\tunique\t\tncrna\t\tcontradictory\tempty\t\tambiguous\tambiguous_codon\tambiguous_assigned:\n"
+        return s + "%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t" % \
             (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned)
 
 class ProfileStorage:
@@ -355,7 +359,7 @@ class GeneBarcodeInfo:
             return
 
         if barcode_id not in self.barcodes:
-            self.barcodes[barcode_id] = BacrodeInfo(barcode_id, len(self.junctions), self.gene_db.strand)
+            self.barcodes[barcode_id] = BacrodeInfo(barcode_id, len(self.junctions) + 2, self.gene_db.strand)
         self.barcodes[barcode_id].add_read(alignment, self.junctions)
 
 
