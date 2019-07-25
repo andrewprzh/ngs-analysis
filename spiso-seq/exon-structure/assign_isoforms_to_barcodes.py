@@ -7,7 +7,7 @@ from common import *
 DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
-MIN_CODON_COUNT = 2
+MIN_CODON_COUNT = 1
 ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 
 def print_ints(l):
@@ -37,15 +37,15 @@ class FeatureVector:
         
         #if self.strategy == "start":
         #print " === "
-        #print read_features
-        #print known_features
+        print read_features
+        print known_features
 
         features_present = [0 for i in range(0, len(known_features) + 2)]
 
-        if len(read_features) > 0 and left_of(read_features[0], known_features[0]):
+        if len(read_features) > 0 and len(known_features) > 0  and left_of(read_features[0], known_features[0]):
             features_present[0] = 1
 
-        if left_of(known_features[-1], read_features[-1]):
+        if len(read_features) > 0 and len(known_features) > 0 and left_of(known_features[-1], read_features[-1]):
             features_present[-1] = 1
 
         while read_pos < len(read_features) and ref_pos < len(known_features):
@@ -357,7 +357,7 @@ class GeneBarcodeInfo:
 
         self.coding_rna_profiles.detect_ambiguous()
         self.all_rna_profiles.detect_ambiguous()
-        print("Gene has " + str(len(self.all_rna_profiles.ambiguous)) + " ambiguous isoforms")
+        #print("Gene has " + str(len(self.all_rna_profiles.ambiguous)) + " ambiguous isoforms")
 
     def get_gene_region(self):
         return self.gene_db.seqid, self.gene_db.start, self.gene_db.end       
@@ -378,6 +378,7 @@ class GeneBarcodeInfo:
 
         if barcode_id not in self.barcodes:
             self.barcodes[barcode_id] = BacrodeInfo(barcode_id, len(self.junctions) + 2, self.gene_db.strand)
+        #print(" *** " + barcode_id + " *** ")
         self.barcodes[barcode_id].add_read(alignment, self.junctions)
 
 
