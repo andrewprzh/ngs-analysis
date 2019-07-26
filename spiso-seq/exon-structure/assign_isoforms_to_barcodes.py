@@ -82,7 +82,7 @@ class FeatureVector:
                 read_pos +=1
                
         #print features_present
-        #self.fill_gaps(features_present)
+        self.fill_gaps(features_present)
 
         self.reads += 1
         for i in range(0, len(self.profile)):
@@ -467,30 +467,29 @@ class GeneBarcodeInfo:
             stat.contradictory += 1
             print_debug("Contradictory")
         elif len(matched_isoforms) > 1:
-            #matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.coding_rna_profiles)
+            matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.coding_rna_profiles)
             
-            #if len(matched_isoforms) == 1:
-            #    stat.ambiguous_subisoform_assigned += 1
-            #    #print("Unique match after resolution")
-            #    transcript_id = list(matched_isoforms)[0]
-            #    codon_pair = self.codon_pairs[transcript_id]
-            #else:
-
-            codons = set()
-            if ASSIGN_CODONS_WHEN_AMBIGUOUS:
-                for t in matched_isoforms:
-                    codons.add(self.codon_pairs[t])
-            if len(codons) == 1:
-                codon_pair = list(codons)[0]
-                stat.ambiguous_codon_assigned += 1   
+            if len(matched_isoforms) == 1:
+                stat.ambiguous_subisoform_assigned += 1
+                #print("Unique match after resolution")
                 transcript_id = list(matched_isoforms)[0]
-            else:       
-                if any(mi in self.all_rna_profiles.ambiguous for mi in matched_isoforms):
-                    stat.ambiguous_unassignable += 1
-                    print_debug("unassignable")
-                else:        
-                    stat.ambiguous += 1
-                    print_debug("Ambigous match")
+                codon_pair = self.codon_pairs[transcript_id]
+            else:
+                codons = set()
+                if ASSIGN_CODONS_WHEN_AMBIGUOUS:
+                    for t in matched_isoforms:
+                        codons.add(self.codon_pairs[t])
+                if len(codons) == 1:
+                    codon_pair = list(codons)[0]
+                    stat.ambiguous_codon_assigned += 1   
+                    transcript_id = list(matched_isoforms)[0]
+                else:       
+                    if any(mi in self.all_rna_profiles.ambiguous for mi in matched_isoforms):
+                        stat.ambiguous_unassignable += 1
+                        print_debug("unassignable")
+                    else:        
+                        stat.ambiguous += 1
+                        print_debug("Ambigous match")
         else:
             stat.uniquely_assigned += 1
             print_debug("Unique match")
