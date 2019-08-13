@@ -12,7 +12,7 @@ def get_spades_barcode(contig_id):
     return tokens[0], tokens[1].strip() if len(tokens) > 1 else ""
     
 
-def convert_fasta_with_barcodes(contigs_file, output_dir, barcode_from_id_function):
+def convert_fasta_with_barcodes(contigs_file, output_dir, barcode_from_id_function, max_len = 100000):
     contigs_name, ext = os.path.splitext(contigs_file.split('/')[-1])
     short_id_contigs_name = os.path.join(output_dir, contigs_name + "_short_ids.fasta")
     map_file_name = os.path.join(output_dir, contigs_name + "_map.txt")
@@ -20,7 +20,12 @@ def convert_fasta_with_barcodes(contigs_file, output_dir, barcode_from_id_functi
 
     new_fasta = []
     for record in SeqIO.parse(contigs_file, "fasta"):
+        if len(record.seq) > max_len:
+            continue
         name = record.id
+        num = int(name.split('_')[1])
+        if num % 2 == 1:
+            continue
         record.id, bc = barcode_from_id_function(name)
         new_fasta.append(record)
         mapf.write(record.id + "_barcodeIDs_" + bc + "\n")
@@ -48,7 +53,7 @@ def align_fasta(output_dir, contigs_name, short_id_contigs_name, index, method =
         #Hagen options
         command = '{star} --runThreadN 16 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM --outSAMattributes NH HI NM MD --outFilterMultimapScoreRange 1 \
                    --outFilterMismatchNmax 2000 --scoreGapNoncan -20 --scoreGapGCAG -4 --scoreGapATAC -8 --scoreDelOpen -1 --scoreDelBase -1 --scoreInsOpen -1 --scoreInsBase -1 \
-                   --alignEndsType Local --seedSearchStartLmax 50 --seedPerReadNmax 100000 --seedPerWindowNmax 1000 --alignTranscriptsPerReadNmax 100000 --alignTranscriptsPerWindowNmax 10000 \
+                   --alignEndsType Local --seedSearchStartLmax 50 --seedPerReadNmax 1000000 --seedPerWindowNmax 1000 --alignTranscriptsPerReadNmax 100000 --alignTranscriptsPerWindowNmax 10000 \
                    --outFileNamePrefix {alignment_out}'.format(star=star_path, ref_index_name=index, transcripts=short_id_contigs_name, alignment_out=alignment_name)
 
         exit_code = os.system(command)
