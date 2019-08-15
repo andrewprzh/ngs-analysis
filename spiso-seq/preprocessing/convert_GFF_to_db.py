@@ -8,7 +8,7 @@ def main():
         sys.stderr.write("Usage: " + sys.argv[0] + " <GFF> <output> \n")
         exit(0)
     fn = sys.argv[1]
-    db = gffutils.create_db(fn, dbfn= sys.argv[1] + '.db', force=True, keep_order=True, merge_strategy='merge', sort_attribute_values=True)
+    db = gffutils.create_db(fn, dbfn= sys.argv[1] + '.db', force=True, keep_order=True, merge_strategy='merge', sort_attribute_values=True, disable_infer_transcripts=True, disable_infer_genes=True)
 
 
 
