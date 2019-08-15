@@ -27,7 +27,7 @@ COUNT_ISOFORM_STATS = True
 # separate --- count start/stop codons independently for each gene
 # ignore_overlaps --- do not output overlapping genes at all
 # shared_exons --- merge ones with at least 2 shared exons
-CODON_OUTPUT = "merge"
+CODON_OUTPUT = "separate"
 WRITE_CODON_COORDINATES = False
 
 # global variables for carrying out the stats
@@ -557,7 +557,8 @@ class GeneDBProcessor:
         if not samfile_in.has_index:
             raise Exception("BAM file " + self.samfile_nam + " is not indexed, run samtools index")
         if samfile_in.references[0].startswith('chr'):
-            chr_bam_prefix = 'chr'
+            print("Changing chomosome prefix")
+            self.chr_bam_prefix = 'chr'
         samfile_in.close()
 
         if not os.path.isfile(args.genedb):
