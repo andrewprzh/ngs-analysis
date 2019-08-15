@@ -196,20 +196,29 @@ def sign(i):
     return 0 if i == 0 else (-1 if i < 0 else 1)
 
 
-def table_to_str(d):
+def table_to_str(d, write_coordinates = False, delim = '\t'):
         vertical_keys = set()
         horisontal_keys = set()
         for k in sorted(d.keys()):
             vertical_keys.add(k[0])
             horisontal_keys.add(k[1])
 
-        res = ""
+        vertical_keys = sorted(list(vertical_keys))
+        horisontal_keys = sorted(list(horisontal_keys))
+
+        header = ""
+        if write_coordinates:
+            header = delim + delim.join(map(str, horisontal_keys)) + "\n"
+        res = header
         for x1 in vertical_keys:
-            s = ""
+            row_els = []
+            if write_coordinates:
+                row_els.append(str(x1))
+
             for x2 in horisontal_keys:
-                v = d.get((x1,x2), 0)
-                s += str(v) + '\t'
-            res += s[:-1] + '\n'
+                v = d.get((x1, x2), 0)
+                row_els.append(str(v))
+            res += delim.join(row_els)
         return res
 
 

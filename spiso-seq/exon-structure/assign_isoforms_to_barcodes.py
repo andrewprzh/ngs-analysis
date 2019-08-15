@@ -13,11 +13,11 @@ import pysam
 from common import *
 from traceback import print_exc
 
-RESOLVE_AMBIGUOUS = False
+# global params, to be fixed
+RESOLVE_AMBIGUOUS = True
 DEDUCE_CODONS_FROM_CDS = True
-KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
-MIN_CODON_COUNT = 1
+MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = True
 CONSIDER_FLANKING_JUNCTIONS = True
 JUNCTION_DELTA = 2
@@ -26,10 +26,12 @@ COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
 # separate --- count start/stop codons independently for each gene
 # ignore_overlaps --- do not output overlapping genes at all
-CODON_OUTPUT = "overlap" 
+# shared_exons --- merge ones with at least 2 shared exons
+CODON_OUTPUT = "merge"
+WRITE_CODON_COORDINATES = False
 
+# global variables for carrying out the stats
 global_barcode_map = {}
-
 global_unassignable_set = set()
 
 DEBUG = False
@@ -37,7 +39,7 @@ def print_debug(s):
     if DEBUG:
         print(s)
 
-
+# class for storing support vectors for known features (junctions)
 class FeatureVector:
     profile = []
     reads = 0
@@ -48,6 +50,7 @@ class FeatureVector:
         self.reads = 0
         self.check_flanking = check_flanking    
 
+    # update vector using features from alignment
     def add_from_blocks(self, read_features, known_features): 
         read_pos = 0
         ref_pos = 0
@@ -106,7 +109,7 @@ class FeatureVector:
             if features_present[i] == 0:
                 features_present[i] = -1
 
-
+# Feature vector + support information for a barcode
 class BacrodeInfo:
     barcode = ""
     total_reads = 0
@@ -128,7 +131,7 @@ class BacrodeInfo:
             print_debug("Barcode " + self.barcode + "\n" + str(read_junctions))
 
 
-#class for saving all the stats
+# class for saving all the stats
 class BarcodeAssignmentStats:
     low_covered = 0
     uniquely_assigned = 0
@@ -209,6 +212,7 @@ class BarcodeAssignmentStats:
         return s + "%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%d" % \
             (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned, self.ambiguous_unassignable)
 
+# storage for feature profiles of all known isoforms of a gene or a set of overlapping genes
 class ProfileStorage:
     isoform_profiles = {}
     isoform_exon_profiles = {}
@@ -238,7 +242,7 @@ class ProfileStorage:
             global_unassignable_set.add(i)
         #print(self.ambiguous)
          
-
+# storage for all barcodes/sequences mapped to a specific set of genes
 class GeneBarcodeInfo:
     gene_db_list = []
     chr_id = None
@@ -274,7 +278,8 @@ class GeneBarcodeInfo:
         self.all_rna_profiles.detect_ambiguous()
         #print("Gene has " + str(len(self.all_rna_profiles.ambiguous)) + " ambiguous isoforms")
 
-
+    # return start-stop codon pair for a known isoform
+    # return None when codon could not be found
     def get_codon_pair(self, transcript):
         start_codon = None
         stop_codon = None
@@ -311,8 +316,8 @@ class GeneBarcodeInfo:
         start_codon, stop_codon = self.get_codon_pair(t)
         return stop_codon is not None and start_codon is not None
 
-
-    def get_junctions_and_exons(self, keep_isoforms_without_codons = False):
+    # get a set of all known exons and splice junctions in a set of genes
+    def get_junctions_and_exons(self, keep_isoforms_without_codons):
         i_junctions = {}
         i_exons = {}
         
@@ -350,8 +355,8 @@ class GeneBarcodeInfo:
 
         return i_junctions, i_exons
 
-
-    def set_junction_profiles(self, profile_storage, i_junctions, i_exons, keep_isoforms_without_codons = False):
+    # calculate junction profiles for known isoforms
+    def set_junction_profiles(self, profile_storage, i_junctions, i_exons, keep_isoforms_without_codons):
         profile_storage.isoform_profiles = {}
         profile_storage.isoform_exon_profiles = {}
 
@@ -378,17 +383,22 @@ class GeneBarcodeInfo:
                     del profile_storage.isoform_exon_profiles[t.id]
                     profile_storage.empty.add(t.id)
 
-
-    def set_codon_pairs(self):
-        for gene_db in self.gene_db_list:
+    # compute start-stop codon pair for known isoforms
+    def get_codon_pairs(self, gene_db_list):
+        codon_pairs = {}
+        for gene_db in gene_db_list:
             for t in self.db.children(gene_db, featuretype = 'transcript', order_by='start'):
                 start_codon, stop_codon = self.get_codon_pair(t)
                 if stop_codon is not None and start_codon is not None:
-                    self.codon_pairs[t.id] = (start_codon, stop_codon) 
+                    codon_pairs[t.id] = (start_codon, stop_codon)
                 else:
-                    self.codon_pairs[t.id] = (None, None) 
+                    codon_pairs[t.id] = (None, None)
+        return codon_pairs
 
+    def set_codon_pairs(self):
+        self.codon_pairs = self.get_codon_pairs(self.gene_db_list)
 
+    # return region of overlapping gene set
     def get_gene_region(self):
         start = self.gene_db_list[0].start
         end = self.gene_db_list[-1].end
@@ -402,7 +412,7 @@ class GeneBarcodeInfo:
 
         return chr_id, start, end       
 
-
+    # process alignment within a gene region
     def add_read(self, alignment, barcode_id):
         chr_name = alignment.reference_name.strip()
         if chr_name != self.chr_id:
@@ -420,12 +430,11 @@ class GeneBarcodeInfo:
             self.barcodes[barcode_id] = BacrodeInfo(barcode_id, len(self.junctions) + 2, self.args.consider_flanking_junctions)
         self.barcodes[barcode_id].add_read(alignment, self.junctions)
 
-
+    # match barcode/sequence junction profile to a known isoform junction profile
     def find_matches(self, barcode_info, profile_storage):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
         print_debug(barcode_info.barcode)
         print_debug(bacrode_jprofile)
-
 
         matched_isoforms = set()
         for t in profile_storage.isoform_profiles.keys():
@@ -435,7 +444,7 @@ class GeneBarcodeInfo:
                 matched_isoforms.add(t)
         return matched_isoforms
 
-
+    # returns true if alignment has no splice junctions (e.g. single-block alignment)
     def is_empty_alignment(self, barcode_info):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
 #        print_debug(barcode_info.barcode)
@@ -445,7 +454,7 @@ class GeneBarcodeInfo:
             return True
         return False
 
-
+    # assign barcode/sequence alignment to a known isoform
     def assign_isoform(self, barcode_id, stat, coverage_cutoff):
         print_debug('=== ' + barcode_id + ' ===')
 
@@ -467,7 +476,7 @@ class GeneBarcodeInfo:
             global_barcode_map[barcode_id].add(i)
 
         transcript_id = None
-        codon_pair = None
+        codon_pair = (None, None)
         if len(matched_isoforms) == 0:
             stat.contradictory += 1
             print_debug("Contradictory")
@@ -504,7 +513,7 @@ class GeneBarcodeInfo:
 
         return transcript_id, codon_pair
 
-
+    # resolve assignment ambiguities caused by identical profiles
     def resolve_ambiguous(self, barcode_info, matched_isoforms, profile_storage):
         bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
         for t in matched_isoforms:
@@ -528,7 +537,7 @@ class GeneBarcodeInfo:
         return matched_isoforms
 
 
-#Class for processing entire bam file agains gene database
+# Class for processing entire bam file agains gene database
 class GeneDBProcessor:
     bc_map = None
     db = None
@@ -557,7 +566,7 @@ class GeneDBProcessor:
         self.stats = BarcodeAssignmentStats()
         self.output_prefix = args.output_prefix
 
-
+    # read barcode map file generated along with a BAM file
     def get_barcode_map(self, sam_file_name):
         barcode_map = {}
         contigs_name, ext = os.path.splitext(sam_file_name)
@@ -678,23 +687,59 @@ class GeneDBProcessor:
         return barcodes
 
 
-    def write_gene_stats(self, gene_name, barcodes):
+    def gene_list_id_str(self, gene_db_list, delim = "_"):
+        gene_names = [g.id for g in gene_db_list]
+        return delim.join(gene_names)
+    
+
+    def write_gene_stats(self, gene_db_list, barcodes):
         #writing TSV with barcode -> isoform id
         outf = open(self.out_tsv, "a+")
-        outf.write(gene_name + "\t" + str(len(barcodes)) + "\n")
+        outf.write(self.gene_list_id_str(gene_db_list) + "\t" + str(len(barcodes)) + "\n")
         for b in barcodes.keys():
             if b != "" and barcodes[b][0] is not None:
                 outf.write(b + "\t" + barcodes[b][0] + "\n")
         outf.close()
 
+    def write_codon_tables(self, gene_db_list, gene_info, barcodes):
+        if CODON_OUTPUT == "ignore_overlaps" and len(gene_db_list) == 1:
+            self.write_codon_tables_for_genes(gene_db_list, gene_info, barcodes)
+        elif CODON_OUTPUT == "merge":
+            self.write_codon_tables_for_genes(gene_db_list, gene_info, barcodes)
+        elif CODON_OUTPUT == "separate":
+            for g in gene_db_list:
+                self.write_codon_tables_for_genes([g], gene_info, barcodes)
+        elif CODON_OUTPUT == "merge_exons":
+            for genes in self.group_genes_with_overlapping_exons(gene_db_list):
+                self.write_codon_tables_for_genes(genes, gene_info, barcodes)
+        else:
+            print("Unsupported codon output method")
+
+
+    def group_genes_with_overlapping_exons(self, gene_db_list):
+        sys.exit(-1)
+        return []
+
+    def write_codon_tables_for_genes(self, gene_db_list, gene_info, barcodes):
         #writing codon stats
+        gene_codon_pairs =  set(gene_info.get_codon_pairs(gene_db_list).values())
         codon_count_table = {}
         start_codons = set()
         stop_codons = set()
         for b in barcodes.keys():
+            if b != "" and barcodes[b][0] is None:
+                continue
+
             codon_pair = barcodes[b][1]
             if codon_pair is None or codon_pair[0] is None or codon_pair[1] is None:
                 continue
+            if codon_pair[0] <= 0 or codon_pair[1] <= 0:
+                print("Incorrect codon pair")
+                continue
+
+            if codon_pair not in gene_codon_pairs:
+                continue
+
             start_codons.add(codon_pair[0])
             stop_codons.add(codon_pair[1])
             if codon_pair not in codon_count_table:
@@ -702,47 +747,22 @@ class GeneDBProcessor:
             codon_count_table[codon_pair] += 1
 
         if len(start_codons) >= MIN_CODON_COUNT and len(stop_codons) >= MIN_CODON_COUNT:
+            #WRITE_CODON_COORDINATES
             outf = open(self.out_codon_stats, "a+")
-            outf.write("====" + gene_name + "\n")
-            outf.write(table_to_str(codon_count_table))
+            outf.write("====" + self.gene_list_id_str(gene_db_list) + "\n")
+            outf.write(table_to_str(codon_count_table, WRITE_CODON_COORDINATES))
             outf.close()
 
 
-    def need_to_process(self, gene_db):
-        #WARNING, not used now
-        return True
-        #checking codons
-        start_codons = set()
-        stop_codons = set()
-        for t in db.children(gene_db, featuretype='transcript', order_by='start'):
-            start_codon = None
-            stop_codon = None
-            for s in self.db.children(t, featuretype='start_codon', order_by='start'):
-                start_codon = s.start
-            for s in self.db.children(t, featuretype='stop_codon', order_by='start'):
-                stop_codon = s.start
-
-            if start_codon is not None and stop_codon is not None:
-                start_codons.add(start_codon)
-                stop_codons.add(stop_codon)
-
-        return len(start_codons) >= MIN_CODON_COUNT and len(stop_codons) >= MIN_CODON_COUNT
-
-    #Process a set of genes given in gene_db_list
+    # Process a set of genes given in gene_db_list
     def process_gene_list(self, gene_db_list):
-        print("Processing " + str(len(gene_db_list)) + " gene(s):")
-        s = ""
-        for g in gene_db_list:
-            s += g.id + ", "
-        print(s)
+        print("Processing " + str(len(gene_db_list)) + " gene(s): " + self.gene_list_id_str(gene_db_list, ", "))
         
         gene_info = GeneBarcodeInfo(gene_db_list, self.db, self.args)
         barcodes = self.get_gene_barcodes(gene_info)
 
-        gene_name = ""
-        for g in gene_db_list:
-            gene_name += g.id + "_"
-        self.write_gene_stats(gene_name, barcodes)
+        self.write_gene_stats(gene_db_list, barcodes)
+        self.write_codon_tables(gene_db_list, gene_info, barcodes)
 
     #Run though all genes in db and count stats according to alignments given in bamfile_name
     def process_all_genes(self):
