@@ -13,7 +13,7 @@ import pysam
 from common import *
 from traceback import print_exc
 
-RESOLVE_AMBIGUOUS = True
+RESOLVE_AMBIGUOUS = False
 DEDUCE_CODONS_FROM_CDS = True
 KEEP_ISOFORMS_WITHOUT_CODONS = False
 READS_CUTOFF = 10
@@ -482,7 +482,7 @@ class GeneBarcodeInfo:
                 codon_pair = self.codon_pairs[transcript_id]
             else:
                 codons = set()
-                if args.assign_codons_when_ambiguous:
+                if self.args.assign_codons_when_ambiguous:
                     for t in matched_isoforms:
                         codons.add(self.codon_pairs[t])
                 if len(codons) == 1:
