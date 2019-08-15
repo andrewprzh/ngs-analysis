@@ -257,12 +257,13 @@ class GeneBarcodeInfo:
     barcodes = {}
     args = None
 
-    def __init__(self, gene_db_list, db, args):
+    def __init__(self, gene_db_list, db, args, chr_bam_prefix = ""):
         self.args = args
         self.codon_pairs = {}
         self.db = db
         self.gene_db_list = gene_db_list
         self.chr_id, self.start, self.end = self.get_gene_region()
+        self.chr_id = chr_bam_prefix + self.chr_id
         self.barcodes = {}
         self.junctions = []
         self.exons = []
@@ -760,7 +761,7 @@ class GeneDBProcessor:
     def process_gene_list(self, gene_db_list):
         print("Processing " + str(len(gene_db_list)) + " gene(s): " + self.gene_list_id_str(gene_db_list, ", "))
         
-        gene_info = GeneBarcodeInfo(gene_db_list, self.db, self.args)
+        gene_info = GeneBarcodeInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix)
         barcodes = self.get_gene_barcodes(gene_info)
 
         self.write_gene_stats(gene_db_list, barcodes)
