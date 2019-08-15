@@ -104,8 +104,8 @@ def overlaps(range1, range2):
 def left_of(range1, range2):
     return range1[1] < range2[0]
 
-def equal_ranges(range1, range2):
-    return abs(range1[0] - range2[0]) <= 2 and abs(range1[1] - range2[1]) <= 2 
+def equal_ranges(range1, range2, delta = 2):
+    return abs(range1[0] - range2[0]) <= delta and abs(range1[1] - range2[1]) <= delta 
 
 def covers_end(bigger_range, smaller_range):
     return bigger_range[1] <= smaller_range[1] and bigger_range[0] <= smaller_range[0]
@@ -194,6 +194,31 @@ def is_subprofile(short_isoform_profile, long_isoform_profile):
 
 def sign(i):
     return 0 if i == 0 else (-1 if i < 0 else 1)
+
+
+def table_to_str(d):
+        vertical_keys = set()
+        horisontal_keys = set()
+        for k in sorted(d.keys()):
+            vertical_keys.add(k[0])
+            horisontal_keys.add(k[1])
+
+        res = ""
+        for x1 in vertical_keys:
+            s = ""
+            for x2 in horisontal_keys:
+                v = d.get((x1,x2), 0)
+                s += str(v) + '\t'
+            res += s[:-1] + '\n'
+        return res
+
+
+#check whether genes overlap and should be processed together
+def genes_overlap(gene_db1, gene_db2):
+    if (gene_db1.seqid != gene_db2.seqid):
+        print("Processing chromosome " + gene_db2.seqid)
+        return False
+    return overlaps((gene_db1.start, gene_db1.end), (gene_db2.start, gene_db2.end))
 
 class BarcodeStats:
     contig_alignment_count = 0
