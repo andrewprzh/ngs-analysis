@@ -271,7 +271,7 @@ class GeneBarcodeInfo:
 
         self.set_codon_pairs()
         i_junctions, i_exons = self.get_junctions_and_exons(True)
-        self.set_junction_profiles(self.coding_rna_profiles, i_junctions, i_exons)
+        self.set_junction_profiles(self.coding_rna_profiles, i_junctions, i_exons, False)
         self.set_junction_profiles(self.all_rna_profiles, i_junctions, i_exons, True)
 
         self.coding_rna_profiles.detect_ambiguous()
@@ -550,9 +550,6 @@ class GeneDBProcessor:
     def __init__(self, args):
         self.args = args
         self.bc_map = self.get_barcode_map(args.bam)
-        if not os.path.isfile(args.genedb):
-            raise Exception("Gene database " + args.genedb + " does not exist")
-        self.db = gffutils.FeatureDB(args.genedb, keep_order = True)
         self.bamfile_name = args.bam
         if not os.path.isfile(self.bamfile_name):
             raise Exception("BAM file " + self.samfile_nam + " does not exist")
@@ -562,6 +559,10 @@ class GeneDBProcessor:
         if samfile_in.references[0].startswith('chr'):
             chr_bam_prefix = 'chr'
         samfile_in.close()
+
+        if not os.path.isfile(args.genedb):
+            raise Exception("Gene database " + args.genedb + " does not exist")
+        self.db = gffutils.FeatureDB(args.genedb, keep_order = True)
         
         self.stats = BarcodeAssignmentStats()
         self.output_prefix = args.output_prefix
@@ -634,7 +635,7 @@ class GeneDBProcessor:
                 gene_stats.mismapped += 1
 
 
-    def count_unmapped_stats(self, gene_info):
+    def count_unmapped_stats(self, gene_info,  gene_stats):
         gene_isoform_ids = set(gene_info.coding_rna_profiles.isoform_profiles.keys())
         processed_barcodes = set()
         for t in gene_info.barcodes.keys():
@@ -677,7 +678,7 @@ class GeneDBProcessor:
                 self.count_isoform_stats(isoform, barcode_id, gene_stats, gene_info)
         
         if self.args.count_isoform_stats:
-            self.count_unmapped_stats(gene_info)
+            self.count_unmapped_stats(gene_info,  gene_stats)
 
         print("Done. Barcodes stats " + gene_stats.to_str())
         if self.args.count_isoform_stats:
