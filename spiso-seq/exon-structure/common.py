@@ -218,7 +218,7 @@ def table_to_str(d, write_coordinates = False, delim = '\t'):
             for x2 in horisontal_keys:
                 v = d.get((x1, x2), 0)
                 row_els.append(str(v))
-            res += delim.join(row_els)
+            res += delim.join(row_els)  + "\n"
         return res
 
 
