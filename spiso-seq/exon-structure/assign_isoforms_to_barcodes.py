@@ -11,6 +11,7 @@ import gffutils
 import argparse
 import pysam
 from common import *
+from traceback import print_exc
 
 RESOLVE_AMBIGUOUS = True
 DEDUCE_CODONS_FROM_CDS = True
@@ -528,7 +529,7 @@ class GeneBarcodeInfo:
 
 
 #Class for processing entire bam file agains gene database
-class GeneDBProccessor:
+class GeneDBProcessor:
     bc_map = None
     db = None
     args = None
@@ -537,7 +538,7 @@ class GeneDBProccessor:
     stats = None
     chr_bam_prefix = ""
     
-    def __init__(args):
+    def __init__(self, args):
         self.args = args
         self.bc_map = self.get_barcode_map(args.bam)
         if not os.path.isfile(args.genedb):
@@ -557,7 +558,7 @@ class GeneDBProccessor:
         self.output_prefix = args.output_prefix
 
 
-    def get_barcode_map(sam_file_name):
+    def get_barcode_map(self, sam_file_name):
         barcode_map = {}
         contigs_name, ext = os.path.splitext(sam_file_name)
         barcode_map_file = contigs_name + "_map.txt"
@@ -575,7 +576,7 @@ class GeneDBProccessor:
 
 
     #get barcode or sequence id depending on data type
-    def get_sequence_id(query_name):
+    def get_sequence_id(self, query_name):
         if self.args.data_type == "10x":
             tokens = query_name.strip().split("___")
             if len(tokens) != 2:
@@ -587,7 +588,7 @@ class GeneDBProccessor:
             return query_name.strip()
 
     #add isoform stats whem mapping reference sequences
-    def count_isoform_stats(isoform, barcode_id, gene_stats, gene_info):
+    def count_isoform_stats(self, isoform, barcode_id, gene_stats, gene_info):
         gene_isoform_ids = set(gene_info.coding_rna_profiles.isoform_profiles.keys())
         gene_all_isoform_ids = set(gene_info.all_rna_profiles.isoform_profiles.keys())
 
@@ -624,7 +625,7 @@ class GeneDBProccessor:
                 gene_stats.mismapped += 1
 
 
-    def count_unmapped_stats(gene_info):
+    def count_unmapped_stats(self, gene_info):
         gene_isoform_ids = set(gene_info.coding_rna_profiles.isoform_profiles.keys())
         processed_barcodes = set()
         for t in gene_info.barcodes.keys():
@@ -635,7 +636,7 @@ class GeneDBProccessor:
 
 
     #assign all barcodes mapped to gene region
-    def get_gene_barcodes(gene_info):
+    def get_gene_barcodes(self, gene_info):
         samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
         gene_chr, gene_start, gene_end = gene_info.get_gene_region()
 
@@ -656,29 +657,28 @@ class GeneDBProccessor:
             isoform, codons = gene_info.assign_isoform(b, gene_stats, self.args.reads_cutoff)
 
             barcode_id = b
-            if bc_map is not None:
-                barcode_id = list(bc_map[b])[0]
-                for bc in bc_map[b]:
+            if self.bc_map is not None:
+                barcode_id = list(self.bc_map[b])[0]
+                for bc in self.bc_map[b]:
                     barcodes[bc] = (isoform, codons)
             else:
                 barcodes[b] = (isoform, codons)
             
-            if args.count_isoform_stats:
+            if self.args.count_isoform_stats:
                 self.count_isoform_stats(isoform, barcode_id, gene_stats, gene_info)
         
-        if args.count_isoform_stats:
+        if self.args.count_isoform_stats:
             self.count_unmapped_stats(gene_info)
 
         print("Done. Barcodes stats " + gene_stats.to_str())
-        if args.count_isoform_stats:
+        if self.args.count_isoform_stats:
             print("Done. Isoform stats " + gene_stats.isoform_stats())
         self.stats.merge(gene_stats)
-
 
         return barcodes
 
 
-    def write_gene_stats(gene_name, barcodes):
+    def write_gene_stats(self, gene_name, barcodes):
         #writing TSV with barcode -> isoform id
         outf = open(self.out_tsv, "a+")
         outf.write(gene_name + "\t" + str(len(barcodes)) + "\n")
@@ -708,7 +708,7 @@ class GeneDBProccessor:
             outf.close()
 
 
-    def need_to_process(gene_db):
+    def need_to_process(self, gene_db):
         #WARNING, not used now
         return True
         #checking codons
@@ -729,28 +729,28 @@ class GeneDBProccessor:
         return len(start_codons) >= MIN_CODON_COUNT and len(stop_codons) >= MIN_CODON_COUNT
 
     #Process a set of genes given in gene_db_list
-    def process_gene_list(gene_db_list):
-        print("Processing " + str(len(gene_db_list)) + " genes:")
+    def process_gene_list(self, gene_db_list):
+        print("Processing " + str(len(gene_db_list)) + " gene(s):")
         s = ""
         for g in gene_db_list:
             s += g.id + ", "
         print(s)
         
-        gene_info = GeneBarcodeInfo(gene_db_list, self.db)
+        gene_info = GeneBarcodeInfo(gene_db_list, self.db, self.args)
         barcodes = self.get_gene_barcodes(gene_info)
 
         gene_name = ""
         for g in gene_db_list:
             gene_name += g.id + "_"
-        self.write_gene_stats(gene_name, barcodes, self.out_tsv, self.out_codon_stats)
+        self.write_gene_stats(gene_name, barcodes)
 
     #Run though all genes in db and count stats according to alignments given in bamfile_name
-    def process_all_genes():
-        self.out_tsv = self.outf_prefix + ".barcodes.tsv"
-        outf = open(out_tsv, "w")
+    def process_all_genes(self):
+        self.out_tsv = self.output_prefix + ".barcodes.tsv"
+        outf = open(self.out_tsv, "w")
         outf.close()
-        self.out_codon_stats = self.outf_prefix + ".codon_stats.tsv"
-        outf = open(out_codon_stats, "w")
+        self.out_codon_stats = self.output_prefix + ".codon_stats.tsv"
+        outf = open(self.out_codon_stats, "w")
         outf.close()
         
         gene_db_list = []
@@ -854,7 +854,6 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except:
-        log.err("The following unexpected error occured during the run:")
         print_exc()
         sys.exit(-1)
 
