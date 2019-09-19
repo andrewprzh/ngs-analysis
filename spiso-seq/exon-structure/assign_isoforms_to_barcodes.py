@@ -39,98 +39,6 @@ def print_debug(s):
     if DEBUG:
         print(s)
 
-# class for storing support vectors for known features (junctions)
-class FeatureVector:
-    profile = []
-    reads = 0
-    check_flanking = True
-    
-    def __init__(self, num, check_flanking = True):
-        self.profile = [0 for i in range(0, num)]  
-        self.reads = 0
-        self.check_flanking = check_flanking    
-
-    # update vector using features from alignment
-    def add_from_blocks(self, read_features, known_features): 
-        read_pos = 0
-        ref_pos = 0
-        
-        #print read_features
-        #print known_features
-
-        features_present = [0 for i in range(0, len(known_features) + 2)]
-
-        if self.check_flanking:
-            if len(read_features) > 0 and len(known_features) > 0  and left_of(read_features[0], known_features[0]):
-                features_present[0] = 1
-
-            if len(read_features) > 0 and len(known_features) > 0 and left_of(known_features[-1], read_features[-1]):
-                features_present[-1] = 1
-
-        while read_pos < len(read_features) and ref_pos < len(known_features):
-            while read_pos < len(read_features) and left_of(read_features[read_pos], known_features[ref_pos]):
-                read_pos += 1
-            if read_pos == len(read_features):
-                break
-
-            while ref_pos < len(known_features) and left_of(known_features[ref_pos], read_features[read_pos]):
-                ref_pos += 1
-            if ref_pos == len(known_features):
-                break
-
-            if equal_ranges(known_features[ref_pos], read_features[read_pos]):
-                features_present[ref_pos + 1] = 1
-                ref_pos += 1
-            elif overlaps(known_features[ref_pos], read_features[read_pos]):
-                features_present[ref_pos + 1] = -1
-                ref_pos += 1
-            elif known_features[ref_pos] < read_features[read_pos]:
-                ref_pos += 1
-            else:
-                read_pos +=1
-               
-        #print features_present
-        self.fill_gaps(features_present)
-
-        self.reads += 1
-        for i in range(0, len(self.profile)):
-            self.profile[i] += features_present[i]
-
-    def fill_gaps(self, features_present):
-        start = 0
-        while start < len(features_present) and features_present[start] == 0:
-            start += 1
-
-        end = len(features_present) - 1
-        while end > 0 and features_present[end] == 0:
-            end -= 1
-
-        for i in range(start, end):
-            if features_present[i] == 0:
-                features_present[i] = -1
-
-# Feature vector + support information for a barcode
-class BacrodeInfo:
-    barcode = ""
-    total_reads = 0
-    junctions_counts = None
-
-    def __init__(self, bc, junctions_num, check_flanking):
-        self.barcode = bc
-        self.total_reads = 0
-        self.junctions_counts = FeatureVector(junctions_num, check_flanking)
-
-    def add_read(self, alignment, known_junctions):
-        self.total_reads += 1
-        blocks = sorted(alignment.get_blocks())
-        if len(blocks) >= 2:
-            read_junctions = []
-            for i in range(0, len(blocks) - 1):
-                read_junctions.append((blocks[i][1], blocks[i+1][0]))
-            self.junctions_counts.add_from_blocks(read_junctions, known_junctions)
-            print_debug("Barcode " + self.barcode + "\n" + str(read_junctions))
-
-
 # class for saving all the stats
 class BarcodeAssignmentStats:
     low_covered = 0
@@ -212,27 +120,129 @@ class BarcodeAssignmentStats:
         return s + "%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%d" % \
             (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned, self.ambiguous_unassignable)
 
+
+# class for storing support vectors for known features (junctions)
+class FeatureVector:
+    profile = []
+    reads = 0
+    check_flanking = True
+    fill_gaps = True
+    
+    def __init__(self, num, check_flanking, fill_gaps, block_comparator):
+        self.profile = [0 for i in range(0, num)]  
+        self.reads = 0
+        self.check_flanking = check_flanking
+        self.fill_gaps = fill_gaps
+
+    # update vector using features from alignment
+    def add_from_blocks(self, read_features, known_features): 
+        read_pos = 0
+        ref_pos = 0
+        
+        #print read_features
+        #print known_features
+
+        features_present = [0 for i in range(0, len(known_features) + 2)]
+
+        if self.check_flanking:
+            if len(read_features) > 0 and len(known_features) > 0  and left_of(read_features[0], known_features[0]):
+                features_present[0] = 1
+
+            if len(read_features) > 0 and len(known_features) > 0 and left_of(known_features[-1], read_features[-1]):
+                features_present[-1] = 1
+
+        while read_pos < len(read_features) and ref_pos < len(known_features):
+            while read_pos < len(read_features) and left_of(read_features[read_pos], known_features[ref_pos]):
+                read_pos += 1
+            if read_pos == len(read_features):
+                break
+
+            while ref_pos < len(known_features) and left_of(known_features[ref_pos], read_features[read_pos]):
+                ref_pos += 1
+            if ref_pos == len(known_features):
+                break
+
+            if block_comparator(known_features[ref_pos], read_features[read_pos]):
+                features_present[ref_pos + 1] = 1
+                ref_pos += 1
+            elif overlaps(known_features[ref_pos], read_features[read_pos]):
+                features_present[ref_pos + 1] = -1
+                ref_pos += 1
+            elif known_features[ref_pos] < read_features[read_pos]:
+                ref_pos += 1
+            else:
+                read_pos +=1
+               
+        #print features_present
+        if self.fill_gaps:
+            self.fill_gaps(features_present)
+
+        self.reads += 1
+        for i in range(0, len(self.profile)):
+            self.profile[i] += features_present[i]
+
+    def fill_gaps(self, features_present):
+        start = 0
+        while start < len(features_present) and features_present[start] == 0:
+            start += 1
+
+        end = len(features_present) - 1
+        while end > 0 and features_present[end] == 0:
+            end -= 1
+
+        for i in range(start, end):
+            if features_present[i] == 0:
+                features_present[i] = -1
+
+# Two feature vectors (intons + exons) + support information for a read/barcode mapping
+class ReadMappingInfo:
+    read_id = ""
+    total_reads = 0
+    junctions_counts = None
+    exon_counts = None
+
+    def __init__(self, read_id, introns_count, exons_count):
+        self.read_id = read_id
+        self.total_reads = 0
+        self.junctions_counts = \
+            FeatureVector(introns_count, check_flanking = True, fill_gaps = True, block_comparator = equal_ranges)
+        self.exons_counts = \
+            FeatureVector(exons_count, check_flanking = True, fill_gaps = False, block_comparator = contains_approx)
+
+    def add_read(self, alignment, known_introns, known_exons):
+        self.total_reads += 1
+        #converting to 1-based coordinates
+        #second coordinate is not converted since alignment block is end-exclusive, i.e. [x, y)
+        blocks = map(lambda x: (x[0] + 1, x[1]), sorted(alignment.get_blocks()))
+
+        if len(blocks) >= 2:
+            read_junctions = junctions_from_blocks(blocks)
+            self.junctions_counts.add_from_blocks(read_junctions, known_introns)
+            print_debug("Barcode " + self.read_id + "\n" + str(read_junctions))
+        self.exons_counts.add_from_blocks(blocks, known_exons)
+
+
+
 # storage for feature profiles of all known isoforms of a gene or a set of overlapping genes
-class ProfileStorage:
-    isoform_profiles = {}
-    isoform_exon_profiles = {}
+class IsoformProfileStorage:
+    intron_profiles = {}
+    exon_profiles = {}
     empty = set()
     ambiguous = set()
 
     def __init__(self):
-        self.isoform_profiles = {}
-        self.isoform_exon_profiles = {}
-        self.empty = set()
+        self.intron_profiles = {}
+        self.exon_profiles = {}
         self.ambiguous = set()
 
-
+    # detect isoforms which are exact sub-isoforms of others
     def detect_ambiguous(self):
-        for t in self.isoform_profiles:
-            isoform_profile = self.isoform_profiles[t]
-            for t2 in self.isoform_profiles:
+        for t in self.intron_profiles:
+            isoform_profile = self.intron_profiles[t]
+            for t2 in self.intron_profiles:
                 if t == t2:
                     continue
-                if is_subprofile(isoform_profile, self.isoform_profiles[t2]):
+                if is_subprofile(isoform_profile, self.intron_profiles[t2]):
                     self.ambiguous.add(t)
                     #print("Unassignable " + t)
                     #print(isoform_profile)
@@ -241,43 +251,52 @@ class ProfileStorage:
         for i in self.ambiguous:
             global_unassignable_set.add(i)
         #print(self.ambiguous)
-         
-# storage for all barcodes/sequences mapped to a specific set of genes
-class GeneBarcodeInfo:
+
+
+# All gene(s) information
+class GeneInfo:
+    # list of genes in cluster
     gene_db_list = []
+    # gene region
     chr_id = None
     start = 0
     end = 0
+    # gffutils main structure
     db = None
-    coding_rna_profiles = ProfileStorage()
-    all_rna_profiles = ProfileStorage()
-    junctions = []
+
+    # profiles for isoforms having CDS
+    coding_rna_profiles = IsoformProfileStorage()
+    # profiles for all known isoforoms
+    all_rna_profiles = IsoformProfileStorage()
+    # sorted list of all known introns (pairs of coordinates)
+    introns = []
+    # sorted list of non-overlapping
     exons = []
-    codon_pairs = {}
-    barcodes = {}
     args = None
 
+    # args: parameters of the tool
+    # chr_bam_prefix: additional string used when bam files were aligned to different reference that has difference in chromosome names (e.g. 1 and chr1)
     def __init__(self, gene_db_list, db, args, chr_bam_prefix = ""):
         self.args = args
-        self.codon_pairs = {}
         self.db = db
         self.gene_db_list = gene_db_list
         self.chr_id, self.start, self.end = self.get_gene_region()
         self.chr_id = chr_bam_prefix + self.chr_id
-        self.barcodes = {}
-        self.junctions = []
-        self.exons = []
-        self.coding_rna_profiles = ProfileStorage()
-        self.all_rna_profiles = ProfileStorage()
 
-        self.set_codon_pairs()
-        i_junctions, i_exons = self.get_junctions_and_exons(True)
-        self.set_junction_profiles(self.coding_rna_profiles, i_junctions, i_exons, False)
-        self.set_junction_profiles(self.all_rna_profiles, i_junctions, i_exons, True)
+        self.introns = []
+        self.exons = []
+        self.coding_rna_profiles = IsoformProfileStorage()
+        self.all_rna_profiles = IsoformProfileStorage()
+
+        i_introns, i_exons = self.set_introns_and_exons(True)
+        self.exons = self.split_exons(self.exons)
+
+        self.set_junction_profiles(self.coding_rna_profiles, i_introns, i_exons, False)
+        self.set_junction_profiles(self.all_rna_profiles, i_introns, i_exons, True)
 
         self.coding_rna_profiles.detect_ambiguous()
         self.all_rna_profiles.detect_ambiguous()
-        #print("Gene has " + str(len(self.all_rna_profiles.ambiguous)) + " ambiguous isoforms")
+        # print("Gene has " + str(len(self.all_rna_profiles.ambiguous)) + " ambiguous isoforms")
 
     # return start-stop codon pair for a known isoform
     # return None when codon could not be found
@@ -312,83 +331,112 @@ class GeneBarcodeInfo:
                     break
         return start_codon, stop_codon
 
-
     def isoform_is_coding(self, t):
         start_codon, stop_codon = self.get_codon_pair(t)
         return stop_codon is not None and start_codon is not None
 
-    # get a set of all known exons and splice junctions in a set of genes
-    def get_junctions_and_exons(self, keep_isoforms_without_codons):
-        i_junctions = {}
-        i_exons = {}
-        
+    # assigns an ordered list of all known exons and introns to self.exons and self.introns
+    # returns 2 maps, isoform id -> intron / exon list
+    def set_introns_and_exons(self, keep_isoforms_without_codons):
+        # dictionary: isoform id -> ordered list of intron coordinates
+        all_isoforms_introns = {}
+        # dictionary: isoform id -> ordered list of exon coordinates
+        all_isoforms_exons = {}
+
         for gene_db in self.gene_db_list:
-            for t in self.db.children(gene_db, featuretype = 'transcript', order_by='start'):
+            for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
                 if not keep_isoforms_without_codons and not self.isoform_is_coding(t):
                     continue
 
-                cur_exon = None
-                i_junctions[t.id] = set()
-                i_exons[t.id] = set()
+                all_isoforms_exons[t.id] = []
                 for e in self.db.children(t, order_by='start'):
                     if e.featuretype == 'exon':
-                        if cur_exon is None:
-                            i_exons[t.id].add((e.start, e.end))
-                            cur_exon = e
-                            continue
-                        i_junctions[t.id].add((cur_exon.end, e.start))
-                        i_exons[t.id].add((e.start, e.end))
-                        cur_exon = e
+                        all_isoforms_exons[t.id].append((e.start, e.end))
 
-        self.junctions = set()
+                all_isoforms_introns[t.id] = junctions_from_blocks(all_isoforms_exons[t.id])
+
+        self.introns = set()
         self.exons = set()
-        for i in i_junctions.keys():
-            for j in i_junctions[i]:
-                self.junctions.add(j)
-        for i in i_exons.keys():
-            for e in i_exons[i]:
-                self.exons.add(e)
-            
-        self.junctions = sorted(list(self.junctions))
-        self.exons = sorted(list(self.exons))
-        print_debug(self.junctions)
-        #print(self.exons)
+        for i in all_isoforms_introns.keys():
+            self.introns.update(all_isoforms_introns[i])
+        for i in all_isoforms_exons.keys():
+            self.exons.update(all_isoforms_exons[i])
 
-        return i_junctions, i_exons
+        self.introns = sorted(list(self.introns))
+        self.exons = sorted(list(self.exons))
+        # print_debug(self.junctions)
+        # print(self.exons)
+
+        return all_isoforms_introns, all_isoforms_exons
+
+    # split exons into non-overlapping covering blocks
+    def split_exons(self, exons):
+        exon_starts = sorted(map(lambda x:x[0], exons))
+        exon_ends = sorted(map(lambda x: x[1], exons))
+
+        current_state = 0
+        starts_pos = 0
+        ends_pos = 0
+        last_border = -1
+        exon_blocks = []
+
+        while starts_pos < len(exon_starts) and ends_pos < len(exon_ends):
+            if exon_starts[starts_pos] < exon_ends[ends_pos]:
+                cur_border = exon_starts[starts_pos]
+                if last_border != -1 and current_state > 0:
+                    exon_blocks.append((last_border, cur_border - 1))
+                current_state += 1
+                last_border = cur_border
+            else:
+                if last_border == -1 or current_state == 0:
+                    print("Error, exon ends before the start")
+
+                cur_border = exon_ends[ends_pos]
+                exon_blocks.append((last_border, cur_border))
+                last_border = cur_border + 1
+                current_state -= 1
+
+        if exon_blocks != sorted(exon_blocks):
+            print("Somehow block are unsorted")
+
+        return exon_blocks
+
 
     # calculate junction profiles for known isoforms
-    def set_junction_profiles(self, profile_storage, i_junctions, i_exons, keep_isoforms_without_codons):
-        profile_storage.isoform_profiles = {}
-        profile_storage.isoform_exon_profiles = {}
+    def set_junction_profiles(self, profile_storage, i_introns, i_exons, keep_isoforms_without_codons):
+        profile_storage.intron_profiles = {}
+        profile_storage.exon_profiles = {}
 
         for gene_db in self.gene_db_list:
-            for t in self.db.children(gene_db, featuretype = 'transcript', order_by='start'):
+            for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
                 if not keep_isoforms_without_codons and not self.isoform_is_coding(t):
                     continue
 
-                profile_storage.isoform_profiles[t.id] = [-1 for i in range(0, len(self.junctions) + 2)]
-                profile_storage.isoform_exon_profiles[t.id] = [-1 for i in range(0, len(self.exons) + 2)]
-                for j in i_junctions[t.id]:
-                    pos = self.junctions.index(j)
-                    profile_storage.isoform_profiles[t.id][pos + 1] = 1
-                for e in i_exons[t.id]:
-                    pos = self.exons.index(e)
-                    profile_storage.isoform_exon_profiles[t.id][pos + 1] = 1
-     
-                print_debug("Isoform " + t.id)
-                print_debug(profile_storage.isoform_profiles[t.id])
-                #print_debug(profile_storage.isoform_exon_profiles[t.id])
+                # setting up intron profiles for current isoform
+                profile_storage.intron_profiles[t.id] = [-1 for i in range(0, len(self.introns) + 2)]
+                pos = 0
+                for intron in i_introns[t.id]:
+                    while not equal_ranges(self.introns[pos], intron, 0):
+                        pos += 1
+                    profile_storage.intron_profiles[t.id][pos + 1] = 1
 
-                if all(x == -1 for x in profile_storage.isoform_profiles[t.id]):
-                    del profile_storage.isoform_profiles[t.id]
-                    del profile_storage.isoform_exon_profiles[t.id]
-                    profile_storage.empty.add(t.id)
+                # setting up exon profiles for current isoform
+                profile_storage.exon_profiles[t.id] = [-1 for i in range(0, len(self.exons) + 2)]
+                pos = 0
+                for exon in i_exons[t.id]:
+                    while not contains(exon, self.exons[pos]):
+                        pos += 1
+                    profile_storage.intron_profiles[t.id][pos + 1] = 1
+
+                print_debug("Isoform " + t.id)
+                print_debug(profile_storage.intron_profiles[t.id])
+                print_debug(profile_storage.exon_profiles[t.id])
 
     # compute start-stop codon pair for known isoforms
     def get_codon_pairs(self, gene_db_list):
         codon_pairs = {}
         for gene_db in gene_db_list:
-            for t in self.db.children(gene_db, featuretype = 'transcript', order_by='start'):
+            for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
                 start_codon, stop_codon = self.get_codon_pair(t)
                 if stop_codon is not None and start_codon is not None:
                     codon_pairs[t.id] = (start_codon, stop_codon)
@@ -396,45 +444,59 @@ class GeneBarcodeInfo:
                     codon_pairs[t.id] = (None, None)
         return codon_pairs
 
-    def set_codon_pairs(self):
-        self.codon_pairs = self.get_codon_pairs(self.gene_db_list)
-
     # return region of overlapping gene set
     def get_gene_region(self):
         start = self.gene_db_list[0].start
         end = self.gene_db_list[-1].end
-        chr_id =  self.gene_db_list[0].seqid
-        
+        chr_id = self.gene_db_list[0].seqid
+
         for gene_db in self.gene_db_list:
             if start > gene_db.start:
                 start = gene_db.start
             if end < gene_db.end:
                 end = gene_db.end
 
-        return chr_id, start, end       
+        return chr_id, start, end
+
+
+# storage for all barcodes/reads mapped to a specific set of genes
+class ReadAssignmentInfo:
+    gene_info = None
+    # isoform id -> start-stop codon pair (pair of starting coordinates)
+    codon_pairs = {}
+    # read id -> read mapping info
+    read_mapping_infos = {}
+    args = None
+
+    def __init__(self, gene_db_list, db, args, chr_bam_prefix = ""):
+        self.gene_info = GeneInfo(gene_db_list, db, args, chr_bam_prefix)
+        self.args = args
+        self.codon_pairs = self.gene_info.get_codon_pairs(self.gene_info.gene_db_list)
+        self.read_mapping_infos = {}
 
     # process alignment within a gene region
-    def add_read(self, alignment, barcode_id):
+    def add_read(self, alignment, read_id):
         chr_name = alignment.reference_name.strip()
-        if chr_name != self.chr_id:
+        if chr_name != self.gene_info.chr_id:
             return
+
         blocks = sorted(alignment.get_blocks())
         if len(blocks) == 0:
             return
+
         read_start = blocks[0][0]
         read_end = blocks[-1][1]
-
         if not overlaps((read_start, read_end), (self.start, self.end)):
             return
 
-        if barcode_id not in self.barcodes:
-            self.barcodes[barcode_id] = BacrodeInfo(barcode_id, len(self.junctions) + 2, self.args.consider_flanking_junctions)
-        self.barcodes[barcode_id].add_read(alignment, self.junctions)
+        if read_id not in self.read_mapping_infos:
+            self.read_mapping_infos[read_id] = ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2)
+        self.read_mapping_infos[read_id].add_read(alignment, self.gene_info.introns, self.gene_info.exons)
 
     # match barcode/sequence junction profile to a known isoform junction profile
-    def find_matches(self, barcode_info, profile_storage):
-        bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
-        print_debug(barcode_info.barcode)
+    def find_matches(self, read_mapping_info, profile_storage):
+        bacrode_jprofile = map(sign, read_mapping_info.junctions_counts.profile)
+        print_debug(read_mapping_info.barcode)
         print_debug(bacrode_jprofile)
 
         matched_isoforms = set()
@@ -446,8 +508,8 @@ class GeneBarcodeInfo:
         return matched_isoforms
 
     # returns true if alignment has no splice junctions (e.g. single-block alignment)
-    def is_empty_alignment(self, barcode_info):
-        bacrode_jprofile = map(sign, barcode_info.junctions_counts.profile)
+    def is_empty_alignment(self, read_mapping_info):
+        bacrode_jprofile = map(sign, read_mapping_info.junctions_counts.profile)
 #        print_debug(barcode_info.barcode)
 #        print_debug(bacrode_jprofile)
 
@@ -456,25 +518,27 @@ class GeneBarcodeInfo:
         return False
 
     # assign barcode/sequence alignment to a known isoform
-    def assign_isoform(self, barcode_id, stat, coverage_cutoff):
-        print_debug('=== ' + barcode_id + ' ===')
+    def assign_isoform(self, read_id, stat, coverage_cutoff):
+        print_debug('=== ' + read_id + ' ===')
 
-        barcode_info = self.barcodes[barcode_id]
-        if barcode_info.total_reads < coverage_cutoff:
+        read_mapping_info = self.read_mapping_infos[read_id]
+        if read_mapping_info.total_reads < coverage_cutoff:
             stat.low_covered += 1
             return None, None          
 
-        if self.is_empty_alignment(barcode_info):
+        if self.is_empty_alignment(read_mapping_info):
             stat.empty += 1
             print_debug("Empty profile ")
             return None, None          
 
-        matched_isoforms = self.find_matches(barcode_info, self.all_rna_profiles)
+        # match read profile with isoform profiles
+        matched_isoforms = self.find_matches(read_mapping_info, self.all_rna_profiles)
 
-        if barcode_id not in global_barcode_map:
-            global_barcode_map[barcode_id] = set()
+        # for statistics
+        if read_id not in global_barcode_map:
+            global_barcode_map[read_id] = set()
         for i in matched_isoforms:
-            global_barcode_map[barcode_id].add(i)
+            global_barcode_map[read_id].add(i)
 
         transcript_id = None
         codon_pair = (None, None)
@@ -483,7 +547,7 @@ class GeneBarcodeInfo:
             print_debug("Contradictory")
         elif len(matched_isoforms) > 1:
             if RESOLVE_AMBIGUOUS:
-                matched_isoforms = self.resolve_ambiguous(barcode_info, matched_isoforms, self.all_rna_profiles)
+                matched_isoforms = self.resolve_ambiguous(read_mapping_info, matched_isoforms, self.all_rna_profiles)
             
             if len(matched_isoforms) == 1:
                 stat.ambiguous_subisoform_assigned += 1
@@ -761,7 +825,7 @@ class GeneDBProcessor:
     def process_gene_list(self, gene_db_list):
         print("Processing " + str(len(gene_db_list)) + " gene(s): " + self.gene_list_id_str(gene_db_list, ", "))
         
-        gene_info = GeneBarcodeInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix)
+        gene_info = ReadAssignmentInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix)
         barcodes = self.get_gene_barcodes(gene_info)
 
         self.write_gene_stats(gene_db_list, barcodes)

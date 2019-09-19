@@ -104,7 +104,7 @@ def overlaps(range1, range2):
 def left_of(range1, range2):
     return range1[1] < range2[0]
 
-def equal_ranges(range1, range2, delta = 3):
+def equal_ranges(range1, range2, delta = 1):
     return abs(range1[0] - range2[0]) <= delta and abs(range1[1] - range2[1]) <= delta 
 
 def covers_end(bigger_range, smaller_range):
@@ -116,15 +116,22 @@ def covers_start(bigger_range, smaller_range):
 def contains(bigger_range, smaller_range):
     return bigger_range[1] >= smaller_range[1] and bigger_range[0] <= smaller_range[0]
 
-
-def contains_approx(bigger_range, smaller_range):
-    return bigger_range[1] + 2 >= smaller_range[1] and bigger_range[0] - 2 <= smaller_range[0]
+def contains_approx(bigger_range, smaller_range, delta = 1):
+    return bigger_range[1] + delta >= smaller_range[1] and bigger_range[0] - delta <= smaller_range[0]
 
 def overlaps_to_left(bigger_range, smaller_range):
     return smaller_range[1] >= bigger_range[0] and smaller_range[1] <= bigger_range[1]
 
 def overlaps_to_right(bigger_range, smaller_range):
     return smaller_range[0] >= bigger_range[0] and smaller_range[0] <= bigger_range[1]
+
+def junctions_from_blocks(blocks):
+    junctions = []
+    if len(blocks) >= 2:
+        for i in range(0, len(blocks) - 1):
+            if blocks[i][1] + 1 < blocks[i + 1][0]:
+                junctions.append((blocks[i][1] + 1, blocks[i + 1][0] - 1))
+    return junctions
 
 def hamming(l1, l2):
     if len(l1) != len(l2):
