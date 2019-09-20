@@ -34,7 +34,7 @@ WRITE_CODON_COORDINATES = False
 global_assignment_map = {}
 global_unassignable_set = set()
 
-DEBUG = False
+DEBUG = True
 def print_debug(s):
     if DEBUG:
         print(s)
@@ -43,6 +43,8 @@ def print_debug(s):
 class ReadAssignmentStats:
     low_covered = 0
     uniquely_assigned = 0
+    unique_extra_exon = 0
+    unique_extra_intros = 0
     assigned_to_ncrna = 0
     contradictory = 0
     empty = 0
@@ -66,6 +68,8 @@ class ReadAssignmentStats:
     def __init__(self):
         self.low_covered = 0
         self.uniquely_assigned = 0
+        self.unique_extra_exon = 0
+        self.unique_extra_intros = 0
         self.assigned_to_ncrna = 0
         self.contradictory = 0
         self.empty = 0
@@ -88,6 +92,8 @@ class ReadAssignmentStats:
     def merge(self, stat):
         self.low_covered += stat.low_covered
         self.uniquely_assigned += stat.uniquely_assigned
+        self.unique_extra_exon += stat.unique_extra_exon
+        self.unique_extra_intros += stat.unique_extra_intros
         self.assigned_to_ncrna += stat.assigned_to_ncrna
         self.contradictory += stat.contradictory
         self.empty += stat.empty
@@ -109,16 +115,24 @@ class ReadAssignmentStats:
 
     def isoform_stats(self):
 
-        total = self.correctly_assigned+self.unassigned+self.mismapped+self.unmapped+self.incorrectly_assigned_same_gene+self.incorrectly_assigned_other_gene +  self.empty_bc+ self.incorrectly_assigned_nc + self.unassigned_nc + self.unassignable
+        total = self.correctly_assigned + self.unassigned + self.mismapped + self.unmapped +\
+                self.incorrectly_assigned_same_gene + self.incorrectly_assigned_other_gene +  self.empty_bc+ \
+                self.incorrectly_assigned_nc + self.unassigned_nc + self.unassignable
         s = "\nTotal\tcorrect\twrong_same\twrong_other\tunassigned\tmismapped\tunmapped\tempty\t\twrong_nc\tunassigned_nc\tunassignable\n"
         return s + "%d\t%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d" % \
-            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene, self.unassigned, self.mismapped, self.unmapped, self.empty_bc, self.incorrectly_assigned_nc, self.unassigned_nc, self.unassignable)
+            (total, self.correctly_assigned, self.incorrectly_assigned_same_gene, self.incorrectly_assigned_other_gene,
+             self.unassigned, self.mismapped, self.unmapped, self.empty_bc, self.incorrectly_assigned_nc,
+             self.unassigned_nc, self.unassignable)
 
     def to_str(self):
-        total_bc = self.low_covered + self.uniquely_assigned + self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + self.ambiguous_subisoform_assigned + self.ambiguous_unassignable
-        s = "\nTotal\t\tlow_covered\tunique\t\tncrna\t\tcontradictory\tempty\t\tambiguous\tambiguous_codon\tambiguous_assigned\tunassignable\n"
-        return s + "%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%d" % \
-            (total_bc, self.low_covered, self.uniquely_assigned, self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned, self.ambiguous_subisoform_assigned, self.ambiguous_unassignable)
+        total_bc = self.low_covered + self.uniquely_assigned + self.unique_extra_exon + self.unique_extra_intros +\
+                   self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + \
+                   self.ambiguous_subisoform_assigned + self.ambiguous_unassignable
+        s = "\nTotal\t\tlow_covered\tunique\tunique_ee\tunique_ei\t\tncrna\t\tcontradictory\tempty\t\tambiguous\tambiguous_codon\tambiguous_assigned\tunassignable\n"
+        return s + "%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%d" % \
+            (total_bc, self.low_covered, self.uniquely_assigned, self.unique_extra_exon, self.unique_extra_intros,
+             self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned,
+             self.ambiguous_subisoform_assigned, self.ambiguous_unassignable)
 
 
 # class for storing support vectors for known features (junctions)
@@ -201,7 +215,7 @@ class ReadMappingInfo:
     read_id = ""
     total_reads = 0
     junctions_counts = None
-    exon_counts = None
+    exons_counts = None
 
     def __init__(self, read_id, introns_count, exons_count, check_flanking = CONSIDER_FLANKING_JUNCTIONS):
         self.read_id = read_id
@@ -209,7 +223,7 @@ class ReadMappingInfo:
         self.junctions_counts = \
             FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
         self.exons_counts = \
-            FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = False, block_comparator = contains_approx)
+            FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps)
 
     def add_read(self, alignment, known_introns, known_exons):
         self.total_reads += 1
@@ -240,11 +254,11 @@ class IsoformProfileStorage:
     # detect isoforms which are exact sub-isoforms of others
     def detect_ambiguous(self):
         for t in self.intron_profiles:
-            isoform_profile = self.intron_profiles[t]
+            intron_profile = self.intron_profiles[t]
+            exon_profile = self.exon_profiles[t]
             for t2 in self.intron_profiles:
-                if t == t2:
-                    continue
-                if is_subprofile(isoform_profile, self.intron_profiles[t2]):
+                if is_subprofile(intron_profile, self.intron_profiles[t2]) and \
+                        is_subprofile(exon_profile, self.exon_profiles[t2]):
                     self.ambiguous.add(t)
                     #print("Unassignable " + t)
                     #print(isoform_profile)
@@ -514,29 +528,58 @@ class ReadProfilesInfo:
                 ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2, CONSIDER_FLANKING_JUNCTIONS)
         self.read_mapping_infos[read_id].add_read(alignment, self.gene_info.introns, self.gene_info.exons)
 
-    # match barcode/sequence junction profile to a known isoform junction profile
-    def find_matches(self, read_mapping_info, profile_storage):
-        bacrode_jprofile = map(sign, read_mapping_info.junctions_counts.profile)
-        print_debug(read_mapping_info.read_id)
-        print_debug(bacrode_jprofile)
+    # match barcode/sequence junction profile to a known isoform junction profile, hint - potential candidates
+    def find_matching_isofoms_by_profile(self, read_profile, profiles, hint = set()):
+        read_sign_profile = map(sign, read_profile.profile)
+        print_debug(read_sign_profile)
 
         matched_isoforms = set()
-        for t in profile_storage.intron_profiles.keys():
-            isoform_jprofile = profile_storage.intron_profiles[t]
-            if diff_only_present(isoform_jprofile, bacrode_jprofile) == 0:
+        for t in profiles.keys():
+            if len(hint) > 0 and t not in hint:
+                continue
+            isoform_profile = profiles[t]
+            if diff_only_present(isoform_profile, read_sign_profile) == 0:
                 print_debug("Matched " + t)
                 matched_isoforms.add(t)
         return matched_isoforms
 
-    # returns true if alignment has no splice junctions (e.g. single-block alignment)
+    # returns true if alignment has no splice junctions and alignment outside of the gene region
     def is_empty_alignment(self, read_mapping_info):
-        bacrode_jprofile = map(sign, read_mapping_info.junctions_counts.profile)
+        read_intron_profile = map(sign, read_mapping_info.junctions_counts.profile)
+        read_exon_profile = map(sign, read_mapping_info.exons_counts.profile)
 #        print_debug(read_mapping_info.read_id)
-#        print_debug(bacrode_jprofile)
+#        print_debug(read_intron_profile)
+#        print_debug(read_exon_profile)
 
-        if all(el != 1 for el in bacrode_jprofile):
+        if all(el != 1 for el in read_intron_profile) and all(el != 1 for el in read_exon_profile[1:-1]):
             return True
         return False
+
+    # resolve assignment ambiguities caused by identical profiles
+    def resolve_ambiguous(self, read_mapping_info, matched_isoforms, profile_storage):
+        read_intron_profile = map(sign, read_mapping_info.junctions_counts.profile)
+        if all(el != 1 for el in read_intron_profile[1:-1]):
+            return matched_isoforms
+
+        for t in matched_isoforms:
+            matched_positions = find_matching_positions(profile_storage.intron_profiles[t], read_intron_profile)
+            # print_debug(matched_positions)
+            # print_debug(profile_storage.intron_profiles[t])
+
+            all_junctions_detected = True
+            for i in range(len(matched_positions)):
+                if matched_positions[i] == 0 and profile_storage.intron_profiles[t][i] != -1:
+                    all_junctions_detected = False
+                    break
+
+            if all_junctions_detected:
+                # print_debug("Ambiguity resolved")
+                # print_debug(profile_storage.intron_profiles[t])
+                # print_debug(matched_positions)
+                # print_debug(bacrode_jprofile)
+                return set([t])
+
+        return matched_isoforms
 
     # assign barcode/sequence alignment to a known isoform
     def assign_isoform(self, read_id, stat, coverage_cutoff):
@@ -553,74 +596,68 @@ class ReadProfilesInfo:
             return None, None          
 
         # match read profile with isoform profiles
-        matched_isoforms = self.find_matches(read_mapping_info, self.gene_info.all_rna_profiles)
+        intron_matched_isoforms = self.find_matching_isofoms_by_profile(read_mapping_info.junctions_counts,
+                                                                        self.gene_info.all_rna_profiles.intron_profiles)
+        exon_matched_isoforms = self.find_matching_isofoms_by_profile(read_mapping_info.exons_counts,
+                                                                      self.gene_info.all_rna_profiles.exon_profiles)
+        both_mathched_isoforms = intersection(intron_matched_isoforms, exon_matched_isoforms)
 
         # for statistics
         if read_id not in global_assignment_map:
             global_assignment_map[read_id] = set()
-        for i in matched_isoforms:
+        for i in both_mathched_isoforms:
             global_assignment_map[read_id].add(i)
 
         transcript_id = None
         codon_pair = (None, None)
-        if len(matched_isoforms) == 0:
-            stat.contradictory += 1
-            print_debug("Contradictory " + read_id)
-        elif len(matched_isoforms) > 1:
+        if len(both_mathched_isoforms) == 1:
+            stat.uniquely_assigned += 1
+            print_debug("Unique match")
+            transcript_id = list(both_mathched_isoforms)[0]
+            codon_pair = self.codon_pairs[transcript_id]
+        elif len(both_mathched_isoforms) == 0:
+            if len(intron_matched_isoforms) == 1:
+                print_debug("Extra exons, but unique intron profile " + read_id)
+                transcript_id = list(intron_matched_isoforms)[0]
+                codon_pair = self.codon_pairs[transcript_id]
+            elif len(exon_matched_isoforms) == 1:
+                print_debug("Extra intron, but unique exon profile " + read_id)
+                transcript_id = list(exon_matched_isoforms)[0]
+                codon_pair = self.codon_pairs[transcript_id]
+            else:
+                stat.contradictory += 1
+                print_debug("Contradictory " + read_id)
+        else:
             if RESOLVE_AMBIGUOUS:
-                matched_isoforms = self.resolve_ambiguous(read_mapping_info, matched_isoforms, self.gene_info.all_rna_profiles)
+                # TODO: resolve ambiguous using exons
+                intron_matched_isoforms = \
+                    self.resolve_ambiguous(read_mapping_info, intron_matched_isoforms, self.gene_info.all_rna_profiles)
             
-            if len(matched_isoforms) == 1:
+            if len(intron_matched_isoforms) == 1:
                 stat.ambiguous_subisoform_assigned += 1
-                #print_debug("Unique match after resolution")
-                transcript_id = list(matched_isoforms)[0]
+                print_debug("Unique match after resolution")
+                transcript_id = list(intron_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
             else:
                 codons = set()
                 if self.args.assign_codons_when_ambiguous:
-                    for t in matched_isoforms:
+                    for t in intron_matched_isoforms:
                         codons.add(self.codon_pairs[t])
                 if len(codons) == 1:
                     codon_pair = list(codons)[0]
                     stat.ambiguous_codon_assigned += 1   
-                    transcript_id = list(matched_isoforms)[0]
+                    transcript_id = list(intron_matched_isoforms)[0]
                 else:       
-                    if any(mi in self.gene_info.all_rna_profiles.ambiguous for mi in matched_isoforms):
+                    if any(mi in self.gene_info.all_rna_profiles.ambiguous for mi in intron_matched_isoforms):
                         stat.ambiguous_unassignable += 1
                         print_debug("Unassignable")
                     else:        
                         stat.ambiguous += 1
                         print_debug("Ambigous match")
-        else:
-            stat.uniquely_assigned += 1
-            print_debug("Unique match")
-            transcript_id = list(matched_isoforms)[0] 
-            codon_pair = self.codon_pairs[transcript_id]
+
 
         return transcript_id, codon_pair
 
-    # resolve assignment ambiguities caused by identical profiles
-    def resolve_ambiguous(self, read_mapping_info, matched_isoforms, profile_storage):
-        bacrode_jprofile = map(sign, read_mapping_info.junctions_counts.profile)
-        for t in matched_isoforms:
-            matched_positions = find_matching_positions(profile_storage.intron_profiles[t], bacrode_jprofile)
-            #print_debug(matched_positions)
-            #print_debug(profile_storage.intron_profiles[t])
-            
-            all_junctions_detected = True
-            for i in range(len(matched_positions)):
-                if matched_positions[i] == 0 and profile_storage.intron_profiles[t][i] != -1:
-                    all_junctions_detected = False
-                    break
-
-            if all_junctions_detected:
-                #print_debug("Ambiguity resolved")
-                #print_debug(profile_storage.intron_profiles[t])
-                #print_debug(matched_positions)
-                #print_debug(bacrode_jprofile)
-                return set([t])
-
-        return matched_isoforms
 
 
 # Class for processing entire bam file agains gene database
@@ -872,7 +909,7 @@ class GeneDBProcessor:
 
         self.process_gene_list(gene_db_list)
 
-        print("Finished. Total stats " + self.stats.to_str() + "\n")
+        print("\nFinished. Total stats " + self.stats.to_str())
         if self.args.count_isoform_stats:
             print("Finished. Isoform stats " + self.stats.isoform_stats() + "\n")
 

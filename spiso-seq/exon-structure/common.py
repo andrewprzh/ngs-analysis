@@ -100,7 +100,6 @@ class BarcodeRecord:
 def overlaps(range1, range2):
     return not (range1[1] < range2[0] or range1[0] > range2[1])
 
-
 def left_of(range1, range2):
     return range1[1] < range2[0]
 
@@ -176,6 +175,13 @@ def count_diff(cov_profile, sign_profile):
         if cov_profile[i] * sign_profile[i] < 0:
             d += abs(cov_profile[i])
     return d
+
+def intersection(set1, set2):
+    res = set()
+    for el in set1:
+        if el in set2:
+            res.add(el)
+    return  res
 
 
 def is_subprofile(short_isoform_profile, long_isoform_profile):
