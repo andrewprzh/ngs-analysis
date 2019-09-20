@@ -236,8 +236,6 @@ class IsoformProfileStorage:
         self.intron_profiles = {}
         self.exon_profiles = {}
         self.ambiguous = set()
-        # TODO: remove
-        self.empty = set()
 
     # detect isoforms which are exact sub-isoforms of others
     def detect_ambiguous(self):
@@ -293,7 +291,8 @@ class GeneInfo:
         self.all_rna_profiles = IsoformProfileStorage()
 
         i_introns, i_exons = self.set_introns_and_exons(True)
-        #self.exons = self.split_exons(self.exons)
+        self.exons = self.split_exons(self.exons)
+        print_debug(self.exons)
 
         self.set_junction_profiles(self.coding_rna_profiles, i_introns, i_exons, False)
         self.set_junction_profiles(self.all_rna_profiles, i_introns, i_exons, True)
@@ -368,8 +367,8 @@ class GeneInfo:
 
         self.introns = sorted(list(self.introns))
         self.exons = sorted(list(self.exons))
-        # print_debug(self.junctions)
-        # print(self.exons)
+        print_debug(self.introns)
+        print_debug(self.exons)
 
         return all_isoforms_introns, all_isoforms_exons
 
@@ -384,21 +383,37 @@ class GeneInfo:
         last_border = -1
         exon_blocks = []
 
-        while starts_pos < len(exon_starts) and ends_pos < len(exon_ends):
-            if exon_starts[starts_pos] < exon_ends[ends_pos]:
-                cur_border = exon_starts[starts_pos]
-                if last_border != -1 and current_state > 0:
-                    exon_blocks.append((last_border, cur_border - 1))
+        while starts_pos < len(exon_starts):
+            if exon_starts[starts_pos] <= exon_ends[ends_pos]:
+                # do not consider the same exon star
+                if starts_pos == 0 or exon_starts[starts_pos] > exon_starts[starts_pos - 1]:
+                    cur_border = exon_starts[starts_pos]
+                    if last_border != -1 and current_state > 0:
+                        exon_blocks.append((last_border, cur_border - 1))
+                    last_border = cur_border
                 current_state += 1
-                last_border = cur_border
+                starts_pos += 1
             else:
                 if last_border == -1 or current_state == 0:
                     print("Error, exon ends before the start")
 
+                if ends_pos == 0 or  exon_ends[ends_pos] >  exon_ends[ends_pos - 1]:
+                    cur_border = exon_ends[ends_pos]
+                    exon_blocks.append((last_border, cur_border))
+                    last_border = cur_border + 1
+                current_state -= 1
+                ends_pos += 1
+
+        while ends_pos < len(exon_ends):
+            if ends_pos == 0 or exon_ends[ends_pos] > exon_ends[ends_pos - 1]:
                 cur_border = exon_ends[ends_pos]
                 exon_blocks.append((last_border, cur_border))
                 last_border = cur_border + 1
-                current_state -= 1
+            current_state -= 1
+            ends_pos += 1
+
+        if current_state != 0:
+            print("Unequal number of starts and ends")
 
         if exon_blocks != sorted(exon_blocks):
             print("Somehow block are unsorted")
@@ -430,17 +445,13 @@ class GeneInfo:
                 for exon in i_exons[t.id]:
                     while not contains(exon, self.exons[pos]):
                         pos += 1
-                    profile_storage.exon_profiles[t.id][pos + 1] = 1
+                    while pos < len(self.exons) and contains(exon, self.exons[pos]):
+                        profile_storage.exon_profiles[t.id][pos + 1] = 1
+                        pos += 1
 
                 print_debug("Isoform " + t.id)
                 print_debug(profile_storage.intron_profiles[t.id])
                 print_debug(profile_storage.exon_profiles[t.id])
-
-                # TODO: remove
-                if all(x == -1 for x in profile_storage.intron_profiles[t.id]):
-                    del profile_storage.intron_profiles[t.id]
-                    del profile_storage.exon_profiles[t.id]
-                    profile_storage.empty.add(t.id)
 
     # compute start-stop codon pair for known isoforms
     def get_codon_pairs(self, gene_db_list):
@@ -467,7 +478,6 @@ class GeneInfo:
                 end = gene_db.end
 
         return chr_id, start, end
-
 
 # storage for all barcodes/reads mapped to a specific set of genes
 class ReadProfilesInfo:
