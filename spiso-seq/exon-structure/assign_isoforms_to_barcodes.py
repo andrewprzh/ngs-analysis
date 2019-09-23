@@ -678,7 +678,7 @@ class GeneDBProcessor:
             raise Exception("BAM file " + self.samfile_nam + " does not exist")
         samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
         if not samfile_in.has_index:
-            raise Exception("BAM file " + self.samfile_nam + " is not indexed, run samtools index")
+            raise Exception("BAM file " + self.bamfile_name + " is not indexed, run samtools index")
         if samfile_in.references[0].startswith('chr'):
             print("Changing chomosome prefix")
             self.chr_bam_prefix = 'chr'
