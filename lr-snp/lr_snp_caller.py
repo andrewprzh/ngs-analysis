@@ -22,8 +22,13 @@ class Nucl:
         self.reference_nucl = ref_nucl
         self.counts = [0 for i in range(len(NUCL_TO_INDEX_MAP))]
 
-    def clean(self, ref_nucl):
-        self.__init__(ref_nucl)
+    def set(self, ref_nucl):
+        self.reference_nucl = ref_nucl
+        for i in range(len(self.counts)):
+            self.counts[i] = 0
+
+    def clean(self):
+        self.__init__(self.reference_nucl)
 
     def increment(self, nucl):
         if nucl in NUCL_TO_INDEX_MAP.keys():
@@ -78,8 +83,10 @@ class SNPCaller:
         self.args = args
 
     # find all different nucleotides in chromosome region [start, end]
-    def process_region_for_bam(self, bam, chromosome_record, start, end):
-        region_nucls = [Nucl(chromosome_record.seq[pos].upper()) for pos in range(start, end + 1)]
+    def process_region_for_bam(self, index, bam, chromosome_record, start, end):
+        region_nucls = self.all_region_nucls[index]
+        for i in range(start, end):
+            region_nucls[i - start].set(chromosome_record.seq[i].upper())
         #sys.stderr.write("Processing alignments\n")
         for alignment in bam.fetch(chromosome_record.id, start, end):
             if alignment.reference_id == -1:
@@ -102,7 +109,6 @@ class SNPCaller:
 
                 if reached_end:
                     break
-        return region_nucls
 
     def nucl_list(self, all_region_nucls, pos):
         res = []
@@ -147,19 +153,21 @@ class SNPCaller:
 
     # find all SNPs in all samples in chromosome region [start, end]
     def process_bams_in_region(self, chromosome_record, start, end):
-        all_region_nucls = []
-        for bamfile_name in self.bamfiles:
-            bam = pysam.AlignmentFile(bamfile_name, "rb")
-            all_region_nucls.append(self.process_region_for_bam(bam, chromosome_record, start, end))
+        for i in range(len(self.bamfiles)):
+            bam = pysam.AlignmentFile(self.bamfiles[i], "rb")
+            self.process_region_for_bam(i, bam, chromosome_record, start, end)
 
-        for pos in range(0, len(all_region_nucls[0])):
-            multi_snp = self.select_snp(all_region_nucls, pos)
+        for pos in range(0, len(self.all_region_nucls[0])):
+            multi_snp = self.select_snp(self.all_region_nucls, pos)
             if multi_snp is not None:
                 #print("Position " + str(start + pos + 1))
                 self.snp_map[chromosome_record.id][start + pos] = multi_snp
 
     # process all alignments
     def process(self, writer):
+        self.all_region_nucls = []
+        for bamfile_name in self.bamfiles:
+            self.all_region_nucls.append([Nucl('A') for pos in range(0, self.args.window_lenth)])
         for record in SeqIO.parse(self.reference_path, "fasta"):
             region_start = 0
             sys.stderr.write("\nProcessing chormosome " + record.id + "\n")
