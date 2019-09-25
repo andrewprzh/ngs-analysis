@@ -72,14 +72,12 @@ def main():
     args = parse_args()
     set_params(args)
 
-    snp_caller = SNPCaller(args)
-    snp_map = snp_caller.process()
-
     sample_names = map(lambda x: os.path.splitext(os.path.basename(x))[0], args.bam_file)
-    #print_snp_map(snp_map, sample_names)
-
     snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names, args)
-    snp_writer.dump_to_file(snp_map)
+    snp_caller = SNPCaller(args)
+    snp_map = snp_caller.process(snp_writer)
+
+    #print_snp_map(snp_map, sample_names)
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here

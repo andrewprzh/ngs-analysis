@@ -7,7 +7,7 @@
 import sys
 #import gffutils
 import pysam
-import vcf
+#import vcf
 from Bio import SeqIO
 
 NUCL_TO_INDEX_MAP = {'A': 0, 'C': 1, 'G':2, 'T':3}
@@ -75,8 +75,6 @@ class SNPCaller:
         self.bamfiles = args.bam_file
         self.reference_path = args.reference
         self.snp_map = {}
-        for record in SeqIO.parse(self.reference_path, "fasta"):
-            self.snp_map[record.id] = {}
         self.args = args
 
     # find all different nucleotides in chromosome region [start, end]
@@ -161,17 +159,18 @@ class SNPCaller:
                 self.snp_map[chromosome_record.id][start + pos] = multi_snp
 
     # process all alignments
-    def process(self):
+    def process(self, writer):
         for record in SeqIO.parse(self.reference_path, "fasta"):
             region_start = 0
-            sys.stderr.write("Processing chormosome " + record.id + "\n")
+            sys.stderr.write("\nProcessing chormosome " + record.id + "\n")
+            self.snp_map[record.id] = {}
             while region_start < len(record.seq):
                 region_end = min(len(record.seq) - 1, region_start + self.args.window_lenth - 1)
                 self.process_bams_in_region(record, region_start, region_end)
                 region_start += self.args.window_lenth
                 sys.stderr.write("Processed " + str(region_start) + " bases\r")
-
-        return self.snp_map
+                writer.dump_to_file(self.snp_map)
+                self.snp_map[record.id] = {}
 
     # process all alignments gene by gene
     def process_with_genes(self, gene_db):
@@ -195,6 +194,17 @@ class SNPMapTSVWriter:
         self.somatic_file_name = out_prefix + "somatic_SNPs.tsv"
         self.sample_names = sample_names
         self.args = args
+        print("Outputting results to " + self.somatic_file_name + " and " + self.gemline_file_name)
+        somatic_file = open(self.somatic_file_name, 'w')
+        germline_file = open(self.gemline_file_name, 'w')
+        header = self.delim.join(self.main_header)
+        for sample in self.sample_names:
+            for h in self.sample_header:
+                header += self.delim + sample + '_' + h
+        somatic_file.write(header + '\n')
+        germline_file.write(header + '\n')
+        somatic_file.close()
+        germline_file.close()
 
     def form_line(self, chromosome, pos, snp, nucl):
         l = self.delim.join([chromosome, str(pos), snp.reference_nucl, INDEX_TO_NUCL[nucl], snp.snp_type])
@@ -207,18 +217,11 @@ class SNPMapTSVWriter:
         return snp_freq >= self.args.min_freq or (snp_freq > 0 and max_freq / snp_freq <= self.args.min_freq_factor)
 
     def dump_to_file(self, snp_map):
-        print("Outputting results to " + self.somatic_file_name + " and " + self.gemline_file_name)
-        somatic_file = open(self.somatic_file_name, 'w')
-        germline_file = open(self.gemline_file_name, 'w')
-        header = self.delim.join(self.main_header)
-        for sample in self.sample_names:
-            for h in self.sample_header:
-                header += self.delim + sample + '_' + h
-        somatic_file.write(header + '\n')
-        germline_file.write(header + '\n')
+        somatic_file = open(self.somatic_file_name, 'a+')
+        germline_file = open(self.gemline_file_name, 'a+')
 
         for chromosome in snp_map.keys():
-            print("Processing chromosome " + chromosome)
+            #print("Processing chromosome " + chromosome)
             snps = snp_map[chromosome]
             for pos in sorted(snps.keys()):
                 snp = snps[pos]
@@ -234,4 +237,4 @@ class SNPMapTSVWriter:
                         germline_file.write(self.form_line(chromosome, pos, snp, nucl))
         somatic_file.close()
         germline_file.close()
-        print("Outputting done")
+        #print("Outputting done")
