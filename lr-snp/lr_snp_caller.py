@@ -169,10 +169,10 @@ class SNPCaller:
         for bamfile_name in self.bamfiles:
             self.all_region_nucls.append([Nucl('A') for pos in range(0, self.args.window_lenth)])
         for record in SeqIO.parse(self.reference_path, "fasta"):
-            region_start = 0
+            region_start = 0#102000000
             sys.stderr.write("\nProcessing chormosome " + record.id + "\n")
             self.snp_map[record.id] = {}
-            while region_start < len(record.seq):
+            while region_start < len(record.seq): # and region_start < 103000000:
                 region_end = min(len(record.seq) - 1, region_start + self.args.window_lenth - 1)
                 self.process_bams_in_region(record, region_start, region_end)
                 region_start += self.args.window_lenth
@@ -214,15 +214,25 @@ class SNPMapTSVWriter:
         somatic_file.close()
         germline_file.close()
 
-    def form_line(self, chromosome, pos, snp, nucl):
-        l = self.delim.join([chromosome, str(pos), snp.reference_nucl, INDEX_TO_NUCL[nucl], snp.snp_type])
+    def form_line(self, chromosome, pos, snp, nucl, type):
+        l = self.delim.join([chromosome, str(pos), snp.reference_nucl, INDEX_TO_NUCL[nucl], type])
         for sample_snp in snp.per_sample_snps:
             l += self.delim + self.delim.join(map(str, [sample_snp.total_cov(), sample_snp.counts[nucl]]))
             l += self.delim + '{:.2f}'.format(sample_snp.freq(nucl))
         return l + '\n'
 
     def snp_is_detected(self, snp_freq, max_freq):
-        return snp_freq >= self.args.min_freq or (snp_freq > 0 and max_freq / snp_freq <= self.args.min_freq_factor)
+        return snp_freq >= self.args.min_freq or (snp_freq > 0 and max_freq >= self.args.min_freq
+                                                  and max_freq / snp_freq <= self.args.min_freq_factor)
+
+    def detect_type(self, snp, nucl):
+        freqs = map(lambda x: x.freq(nucl), snp.per_sample_snps)
+        min_freq = min(freqs)
+        max_freq = max(freqs)
+        if min_freq > 0 and max_freq / min_freq <= self.args.min_freq_factor:
+            return GERMLINE_SNP
+        return SOMATIC_SNP
+
 
     def dump_to_file(self, snp_map):
         somatic_file = open(self.somatic_file_name, 'a+')
@@ -239,10 +249,11 @@ class SNPMapTSVWriter:
                     if self.snp_is_detected(sample_snp.max_freq, overall_max_freq):
                         detected_variants.add(sample_snp.best_nucl)
                 for nucl in detected_variants:
-                    if snp.snp_type == SOMATIC_SNP:
-                        somatic_file.write(self.form_line(chromosome, pos, snp, nucl))
+                    nucl_type = self.detect_type(snp, nucl)
+                    if nucl_type == SOMATIC_SNP:
+                        somatic_file.write(self.form_line(chromosome, pos, snp, nucl, nucl_type))
                     else:
-                        germline_file.write(self.form_line(chromosome, pos, snp, nucl))
+                        germline_file.write(self.form_line(chromosome, pos, snp, nucl, nucl_type))
         somatic_file.close()
         germline_file.close()
         #print("Outputting done")
