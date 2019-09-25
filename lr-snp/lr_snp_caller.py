@@ -163,9 +163,9 @@ class SNPCaller:
     # process all alignments
     def process(self):
         for record in SeqIO.parse(self.reference_path, "fasta"):
-            region_start = 102300000
+            region_start = 0
             sys.stderr.write("Processing chormosome " + record.id + "\n")
-            while region_start < len(record.seq) and region_start < 102500000:
+            while region_start < len(record.seq):
                 region_end = min(len(record.seq) - 1, region_start + self.args.window_lenth - 1)
                 self.process_bams_in_region(record, region_start, region_end)
                 region_start += self.args.window_lenth

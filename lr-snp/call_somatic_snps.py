@@ -58,7 +58,7 @@ def set_params(args):
         raise Exception("ERROR: gene SNPs are not supported yet")
     if args.out_format != 'TSV':
         raise Exception("ERROR: only TSV format is currently supported")
-    args.window_lenth = 100000
+    args.window_lenth = 1000000
 
     for bam in args.bam_file:
         if not os.path.isfile(bam):
