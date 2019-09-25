@@ -34,6 +34,7 @@ def parse_args():
     optional_group.add_argument("--min_freq", "-f", help="minimal SNP frequency within a sample, between 0.0 and 1.0 [0.2]", type=float, default=0.2)
     optional_group.add_argument("--min_freq_factor", "-m", help="minimal SNP frequency factor, > 1.0 [2.0]", type=float, default=2.0)
     optional_group.add_argument("--min_cov", "-c", help="minimal SNP read coverage depth within a sample, > 0 [50]", type=int, default=50)
+    optional_group.add_argument("--out_format", help="output format: VCF or TSV [TSV]", type=str, default='TSV')
 
     args = parser.parse_args()
 
@@ -53,6 +54,10 @@ def set_params(args):
         raise Exception("ERROR: minimal SNP frequency factor should be larger than 1.0, but set to " + str(args.min_freq))
     if args.min_cov < 1:
         raise Exception("ERROR: minimal SNP coverage should be positive, but set to " + str(args.min_cov))
+    if args.genedb or args.gtf:
+        raise Exception("ERROR: gene SNPs are not supported yet")
+    if args.out_format != 'TSV':
+        raise Exception("ERROR: only TSV format is currently supported")
     args.window_lenth = 100000
 
     for bam in args.bam_file:
@@ -71,8 +76,10 @@ def main():
     snp_map = snp_caller.process()
 
     sample_names = map(lambda x: os.path.splitext(os.path.basename(x))[0], args.bam_file)
-    print_snp_map(snp_map, sample_names)
+    #print_snp_map(snp_map, sample_names)
 
+    snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names, args)
+    snp_writer.dump_to_file(snp_map)
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
