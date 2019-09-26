@@ -5,7 +5,7 @@
 ############################################################################
 
 import sys
-#import gffutils
+import gffutils
 import pysam
 #import vcf
 from Bio import SeqIO
@@ -19,6 +19,16 @@ NUCL_TO_INDEX = [-1 if chr(x) not in NUCL_TO_INDEX_MAP_FULL.keys() else NUCL_TO_
 GERMLINE_SNP = "germline"
 SOMATIC_SNP = "somatic"
 BOUND_CASE_SNP = "unidentified"
+
+
+def overlaps(range1, range2):
+    return not (range1[1] < range2[0] or range1[0] > range2[1])
+
+
+def genes_overlap(gene_db1, gene_db2):
+    if (gene_db1.seqid != gene_db2.seqid):
+        return False
+    return overlaps((gene_db1.start, gene_db1.end), (gene_db2.start, gene_db2.end))
 
 
 class NuclStorage:
@@ -150,10 +160,10 @@ class SNPCaller:
     # process all alignments
     def process(self, writer):
         for record in SeqIO.parse(self.reference_path, "fasta"):
-            region_start = 100000000
+            region_start = 0 #100000000
             sys.stderr.write("\nProcessing chormosome " + record.id + "\n")
             self.snp_map[record.id] = {}
-            while region_start < len(record.seq) and region_start < 105000000:
+            while region_start < len(record.seq): # and region_start < 105000000:
                 region_end = min(len(record.seq) - 1, region_start + self.args.window_lenth - 1)
                 self.process_bams_in_region(record, region_start, region_end)
                 region_start += self.args.window_lenth
@@ -161,9 +171,39 @@ class SNPCaller:
                 writer.dump_to_file(self.snp_map)
                 self.snp_map[record.id] = {}
 
+    def process_gene(self, gene_db_list, reference_dict, writer):
+        region_start = gene_db_list[0].start
+        region_end = gene_db_list[-1].end
+        record = reference_dict[gene_db_list[0].seqid]
+        self.snp_map[record.id] = {}
+        self.process_bams_in_region(record, region_start, region_end)
+        writer.dump_to_file(self.snp_map)
+
     # process all alignments gene by gene
-    def process_with_genes(self, gene_db):
-        pass
+    def process_with_genes(self, db, writer):
+        reference_dict = SeqIO.index(self.reference_path, "fasta")
+        gene_db_list = []
+        gene_count = 0
+        current_chr = ""
+
+        for g in db.features_of_type('gene', order_by=('seqid', 'start')):
+            gene_name = g.id
+            gene_db = db[gene_name]
+
+            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
+                gene_db_list.append(gene_db)
+            else:
+                if currrent_chr != gene_db_list[0].seqid:
+                    current_chr = gene_db_list[0].seqid
+                    print("Processing chromosome " + current_chr)
+                    
+                self.process_gene(gene_db_list, reference_dict, writer)
+                gene_count += len(gene_db_list)
+                sys.stderr.write("Processed " + str(gene_count) + " genes\r")
+                gene_db_list = [gene_db]
+
+        self.process_gene(gene_db_list, reference_dict, writer)
+
 
 def print_snp_map(snp_map, sample_names):
     for chromosome in snp_map.keys():

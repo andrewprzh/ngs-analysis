@@ -7,7 +7,7 @@
 
 import os
 import sys
-#import gffutils
+import gffutils
 import argparse
 import pysam
 from traceback import print_exc
@@ -54,10 +54,12 @@ def set_params(args):
         raise Exception("ERROR: minimal SNP frequency factor should be larger than 1.0, but set to " + str(args.min_freq))
     if args.min_cov < 1:
         raise Exception("ERROR: minimal SNP coverage should be positive, but set to " + str(args.min_cov))
-    if args.genedb or args.gtf:
-        raise Exception("ERROR: gene SNPs are not supported yet")
+
+    if args.genedb and args.gtf:
+        raise Exception("ERROR: provide either GTF or Gene DB file")
     if args.out_format != 'TSV':
         raise Exception("ERROR: only TSV format is currently supported")
+
     args.window_lenth = 100000
 
     for bam in args.bam_file:
@@ -67,6 +69,20 @@ def set_params(args):
         if not bamfile.has_index:
             raise Exception("BAM file " + bam + " is not indexed, run samtools index")
 
+def read_gene_db(args):
+    if (args.gtf):
+        print("WARN: DB conversion from GTF might take some time, we recommend to provide pre-constructed DB")
+        gtf_name = os.path.splitext(os.path.basename(args.gtf))[0]
+        out_folder = os.path.split(args.output_prefix)[0]
+        args.genedb = os.path.join(out_folder, gtf_name) + '.db'
+        print("Writing gene DB to " + args.genedb)
+        db = gffutils.create_db(args.gtf, args.genedb, force=True, keep_order=True, merge_strategy='merge',
+                                sort_attribute_values=True, disable_infer_transcripts=True, disable_infer_genes=True)
+
+    else:
+        print("Reading gene DB from " + args.genedb)
+        db = gffutils.FeatureDB(args.genedb, keep_order = True)
+    return db
 
 def main():
     args = parse_args()
@@ -75,7 +91,12 @@ def main():
     sample_names = map(lambda x: os.path.splitext(os.path.basename(x))[0], args.bam_file)
     snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names, args)
     snp_caller = SNPCaller(args)
-    snp_caller.process(snp_writer)
+
+    if args.genedb or args.gtf:
+        gene_db = read_gene_db(args)
+        snp_caller.process_with_genes(gene_db, snp_writer)
+    else:
+        snp_caller.process(snp_writer)
 
     #print_snp_map(snp_map, sample_names)
 
