@@ -84,26 +84,12 @@ class SNPCaller:
     # find all different nucleotides in chromosome region [start, end]
     def process_region_for_bam(self, index, bam, chromosome_record, start, end):
         count_storage = self.count_storages[index]
-        for alignment in bam.fetch(chromosome_record.id, start, end):
-            if alignment.reference_id == -1:
-                continue
-            reached_end = False
-            read_seq = alignment.query_alignment_sequence
-            read_pos = 0
-            for block in sorted(alignment.get_blocks()):
-                for pos in range(block[0], block[1]):
-                    if pos < start:
-                        read_pos += 1
-                        continue
-                    if pos > end:
-                        reached_end = True
-                        break
-                    if read_pos >= len(read_seq):
-                        print("ERROR: read position out of bounds")
-                    count_storage.increment(pos - start, read_seq[read_pos])
-                    read_pos += 1
-                if reached_end:
-                    break
+        for pileup_column in bam.pileup(chromosome_record.id, start, end):
+            for pileup_read in pileup_column.pileups:
+                if not pileup_read.is_del and not pileup_read.is_refskip:
+                    nucl = pileup_read.alignment.query_sequence[pileup_read.query_position]
+                    if nucl != 'N':
+                        count_storage.increment(pileup_column.pos - start, nucl)
 
     def nucl_list(self, all_region_nucls, pos):
         res = []
@@ -160,10 +146,10 @@ class SNPCaller:
     # process all alignments
     def process(self, writer):
         for record in SeqIO.parse(self.reference_path, "fasta"):
-            region_start = 0 #100000000
+            region_start = 0 #102000000
             sys.stderr.write("\nProcessing chormosome " + record.id + "\n")
             self.snp_map[record.id] = {}
-            while region_start < len(record.seq): # and region_start < 105000000:
+            while region_start < len(record.seq): # and region_start < 104000000:
                 region_end = min(len(record.seq) - 1, region_start + self.args.window_lenth - 1)
                 self.process_bams_in_region(record, region_start, region_end)
                 region_start += self.args.window_lenth
@@ -237,7 +223,7 @@ class SNPMapTSVWriter:
         germline_file.close()
 
     def form_line(self, chromosome, pos, snp):
-        l = self.delim.join([chromosome, str(pos), snp.reference_nucl, snp.alternative_nucl, snp.snp_type])
+        l = self.delim.join([chromosome, str(pos + 1), snp.reference_nucl, snp.alternative_nucl, snp.snp_type])
         for i in range(len(snp.sample_counts)):
             l += self.delim + self.delim.join(map(str, [snp.sample_coverage[i], snp.sample_counts[i]]))
             l += self.delim + '{:.2f}'.format(float(snp.sample_counts[i]) / float(snp.sample_coverage[i]))

@@ -60,7 +60,7 @@ def set_params(args):
     if args.out_format != 'TSV':
         raise Exception("ERROR: only TSV format is currently supported")
 
-    args.window_lenth = 1000000
+    args.window_lenth = 2000000
 
     for bam in args.bam_file:
         if not os.path.isfile(bam):
