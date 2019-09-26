@@ -193,10 +193,10 @@ class SNPCaller:
             if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
                 gene_db_list.append(gene_db)
             else:
-                if currrent_chr != gene_db_list[0].seqid:
+                if current_chr != gene_db_list[0].seqid:
                     current_chr = gene_db_list[0].seqid
                     print("Processing chromosome " + current_chr)
-                    
+
                 self.process_gene(gene_db_list, reference_dict, writer)
                 gene_count += len(gene_db_list)
                 sys.stderr.write("Processed " + str(gene_count) + " genes\r")
