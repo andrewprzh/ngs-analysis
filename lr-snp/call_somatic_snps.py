@@ -58,7 +58,7 @@ def set_params(args):
         raise Exception("ERROR: gene SNPs are not supported yet")
     if args.out_format != 'TSV':
         raise Exception("ERROR: only TSV format is currently supported")
-    args.window_lenth = 1000000
+    args.window_lenth = 100000
 
     for bam in args.bam_file:
         if not os.path.isfile(bam):
@@ -75,7 +75,7 @@ def main():
     sample_names = map(lambda x: os.path.splitext(os.path.basename(x))[0], args.bam_file)
     snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names, args)
     snp_caller = SNPCaller(args)
-    snp_map = snp_caller.process(snp_writer)
+    snp_caller.process(snp_writer)
 
     #print_snp_map(snp_map, sample_names)
 

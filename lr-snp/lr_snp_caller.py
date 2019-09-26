@@ -10,69 +10,57 @@ import pysam
 #import vcf
 from Bio import SeqIO
 
+NUCL_COUNT = 4
 NUCL_TO_INDEX_MAP = {'A': 0, 'C': 1, 'G':2, 'T':3}
+NUCL_TO_INDEX_MAP_FULL = {'A': 0, 'C': 1, 'G':2, 'T':3, 'a': 0, 'c': 1, 'g':2, 't':3}
 INDEX_TO_NUCL = ['A', 'C', 'G', 'T']
+NUCL_TO_INDEX = [-1 if chr(x) not in NUCL_TO_INDEX_MAP_FULL.keys() else NUCL_TO_INDEX_MAP_FULL[chr(x)] for x in range(0, 256)]
+
 GERMLINE_SNP = "germline"
 SOMATIC_SNP = "somatic"
 BOUND_CASE_SNP = "unidentified"
 
 
-class Nucl:
-    def __init__(self, ref_nucl):
+class NuclStorage:
+    def __init__(self, region_size):
+        self.nucl_counts = []
+        for i in range(NUCL_COUNT):
+            self.nucl_counts.append([0 for j in range(region_size)])
+
+    def clean(self, region_size):
+        if region_size > len(self.nucl_counts[0]):
+            self.__init__(region_size)
+        else:
+            for i in range(NUCL_COUNT):
+                for j in range(region_size):
+                    self.nucl_counts[i][j] = 0
+
+    def increment(self, pos, nucl):
+        self.nucl_counts[NUCL_TO_INDEX[ord(nucl)]][pos] += 1
+
+    def total_cov(self, pos):
+        return sum([self.nucl_counts[i][pos] for i in range(NUCL_COUNT)])
+
+    def count(self, pos, nucl):
+        return self.nucl_counts[NUCL_TO_INDEX[ord(nucl)]][pos]
+
+    def freq(self, pos, nucl):
+        return float(self.nucl_counts[NUCL_TO_INDEX[ord(nucl)]][pos]) / self.total_cov(pos)
+
+    def non_ref_freqs(self, pos, ref_nucl):
+        return [self.freq(pos, nucl) if nucl != ref_nucl else 0.0 for nucl in INDEX_TO_NUCL]
+
+    def get_counts(self, pos):
+        return [self.nucl_counts[i][pos] for i in range(NUCL_COUNT)]
+
+
+class SelectedSNP:
+    def __init__(self, ref_nucl, alt_nucl, snp_type, sample_cov, sample_counts):
         self.reference_nucl = ref_nucl
-        self.counts = [0 for i in range(len(NUCL_TO_INDEX_MAP))]
-
-    def set(self, ref_nucl):
-        self.reference_nucl = ref_nucl
-        for i in range(len(self.counts)):
-            self.counts[i] = 0
-
-    def clean(self):
-        self.__init__(self.reference_nucl)
-
-    def increment(self, nucl):
-        if nucl in NUCL_TO_INDEX_MAP.keys():
-            self.counts[NUCL_TO_INDEX_MAP[nucl]] += 1
-
-    def total_cov(self):
-        return sum(self.counts)
-
-    def freq(self, nucl):
-        return self.counts[nucl] / float(self.total_cov())
-
-    def max_non_ref_freq(self):
-        sum = self.total_cov()
-        freqs = map(lambda x: float(x) / float(sum), self.counts)
-        freqs[NUCL_TO_INDEX_MAP[self.reference_nucl]] = 0.0
-
-        self.best_nucl = 0
-        self.max_freq = 0
-        for i in range(len(freqs)):
-            if freqs[i] > self.max_freq:
-                self.best_nucl = i
-                self.max_freq = freqs[i]
-        return (self.max_freq, self.best_nucl)
-
-    def to_str(self):
-        nucls = []
-        for i in range(len(self.counts)):
-            nucls.append((INDEX_TO_NUCL[i], self.counts[i]))
-        return  ', '.join(map(lambda x: x[0] + ": " + str(x[1]), nucls))
-
-
-class MultiSampleSNP:
-    def __init__(self, snp_type, snp_list):
-        self.per_sample_snps = snp_list
+        self.alternative_nucl = alt_nucl
         self.snp_type = snp_type
-        self.reference_nucl = snp_list[0].reference_nucl
-        #print(snp_type + ": " + snp_list[0].to_str())
-
-    def to_str(self, sample_names):
-        res = "TYPE: " + self.snp_type + "; REF: " + self.reference_nucl
-        for i in range(len(self.per_sample_snps)):
-            snp = self.per_sample_snps[i]
-            res += '\n' + sample_names[i] + ": " + snp.to_str() if snp is not None else ""
-        return res
+        self.sample_coverage = sample_cov
+        self.sample_counts = sample_counts
 
 
 class SNPCaller:
@@ -80,14 +68,12 @@ class SNPCaller:
         self.bamfiles = args.bam_file
         self.reference_path = args.reference
         self.snp_map = {}
+        self.count_storages = [NuclStorage(1) for i in range(len(self.bamfiles))]
         self.args = args
 
     # find all different nucleotides in chromosome region [start, end]
     def process_region_for_bam(self, index, bam, chromosome_record, start, end):
-        region_nucls = self.all_region_nucls[index]
-        for i in range(start, end):
-            region_nucls[i - start].set(chromosome_record.seq[i].upper())
-        #sys.stderr.write("Processing alignments\n")
+        count_storage = self.count_storages[index]
         for alignment in bam.fetch(chromosome_record.id, start, end):
             if alignment.reference_id == -1:
                 continue
@@ -104,9 +90,8 @@ class SNPCaller:
                         break
                     if read_pos >= len(read_seq):
                         print("ERROR: read position out of bounds")
-                    region_nucls[pos - start].increment(read_seq[read_pos].upper())
+                    count_storage.increment(pos - start, read_seq[read_pos])
                     read_pos += 1
-
                 if reached_end:
                     break
 
@@ -117,62 +102,58 @@ class SNPCaller:
         return res
 
     # compare nucleotide data from multiple samples
-    def select_snp(self, all_region_nucls, pos):
-        for i in range(len(all_region_nucls)):
-            if all_region_nucls[i][pos].total_cov() < self.args.min_cov:
-                return None
+    def select_snp(self, ref_nucl, pos):
+        for i in range(len(self.count_storages)):
+            if self.count_storages[i].total_cov(pos) < self.args.min_cov:
+                return []
 
-        nucls = []
-        for i in range(len(all_region_nucls)):
-            freq_and_nucl = all_region_nucls[i][pos].max_non_ref_freq()
-            nucls.append(freq_and_nucl)
+        all_frequences = [count_storage.non_ref_freqs(pos, ref_nucl) for count_storage in self.count_storages]
+        resulting_snps = []
+        for nucl in INDEX_TO_NUCL:
+            if nucl == ref_nucl:
+                continue
 
-        min_freq = min(map(lambda x: x[0], nucls))
-        max_freq = max(map(lambda x: x[0], nucls))
-        if min_freq >= self.args.min_freq or \
-                (max_freq >= self.args.min_freq and min_freq > 0 and max_freq / min_freq <= self.args.min_freq_factor):
-            # all snps has good frequency
-            detected_variatns = set(map(lambda x: x[1], nucls))
-            #print(str(all_region_nucls[0][pos].counts))
-            #print(str(nucls))
-            #print("Good frequency, detected variants: " + str(len(detected_variatns)) + " " + str(detected_variatns))
-            if len(detected_variatns) > 1:
-                # more than one possible variant exist
-                return MultiSampleSNP(SOMATIC_SNP, self.nucl_list(all_region_nucls, pos))
-            else:
+            nucl_index = NUCL_TO_INDEX[ord(nucl)]
+            nucl_per_sample_freqs = [freq[nucl_index] for freq in all_frequences]
+            max_freq = max(nucl_per_sample_freqs)
+            if max_freq < self.args.min_freq:
+                continue
+
+            min_freq = min(nucl_per_sample_freqs)
+            if min_freq >= self.args.min_freq or \
+                    (max_freq >= self.args.min_freq and min_freq > 0 and max_freq / min_freq <= self.args.min_freq_factor):
+                # all snps has good frequency
                 if not self.args.keep_germline:
-                    return None
-                # one possible variant
-                return MultiSampleSNP(GERMLINE_SNP, self.nucl_list(all_region_nucls, pos))
-        elif max_freq < self.args.min_freq:
-            # all positions have low frequency
-            return None
-        else:
-            # some SNPs have frequency significantly different from others
-            return MultiSampleSNP(SOMATIC_SNP, self.nucl_list(all_region_nucls, pos))
+                    continue
+                resulting_snps.append(SelectedSNP(ref_nucl, nucl, GERMLINE_SNP,
+                                                  [count_storage.total_cov(pos) for count_storage in self.count_storages],
+                                                  [count_storage.count(pos, nucl) for count_storage in self.count_storages]))
+            else:
+                # some SNPs have frequency significantly different from others
+                resulting_snps.append(SelectedSNP(ref_nucl, nucl, SOMATIC_SNP,
+                                                  [count_storage.total_cov(pos) for count_storage in self.count_storages],
+                                                  [count_storage.count(pos, nucl) for count_storage in self.count_storages]))
+        return resulting_snps
 
     # find all SNPs in all samples in chromosome region [start, end]
     def process_bams_in_region(self, chromosome_record, start, end):
         for i in range(len(self.bamfiles)):
             bam = pysam.AlignmentFile(self.bamfiles[i], "rb")
+            self.count_storages[i].clean(end - start + 1)
             self.process_region_for_bam(i, bam, chromosome_record, start, end)
 
-        for pos in range(0, len(self.all_region_nucls[0])):
-            multi_snp = self.select_snp(self.all_region_nucls, pos)
-            if multi_snp is not None:
-                #print("Position " + str(start + pos + 1))
-                self.snp_map[chromosome_record.id][start + pos] = multi_snp
+        for pos in range(start, end + 1):
+            multi_snp = self.select_snp(chromosome_record.seq[pos], pos - start)
+            if multi_snp is not None and len(multi_snp) > 0:
+                self.snp_map[chromosome_record.id][pos] = multi_snp
 
     # process all alignments
     def process(self, writer):
-        self.all_region_nucls = []
-        for bamfile_name in self.bamfiles:
-            self.all_region_nucls.append([Nucl('A') for pos in range(0, self.args.window_lenth)])
         for record in SeqIO.parse(self.reference_path, "fasta"):
-            region_start = 0#102000000
+            region_start = 100000000
             sys.stderr.write("\nProcessing chormosome " + record.id + "\n")
             self.snp_map[record.id] = {}
-            while region_start < len(record.seq): # and region_start < 103000000:
+            while region_start < len(record.seq) and region_start < 105000000:
                 region_end = min(len(record.seq) - 1, region_start + self.args.window_lenth - 1)
                 self.process_bams_in_region(record, region_start, region_end)
                 region_start += self.args.window_lenth
@@ -191,6 +172,7 @@ def print_snp_map(snp_map, sample_names):
         for pos in sorted(snps.keys()):
             print("Position " + str(pos + 1))
             print(snps[pos].to_str(sample_names))
+
 
 class SNPMapTSVWriter:
     main_header = ['CHR', 'POS', 'REF', 'ALT', 'TYPE']
@@ -214,25 +196,12 @@ class SNPMapTSVWriter:
         somatic_file.close()
         germline_file.close()
 
-    def form_line(self, chromosome, pos, snp, nucl, type):
-        l = self.delim.join([chromosome, str(pos), snp.reference_nucl, INDEX_TO_NUCL[nucl], type])
-        for sample_snp in snp.per_sample_snps:
-            l += self.delim + self.delim.join(map(str, [sample_snp.total_cov(), sample_snp.counts[nucl]]))
-            l += self.delim + '{:.2f}'.format(sample_snp.freq(nucl))
+    def form_line(self, chromosome, pos, snp):
+        l = self.delim.join([chromosome, str(pos), snp.reference_nucl, snp.alternative_nucl, snp.snp_type])
+        for i in range(len(snp.sample_counts)):
+            l += self.delim + self.delim.join(map(str, [snp.sample_coverage[i], snp.sample_counts[i]]))
+            l += self.delim + '{:.2f}'.format(float(snp.sample_counts[i]) / float(snp.sample_coverage[i]))
         return l + '\n'
-
-    def snp_is_detected(self, snp_freq, max_freq):
-        return snp_freq >= self.args.min_freq or (snp_freq > 0 and max_freq >= self.args.min_freq
-                                                  and max_freq / snp_freq <= self.args.min_freq_factor)
-
-    def detect_type(self, snp, nucl):
-        freqs = map(lambda x: x.freq(nucl), snp.per_sample_snps)
-        min_freq = min(freqs)
-        max_freq = max(freqs)
-        if min_freq > 0 and max_freq / min_freq <= self.args.min_freq_factor:
-            return GERMLINE_SNP
-        return SOMATIC_SNP
-
 
     def dump_to_file(self, snp_map):
         somatic_file = open(self.somatic_file_name, 'a+')
@@ -242,18 +211,13 @@ class SNPMapTSVWriter:
             #print("Processing chromosome " + chromosome)
             snps = snp_map[chromosome]
             for pos in sorted(snps.keys()):
-                snp = snps[pos]
-                detected_variants = set()
-                overall_max_freq = max(map(lambda x:x.max_freq, snp.per_sample_snps))
-                for sample_snp in snp.per_sample_snps:
-                    if self.snp_is_detected(sample_snp.max_freq, overall_max_freq):
-                        detected_variants.add(sample_snp.best_nucl)
-                for nucl in detected_variants:
-                    nucl_type = self.detect_type(snp, nucl)
-                    if nucl_type == SOMATIC_SNP:
-                        somatic_file.write(self.form_line(chromosome, pos, snp, nucl, nucl_type))
+                multi_snp = snps[pos]
+                for snp in multi_snp:
+                    l = self.form_line(chromosome, pos, snp)
+                    if snp.snp_type == SOMATIC_SNP:
+                        somatic_file.write(l)
                     else:
-                        germline_file.write(self.form_line(chromosome, pos, snp, nucl, nucl_type))
+                        germline_file.write(l)
         somatic_file.close()
         germline_file.close()
-        #print("Outputting done")
+
