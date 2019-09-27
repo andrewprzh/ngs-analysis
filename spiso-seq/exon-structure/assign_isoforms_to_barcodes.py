@@ -749,12 +749,12 @@ class GeneDBProcessor:
                 gene_stats.correctly_assigned += 1
             elif read_id in gene_isoform_ids:
                 gene_stats.incorrectly_assigned_same_gene += 1
-                print_debug("Incorrect assignment: isoform = " + isoform + " ; sequence = " + read_id + "\n")
+                print("Incorrect assignment: isoform = " + isoform + " ; sequence = " + read_id + "\n")
             elif read_id in gene_all_isoform_ids:
                 gene_stats.incorrectly_assigned_nc += 1
             else:
                 gene_stats.incorrectly_assigned_other_gene += 1
-                print_debug("Alien assignment: isoform = " + isoform + " ; sequence = " + read_id + "\n")
+                print("Alien assignment: isoform = " + isoform + " ; sequence = " + read_id + "\n")
 
         else:
             if read_id in gene_isoform_ids:
@@ -793,7 +793,7 @@ class GeneDBProcessor:
         # process all alignments
         # prefix is needed when bam file has chrXX chromosome names, but reference has XX names
         for alignment in samfile_in.fetch(self.chr_bam_prefix + gene_chr, gene_start, gene_end):
-            if alignment.reference_id == -1:
+            if alignment.reference_id == -1 or alignment.is_secondary:
                 continue
             seq_id = self.get_sequence_id(alignment.query_name)
             read_profiles.add_read(alignment, seq_id)
