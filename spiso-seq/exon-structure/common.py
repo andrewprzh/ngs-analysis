@@ -238,7 +238,6 @@ def table_to_str(d, write_coordinates = False, delim = '\t'):
 #check whether genes overlap and should be processed together
 def genes_overlap(gene_db1, gene_db2):
     if (gene_db1.seqid != gene_db2.seqid):
-        print("Processing chromosome " + gene_db2.seqid)
         return False
     return overlaps((gene_db1.start, gene_db1.end), (gene_db2.start, gene_db2.end))
 

@@ -915,8 +915,12 @@ class GeneDBProcessor:
         outf.close()
         
         gene_db_list = []
+        current_chromosome = ""
 
         for g in self.db.features_of_type('gene', order_by=('seqid', 'start')):
+            if current_chromosome != g.seqid:
+                current_chromosome = g.seqid
+                print("Processing chromosome " + current_chromosome)
             gene_name = g.id
             gene_db = self.db[gene_name]
 
