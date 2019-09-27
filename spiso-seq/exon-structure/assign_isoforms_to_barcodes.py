@@ -34,7 +34,14 @@ WRITE_CODON_COORDINATES = False
 global_assignment_map = {}
 global_unassignable_set = set()
 
-DEBUG = True
+
+def add_to_global_stats(read_id, mathched_isoforms):
+    if read_id not in global_assignment_map:
+        global_assignment_map[read_id] = set()
+    for i in mathched_isoforms:
+        global_assignment_map[read_id].add(i)
+
+DEBUG = False
 def print_debug(s):
     if DEBUG:
         print(s)
@@ -556,23 +563,23 @@ class ReadProfilesInfo:
         return False
 
     # resolve assignment ambiguities caused by identical profiles
-    def resolve_ambiguous(self, read_mapping_info, matched_isoforms, profile_storage):
-        read_intron_profile = map(sign, read_mapping_info.junctions_counts.profile)
-        if all(el != 1 for el in read_intron_profile[1:-1]):
+    def resolve_ambiguous(self, read_count_profile, isoform_profiles, matched_isoforms):
+        read_profile = map(sign, read_count_profile)
+        if all(el != 1 for el in read_profile[1:-1]):
             return matched_isoforms
 
         for t in matched_isoforms:
-            matched_positions = find_matching_positions(profile_storage.intron_profiles[t], read_intron_profile)
+            matched_positions = find_matching_positions(isoform_profiles[t], read_profile)
             # print_debug(matched_positions)
             # print_debug(profile_storage.intron_profiles[t])
 
-            all_junctions_detected = True
+            all_positions_detected = True
             for i in range(len(matched_positions)):
-                if matched_positions[i] == 0 and profile_storage.intron_profiles[t][i] != -1:
-                    all_junctions_detected = False
+                if matched_positions[i] == 0 and isoform_profiles[t][i] != -1:
+                    all_positions_detected = False
                     break
 
-            if all_junctions_detected:
+            if all_positions_detected:
                 # print_debug("Ambiguity resolved")
                 # print_debug(profile_storage.intron_profiles[t])
                 # print_debug(matched_positions)
@@ -602,12 +609,6 @@ class ReadProfilesInfo:
                                                                       self.gene_info.all_rna_profiles.exon_profiles)
         both_mathched_isoforms = intersection(intron_matched_isoforms, exon_matched_isoforms)
 
-        # for statistics
-        if read_id not in global_assignment_map:
-            global_assignment_map[read_id] = set()
-        for i in both_mathched_isoforms:
-            global_assignment_map[read_id].add(i)
-
         transcript_id = None
         codon_pair = (None, None)
         if len(both_mathched_isoforms) == 1:
@@ -615,15 +616,18 @@ class ReadProfilesInfo:
             print_debug("Unique match")
             transcript_id = list(both_mathched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
+            add_to_global_stats(read_id, both_mathched_isoforms)
         elif len(both_mathched_isoforms) == 0:
             if len(intron_matched_isoforms) == 1:
                 print_debug("Extra exons, but unique intron profile " + read_id)
                 transcript_id = list(intron_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
+                add_to_global_stats(read_id, intron_matched_isoforms)
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
                 transcript_id = list(exon_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
+                add_to_global_stats(read_id, exon_matched_isoforms)
             else:
                 stat.contradictory += 1
                 print_debug("Contradictory " + read_id)
@@ -631,17 +635,27 @@ class ReadProfilesInfo:
             if RESOLVE_AMBIGUOUS:
                 # TODO: resolve ambiguous using exons
                 intron_matched_isoforms = \
-                    self.resolve_ambiguous(read_mapping_info, intron_matched_isoforms, self.gene_info.all_rna_profiles)
-            
-            if len(intron_matched_isoforms) == 1:
+                    self.resolve_ambiguous(read_mapping_info.junctions_counts.profile,
+                                           self.gene_info.all_rna_profiles.intron_profiles, intron_matched_isoforms)
+                exon_matched_isoforms = \
+                    self.resolve_ambiguous(read_mapping_info.exons_counts.profile,
+                                           self.gene_info.all_rna_profiles.exon_profiles, exon_matched_isoforms)
+
+                both_mathched_isoforms = intersection(intron_matched_isoforms, exon_matched_isoforms)
+
+            if len(both_mathched_isoforms) == 1:
                 stat.ambiguous_subisoform_assigned += 1
                 print_debug("Unique match after resolution")
-                transcript_id = list(intron_matched_isoforms)[0]
+                transcript_id = list(both_mathched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
+                add_to_global_stats(read_id, both_mathched_isoforms)
+            elif len(both_mathched_isoforms) == 0:
+                stat.contradictory += 1
+                print_debug("Contradictory " + read_id)
             else:
                 codons = set()
                 if self.args.assign_codons_when_ambiguous:
-                    for t in intron_matched_isoforms:
+                    for t in both_mathched_isoforms:
                         codons.add(self.codon_pairs[t])
                 if len(codons) == 1:
                     codon_pair = list(codons)[0]
