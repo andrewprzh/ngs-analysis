@@ -780,7 +780,10 @@ class GeneDBProcessor:
         gene_isoform_ids = set(read_profiles.gene_info.coding_rna_profiles.intron_profiles.keys())
         processed_ids = set()
         for t in read_profiles.read_mapping_infos.keys():
-            processed_ids.add(self.bc_map[t][0])
+            if not self.bc_map or len(self.bc_map) == 0:
+                processed_ids.add(t)
+            else:
+                processed_ids.add(self.bc_map[t][0])
         for t in gene_isoform_ids:
             if t not in processed_ids:
                 gene_stats.unmapped += 1
