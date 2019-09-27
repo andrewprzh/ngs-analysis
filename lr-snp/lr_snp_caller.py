@@ -86,6 +86,10 @@ class SNPCaller:
         count_storage = self.count_storages[index]
         for pileup_column in bam.pileup(chromosome_record.id, start, end):
             for pileup_read in pileup_column.pileups:
+                if (pileup_column.pos < start):
+                    continue
+                if (pileup_column.pos > end):
+                    break
                 if not pileup_read.is_del and not pileup_read.is_refskip:
                     nucl = pileup_read.alignment.query_sequence[pileup_read.query_position]
                     if nucl != 'N':
