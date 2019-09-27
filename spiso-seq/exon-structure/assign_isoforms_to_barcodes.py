@@ -622,15 +622,18 @@ class ReadProfilesInfo:
                 print_debug("Extra exons, but unique intron profile " + read_id)
                 transcript_id = list(intron_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
+                stat.unique_extra_exon += 1
                 add_to_global_stats(read_id, intron_matched_isoforms)
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
                 transcript_id = list(exon_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
+                stat.unique_extra_intros += 1
                 add_to_global_stats(read_id, exon_matched_isoforms)
             else:
                 stat.contradictory += 1
                 print_debug("Contradictory " + read_id)
+                add_to_global_stats(read_id, [])
         else:
             if RESOLVE_AMBIGUOUS:
                 # TODO: resolve ambiguous using exons
@@ -652,7 +655,9 @@ class ReadProfilesInfo:
             elif len(both_mathched_isoforms) == 0:
                 stat.contradictory += 1
                 print_debug("Contradictory " + read_id)
+                add_to_global_stats(read_id, [])
             else:
+                add_to_global_stats(read_id, both_mathched_isoforms)
                 codons = set()
                 if self.args.assign_codons_when_ambiguous:
                     for t in both_mathched_isoforms:
@@ -662,7 +667,7 @@ class ReadProfilesInfo:
                     stat.ambiguous_codon_assigned += 1   
                     transcript_id = list(intron_matched_isoforms)[0]
                 else:       
-                    if any(mi in self.gene_info.all_rna_profiles.ambiguous for mi in intron_matched_isoforms):
+                    if any(mi in self.gene_info.all_rna_profiles.ambiguous for mi in both_mathched_isoforms):
                         stat.ambiguous_unassignable += 1
                         print_debug("Unassignable")
                     else:        
@@ -966,11 +971,11 @@ def global_stats(bc_map):
                 else:
                     incorrect_amb += 1
 
-    print("\nGlobal stats, total reads / barcodes processd " + str(len(global_assignment_map)))
+    print("\nGlobal stats, total reads / barcodes processed " + str(len(global_assignment_map)))
     print("\t\tCorrect\tIncorrect")
     print("Unique\t\t" + str(correct_unique) + "\t" + str(incorrect_unique))
-    print("Ambiguos\t" + str(correct_amb) + "\t" + str(incorrect_amb))
-    print("Unassinable\t" + str(correct_unassignable) + "\t" + str(incorrect_unassignable))
+    print("Ambiguous\t" + str(correct_amb) + "\t" + str(incorrect_amb))
+    print("Unassignable\t" + str(correct_unassignable) + "\t" + str(incorrect_unassignable))
     print("\nNot matched " + str(unassigned) + ", unassignable and not matched " + str(unassigned_unassignable))
         
 
