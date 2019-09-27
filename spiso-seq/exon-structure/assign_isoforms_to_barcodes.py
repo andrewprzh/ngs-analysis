@@ -698,7 +698,7 @@ class GeneDBProcessor:
         samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
         if not samfile_in.has_index:
             raise Exception("BAM file " + self.bamfile_name + " is not indexed, run samtools index")
-        if samfile_in.references[0].startswith('chr'):
+        if args.change_chr_prefix and samfile_in.references[0].startswith('chr'):
             print("Changing chomosome prefix")
             self.chr_bam_prefix = 'chr'
         samfile_in.close()
@@ -989,6 +989,7 @@ def parse_args():
     parser.add_argument("--data_type", "-d", help="type of data to process, supported types are: contigs, 10x, long_reads, isoforms", type=str, default = "10x")
     parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)
+    parser.add_argument("--change_chr_prefix", help="change prefix", type=bool, default=False)
     args = parser.parse_args()
     return args
 
