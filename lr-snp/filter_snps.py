@@ -18,8 +18,6 @@ class SNPStorage:
         self.snp_map = {}
 
     def add(self, chr_id, position, multi_snp):
-        if len(multi_snp) == 0:
-            return
         if chr_id not in self.snp_map:
             self.snp_map[chr_id] = {}
         if position not in self.snp_map[chr_id]:
@@ -47,7 +45,7 @@ class TSVParser:
             if any(cov < self.args.min_cov for cov in total_cov):
                 continue
             freqs = [float(tokens[self.sample_start_column + 3 * i + 2]) for i in self.sample_ids]
-            if max(freqs) < args.min_freq:
+            if max(freqs) < self.args.min_freq:
                 continue
             snp_type = SOMATIC_SNP if min(freqs) == 0 or max(freqs) / min(freqs) > 2 else GERMLINE_SNP
             snp_cov = [int(tokens[self.sample_start_column + 3 * i + 1]) for i in self.sample_ids]
@@ -89,7 +87,7 @@ class VarScanParser:
                     snp_cov.append(0 if sample_data[3] == '-' else int(sample_data[3]))
                     freqs.append(0.0 if sample_data[4] == '-' else float(sample_data[4]))
 
-            if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < args.min_freq:
+            if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
                 continue
             snp_type = SOMATIC_SNP if min(freqs) == 0 or max(freqs) / min(freqs) > 2 else GERMLINE_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
@@ -128,7 +126,7 @@ class VCFParser:
                     total_cov.append(int(cov[2]) + int(cov[3]))
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < args.min_freq:
+            if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
                 continue
             snp_type = SOMATIC_SNP if min(freqs) == 0 or max(freqs) / min(freqs) > 2 else GERMLINE_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
@@ -165,10 +163,10 @@ class SNPFilter:
 
     def filter(self, snp_storage):
         filtered_storage = SNPStorage()
-        ref_dict = SeqIO.to_dict(SeqIO.parse(args.reference, "fasta"))
+        ref_dict = SeqIO.to_dict(SeqIO.parse(self.args.reference, "fasta"))
         for chr_id in snp_storage.snp_map.keys():
             filtered_storage.snp_map[chr_id] = {}
-            self.filter_chromosome(ref_dict[chr_id], snp_map[chr_id], filtered_storage.snp_map[chr_id])
+            self.filter_chromosome(ref_dict[chr_id], snp_storage.snp_map[chr_id], filtered_storage.snp_map[chr_id])
 
         return filtered_storage
 
@@ -201,8 +199,6 @@ def parse_args():
 def set_params(args):
     if args.min_freq < 0 or args.min_freq > 1:
         raise Exception("ERROR: minimal SNP frequency should be between 0.0 and 1.0, but set to " + str(args.min_freq))
-    if args.min_freq_factor < 1:
-        raise Exception("ERROR: minimal SNP frequency factor should be larger than 1.0, but set to " + str(args.min_freq))
     if args.min_cov < 1:
         raise Exception("ERROR: minimal SNP coverage should be positive, but set to " + str(args.min_cov))
 
