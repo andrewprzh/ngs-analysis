@@ -31,6 +31,10 @@ def genes_overlap(gene_db1, gene_db2):
     return overlaps((gene_db1.start, gene_db1.end), (gene_db2.start, gene_db2.end))
 
 
+def is_germline(min_freq, max_freq, args):
+    return min_freq >= args.min_freq or (max_freq >= args.min_freq and min_freq > 0 and max_freq / min_freq <= args.min_freq_factor)
+
+
 class NuclStorage:
     def __init__(self, region_size):
         self.nucl_counts = []
@@ -121,8 +125,7 @@ class SNPCaller:
                 continue
 
             min_freq = min(nucl_per_sample_freqs)
-            if min_freq >= self.args.min_freq or \
-                    (max_freq >= self.args.min_freq and min_freq > 0 and max_freq / min_freq <= self.args.min_freq_factor):
+            if is_germline(min_freq, max_freq, self.args):
                 # all snps has good frequency
                 if not self.args.keep_germline:
                     continue

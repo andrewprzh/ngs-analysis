@@ -128,7 +128,7 @@ class VCFParser:
 
             if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
                 continue
-            snp_type = SOMATIC_SNP if min(freqs) == 0 or max(freqs) / min(freqs) > 2 else GERMLINE_SNP
+            snp_type = GERMLINE_SNP if is_germline(min_freq, max_freq, self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
 
 
@@ -184,6 +184,7 @@ def parse_args():
     optional_group.add_argument("--tsv", help="SNPs in TSV format (this tool)", type=str)
     optional_group.add_argument("--no_filter", help="do not filter  SNP clusters and SNPs in poly-A/T regions", action='store_true', default=False)
     optional_group.add_argument("--min_freq", "-f", help="minimal SNP frequency within a sample, between 0.0 and 1.0 [0.2]", type=float, default=0.2)
+    optional_group.add_argument("--min_freq_factor", "-m", help="minimal SNP frequency factor, > 1.0 [2.0]", type=float, default=2.0)
     optional_group.add_argument("--min_cov", "-c", help="minimal SNP read coverage depth within a sample, > 0 [50]", type=int, default=50)
     optional_group.add_argument("--sample_ids", help="comma-separated 0-based sample indices, e.g. 1,3,6", type=str, default='')
 
@@ -201,6 +202,8 @@ def set_params(args):
         raise Exception("ERROR: minimal SNP frequency should be between 0.0 and 1.0, but set to " + str(args.min_freq))
     if args.min_cov < 1:
         raise Exception("ERROR: minimal SNP coverage should be positive, but set to " + str(args.min_cov))
+    if args.min_freq_factor < 1:
+        raise Exception("ERROR: minimal SNP frequency factor should be larger than 1.0, but set to " + str(args.min_freq))
 
     if [args.varscan, args.tsv, args.vcf].count(None) != 2:
         raise Exception("ERROR: provide exactly one input file")
