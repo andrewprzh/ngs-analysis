@@ -77,6 +77,7 @@ class SNPCaller:
     def __init__(self, args):
         self.bamfiles = args.bam_file
         self.reference_path = args.reference
+        # chr_id -> map: position -> list of SelectedSNP
         self.snp_map = {}
         self.count_storages = [NuclStorage(1) for i in range(len(self.bamfiles))]
         self.args = args
@@ -209,11 +210,10 @@ class SNPMapTSVWriter:
     sample_header = ['TOTAL', 'READS', 'FREQ']
     delim = '\t'
 
-    def __init__(self, out_prefix, sample_names, args):
+    def __init__(self, out_prefix, sample_names):
         self.gemline_file_name = out_prefix + "germline_SNPs.tsv"
         self.somatic_file_name = out_prefix + "somatic_SNPs.tsv"
         self.sample_names = sample_names
-        self.args = args
         print("Outputting results to " + self.somatic_file_name + " and " + self.gemline_file_name)
         somatic_file = open(self.somatic_file_name, 'w')
         germline_file = open(self.gemline_file_name, 'w')

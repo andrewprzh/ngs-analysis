@@ -89,7 +89,7 @@ def main():
     set_params(args)
 
     sample_names = map(lambda x: os.path.splitext(os.path.basename(x))[0], args.bam_file)
-    snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names, args)
+    snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names)
     snp_caller = SNPCaller(args)
 
     if args.genedb or args.gtf:
