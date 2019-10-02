@@ -27,11 +27,12 @@ class SNPStorage:
 
 
 class TSVParser:
-    def __init__(self, infile, sample_ids, args):
+    def __init__(self, infile, sample_ids, args, no_filter = False):
         self.sample_start_column = 5
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
+        self.no_filter = no_filter
 
     def fill_map(self, snp_storage):
         header = True
@@ -42,10 +43,10 @@ class TSVParser:
 
             tokens = l.strip().split('\t')
             total_cov = [int(tokens[self.sample_start_column + 3 * i]) for i in self.sample_ids]
-            if any(cov < self.args.min_cov for cov in total_cov):
+            if not self.no_filter and any(cov < self.args.min_cov for cov in total_cov):
                 continue
             freqs = [float(tokens[self.sample_start_column + 3 * i + 2]) for i in self.sample_ids]
-            if max(freqs) < self.args.min_freq:
+            if not self.no_filter and max(freqs) < self.args.min_freq:
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_cov = [int(tokens[self.sample_start_column + 3 * i + 1]) for i in self.sample_ids]
