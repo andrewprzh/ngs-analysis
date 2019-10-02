@@ -32,7 +32,7 @@ def genes_overlap(gene_db1, gene_db2):
 
 
 def is_germline(min_freq, max_freq, args):
-    return min_freq >= args.min_freq or (max_freq >= args.min_freq and min_freq > 0 and max_freq / min_freq <= args.min_freq_factor)
+    return min_freq >= args.min_freq or (max_freq >= args.min_freq and min_freq > 0 and max_freq / min_freq < args.min_freq_factor)
 
 
 class NuclStorage:
@@ -230,7 +230,8 @@ class SNPMapTSVWriter:
         germline_file.close()
 
     def form_line(self, chromosome, pos, snp):
-        l = self.delim.join([chromosome, str(pos + 1), snp.reference_nucl, snp.alternative_nucl, snp.snp_type])
+        #TODO: +1 to position
+        l = self.delim.join([chromosome, str(pos), snp.reference_nucl, snp.alternative_nucl, snp.snp_type])
         for i in range(len(snp.sample_counts)):
             l += self.delim + self.delim.join(map(str, [snp.sample_coverage[i], snp.sample_counts[i]]))
             l += self.delim + '{:.2f}'.format(float(snp.sample_counts[i]) / float(snp.sample_coverage[i]))
@@ -240,7 +241,7 @@ class SNPMapTSVWriter:
         somatic_file = open(self.somatic_file_name, 'a+')
         germline_file = open(self.gemline_file_name, 'a+')
 
-        for chromosome in snp_map.keys():
+        for chromosome in sorted(snp_map.keys()):
             #print("Processing chromosome " + chromosome)
             snps = snp_map[chromosome]
             for pos in sorted(snps.keys()):

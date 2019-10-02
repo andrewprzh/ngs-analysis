@@ -47,7 +47,7 @@ class TSVParser:
             freqs = [float(tokens[self.sample_start_column + 3 * i + 2]) for i in self.sample_ids]
             if max(freqs) < self.args.min_freq:
                 continue
-            snp_type = SOMATIC_SNP if min(freqs) == 0 or max(freqs) / min(freqs) > 2 else GERMLINE_SNP
+            snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_cov = [int(tokens[self.sample_start_column + 3 * i + 1]) for i in self.sample_ids]
 
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
@@ -89,7 +89,7 @@ class VarScanParser:
 
             if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
                 continue
-            snp_type = SOMATIC_SNP if min(freqs) == 0 or max(freqs) / min(freqs) > 2 else GERMLINE_SNP
+            snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
 
 
@@ -128,7 +128,7 @@ class VCFParser:
 
             if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
                 continue
-            snp_type = GERMLINE_SNP if is_germline(min_freq, max_freq, self.args) else SOMATIC_SNP
+            snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
 
 
@@ -138,7 +138,7 @@ class SNPFilter:
 
     def filter_chromosome(self, chromosome_record, chr_map, filtered_chr_map):
         sorted_positions = sorted(chr_map.keys())
-        for i in len(sorted_positions):
+        for i in range(len(sorted_positions)):
             if i > 0 and sorted_positions[i] - sorted_positions[i - 1] <= self.args.min_distance_between_snps:
                 continue
             if i < len(sorted_positions) - 1  and \
@@ -150,8 +150,8 @@ class SNPFilter:
             snp_region = chromosome_record.seq[max(0, position - 5):position + 5].upper()
             region_len = len(snp_region)
 
-            poly_a_region = float(snp_region.count('A')) / float(region_len) >= self.poly_at_percentage
-            poly_t_region = float(snp_region.count('T')) / float(region_len) >= self.poly_at_percentage
+            poly_a_region = float(snp_region.count('A')) / float(region_len) >= self.args.poly_at_percentage
+            poly_t_region = float(snp_region.count('T')) / float(region_len) >= self.args.poly_at_percentage
             for snp in chr_map[position]:
                 if (poly_a_region and snp.alternative_nucl == 'A') or (poly_t_region and snp.alternative_nucl == 'T') \
                         or (snp.reference_nucl == 'A' and snp.alternative_nucl == 'G'):
