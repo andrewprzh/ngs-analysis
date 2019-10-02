@@ -67,11 +67,10 @@ class VarScanParser:
                 header = False
                 continue
 
-            tokens = l.strip().split('\t')
+            tokens = l.strip().split()
             if len(tokens[3]) > 1:
                 # ignore multiple variants so far
                 continue
-
             sample_tokens = [tokens[self.sample_start_column + i] for i in self.sample_ids]
             snp_cov = []
             freqs = []
@@ -83,9 +82,9 @@ class VarScanParser:
                     snp_cov.append(0)
                     freqs.append(0.0)
                 else:
-                    total_cov.append(0 if sample_data[2] == '-' else int(sample_data[3]) + int(sample_data[3]))
+                    total_cov.append(0 if sample_data[2] == '-' else int(sample_data[2]) + int(sample_data[3]))
                     snp_cov.append(0 if sample_data[3] == '-' else int(sample_data[3]))
-                    freqs.append(0.0 if sample_data[4] == '-' else float(sample_data[4]))
+                    freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
             if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
                 continue
@@ -121,9 +120,9 @@ class VCFParser:
                     snp_cov.append(0)
                     freqs.append(0.0)
                 else:
-                    cov = tokens[1].split(',')
-                    snp_cov.append(int(cov[2]))
-                    total_cov.append(int(cov[2]) + int(cov[3]))
+                    cov = sample_data[1].split(',')
+                    snp_cov.append(int(cov[1]))
+                    total_cov.append(int(cov[0]) + int(cov[1]))
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
             if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
