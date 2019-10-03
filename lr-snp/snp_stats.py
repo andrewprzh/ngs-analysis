@@ -44,7 +44,7 @@ def common_snps(snp_storages):
     return intersect_map, total_counts
 
 
-def get_intersected_snps(snp_storages, storage_index = 0, cov_cutoff = 0):
+def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutoff = 0):
     common_chromosomes = set(snp_storages[0].snp_map.keys())
     for i in range(1, len(snp_storages)):
         common_chromosomes =  common_chromosomes.intersection(set(snp_storages[i].snp_map.keys()))
@@ -63,12 +63,17 @@ def get_intersected_snps(snp_storages, storage_index = 0, cov_cutoff = 0):
                 continue
 
             pos_id = chr_id + ":" + str(pos)
-            snp_frequency_map[pos_id] = []
+            freq_list = []
             sample_count = len(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage)
             for i in range(sample_count):
                 snp_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_counts[i]
                 total_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]
-                snp_frequency_map[pos_id].append(float(snp_cov) / float(total_cov))
+                freq_list.append(float(snp_cov) / float(total_cov))
+
+            if any(freq < freq_cutoff for freq in freq_list):
+                continue
+
+            snp_frequency_map[pos_id] = freq_list
 
     return snp_frequency_map
 
@@ -80,7 +85,10 @@ def print_map(snp_frequency_map):
 
 def freq_stat(snp_frequency_map, sample_index):
     freqs = [snp_frequency_map[pos][sample_index] for pos in snp_frequency_map.keys()]
-    print(numpy.histogram(freqs, bins = [0.1 * i for i in range(10)]))
+    v,k = numpy.histogram(freqs, bins = [0.1 * i for i in range(10)])
+
+    for i in range(len(k)):
+        print(str(k) + '\t' + str(v))
 
 
 def parse_args():
@@ -89,7 +97,9 @@ def parse_args():
 
     required_group = parser.add_argument_group('required parameters')
     required_group.add_argument('--tsv', dest='tsv_file', nargs='+', help='list of TSV files')
-    #required_group.add_argument("--output_prefix", "-o", help="output prefix", type=str)
+    optional_group.add_argument("--min_freq", help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
+    optional_group.add_argument("--min_cov", help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
+    optional_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=2)
 
     args = parser.parse_args()
 
@@ -101,11 +111,14 @@ def parse_args():
 
 # Tune algorithm params
 def set_params(args):
-    pass
+    if args.min_freq < 0 or args.min_freq > 1:
+        raise Exception("ERROR: minimal SNP frequency should be between 0.0 and 1.0, but set to " + str(args.min_freq))
+    if args.min_cov < 0:
+        raise Exception("ERROR: minimal SNP coverage should be positive, but set to " + str(args.min_cov))
 
 def main():
     args = parse_args()
-    # set_params(args)
+    set_params(args)
 
     snp_storages = []
     for f in args.tsv_file:
@@ -114,17 +127,14 @@ def main():
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
 
-    print(common_snps(snp_storages))
+    # print(common_snps(snp_storages))
 
-    snp_freqs = get_intersected_snps(snp_storages, 2, 10)
+    snp_freqs = get_intersected_snps(snp_storages, args.tool_id, args.min_cov, args.min_freq)
     print_map(snp_freqs)
-    for i in range(len(args.tsv_file)):
+
+    for i in range(3):
         freq_stat(snp_freqs, i)
 
-    snp_freqs = get_intersected_snps(snp_storages, 2, 20)
-    print_map(snp_freqs)
-    for i in range(len(args.tsv_file)):
-        freq_stat(snp_freqs, i)
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
