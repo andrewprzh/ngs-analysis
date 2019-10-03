@@ -59,7 +59,7 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
         for pos in common_positions:
             if any(len(snp_storages[i].snp_map[chr_id][pos]) > 1 for i in range(len(snp_storages))):
                 continue
-            if any(snp_storages[i].snp_map[chr_id][pos][0].sample_coverage < cov_cutoff for i in range(len(snp_storages))):
+            if any(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i] < cov_cutoff for i in range(3)):
                 continue
 
             pos_id = chr_id + ":" + str(pos)
@@ -70,10 +70,8 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
                 total_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]
                 freq_list.append(float(snp_cov) / float(total_cov))
 
-            if any(freq < freq_cutoff for freq in freq_list):
-                continue
-
-            snp_frequency_map[pos_id] = freq_list
+            if any(freq >= freq_cutoff for freq in freq_list) and any(freq < 0.05 for freq in freq_list):
+                snp_frequency_map[pos_id] = freq_list
 
     return snp_frequency_map
 
@@ -83,23 +81,28 @@ def print_map(snp_frequency_map):
         print(pos + '\t' + '\t'.join(map('{:.2f}'.format, snp_frequency_map[pos])))
 
 
-def freq_stat(snp_frequency_map, sample_index):
-    freqs = [snp_frequency_map[pos][sample_index] for pos in snp_frequency_map.keys()]
-    v,k = numpy.histogram(freqs, bins = [0.1 * i for i in range(10)])
+def freq_stat(snp_frequency_map):
+    key = None
+    values = []
+    for i in range(3):
+        freqs = [snp_frequency_map[pos][i] for pos in snp_frequency_map.keys()]
+        v,k = numpy.histogram(freqs, bins = [0.1 * i for i in range(11)])
+        key = k
+        values.append(v)
 
-    for i in range(len(k)):
-        print(str(k) + '\t' + str(v))
+    for i in range(len(v)):
+        print('{:.2f}'.format(key[i]) + '\t' + '\t'.join(map(str, [values[j][i] for j in range(3)])))
 
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
                                      description="Get stats for several SNP files ")
 
-    required_group = parser.add_argument_group('required parameters')
+    required_group = parser.add_argument_group('parameters')
     required_group.add_argument('--tsv', dest='tsv_file', nargs='+', help='list of TSV files')
-    optional_group.add_argument("--min_freq", help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
-    optional_group.add_argument("--min_cov", help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
-    optional_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=2)
+    required_group.add_argument("--min_freq", help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
+    required_group.add_argument("--min_cov", help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
+    required_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=2)
 
     args = parser.parse_args()
 
@@ -127,13 +130,12 @@ def main():
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
 
-    # print(common_snps(snp_storages))
+#    print(common_snps(snp_storages))
 
     snp_freqs = get_intersected_snps(snp_storages, args.tool_id, args.min_cov, args.min_freq)
     print_map(snp_freqs)
 
-    for i in range(3):
-        freq_stat(snp_freqs, i)
+#    freq_stat(snp_freqs)
 
 
 if __name__ == "__main__":
