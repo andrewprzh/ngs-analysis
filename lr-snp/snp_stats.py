@@ -44,7 +44,7 @@ def common_snps(snp_storages):
     return intersect_map, total_counts
 
 
-def get_intersected_snps(snp_storages, cov_cutoff = 0):
+def get_intersected_snps(snp_storages, storage_index = 0, cov_cutoff = 0):
     common_chromosomes = set(snp_storages[0].snp_map.keys())
     for i in range(1, len(snp_storages)):
         common_chromosomes =  common_chromosomes.intersection(set(snp_storages[i].snp_map.keys()))
@@ -52,35 +52,35 @@ def get_intersected_snps(snp_storages, cov_cutoff = 0):
     # chr:pos -> list of frequences
     snp_frequency_map = {}
     for chr_id in common_chromosomes:
-        stat_map[chr_id] = {}
         common_positions = set(snp_storages[0].snp_map[chr_id].keys())
         for i in range(1, len(snp_storages)):
-            common_positions.intersection(set(snp_storages[i].snp_map[chr_id].keys()))
+            common_positions = common_positions.intersection(set(snp_storages[i].snp_map[chr_id].keys()))
 
         for pos in common_positions:
-            if any(len(snp_storages[i].snp_map[chr_id][pos]) > 0 for i in range(len(snp_storages))):
+            if any(len(snp_storages[i].snp_map[chr_id][pos]) > 1 for i in range(len(snp_storages))):
                 continue
-            if any(x < cov_cutoff for x in [snp_storages[i].snp_map[chr_id][pos][0].sample_coverage for i in range(len(snp_storages))]):
+            if any(snp_storages[i].snp_map[chr_id][pos][0].sample_coverage < cov_cutoff for i in range(len(snp_storages))):
                 continue
 
             pos_id = chr_id + ":" + str(pos)
             snp_frequency_map[pos_id] = []
-            for i in range(len(snp_storages)):
-                snp_cov = snp_storages[i].snp_map[chr_id][pos][0].sample_coverage
-                total_cov = snp_storages[i].snp_map[chr_id][pos][0].sample_coverage
-                snp_frequency_map[pos_id].append(float(snp_cov) / floar(total_cov))
+            sample_count = len(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage)
+            for i in range(sample_count):
+                snp_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_counts[i]
+                total_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]
+                snp_frequency_map[pos_id].append(float(snp_cov) / float(total_cov))
 
     return snp_frequency_map
 
 
 def print_map(snp_frequency_map):
     for pos in sorted(snp_frequency_map.keys()):
-        print(pos + '\t' + '\t'.join(snp_frequency_map[pos]))
+        print(pos + '\t' + '\t'.join(map('{:.2f}'.format, snp_frequency_map[pos])))
 
 
 def freq_stat(snp_frequency_map, sample_index):
     freqs = [snp_frequency_map[pos][sample_index] for pos in snp_frequency_map.keys()]
-    print(numpy.histogram(freqs))
+    print(numpy.histogram(freqs, bins = [0.1 * i for i in range(10)]))
 
 
 def parse_args():
@@ -116,12 +116,12 @@ def main():
 
     print(common_snps(snp_storages))
 
-    snp_freqs = get_intersected_snps(snp_storages, 10)
+    snp_freqs = get_intersected_snps(snp_storages, 2, 10)
     print_map(snp_freqs)
     for i in range(len(args.tsv_file)):
         freq_stat(snp_freqs, i)
 
-    snp_freqs = get_intersected_snps(snp_storages, 20)
+    snp_freqs = get_intersected_snps(snp_storages, 2, 20)
     print_map(snp_freqs)
     for i in range(len(args.tsv_file)):
         freq_stat(snp_freqs, i)
