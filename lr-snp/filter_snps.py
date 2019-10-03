@@ -48,7 +48,7 @@ class TSVParser:
             freqs = [float(tokens[self.sample_start_column + 3 * i + 2]) for i in self.sample_ids]
             if not self.no_filter and max(freqs) < self.args.min_freq:
                 continue
-            snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
+            snp_type = GERMLINE_SNP if not self.no_filter and is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_cov = [int(tokens[self.sample_start_column + 3 * i + 1]) for i in self.sample_ids]
 
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
