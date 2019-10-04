@@ -744,34 +744,35 @@ class GeneDBProcessor:
         gene_isoform_ids = set(gene_info.coding_rna_profiles.intron_profiles.keys())
         gene_all_isoform_ids = set(gene_info.all_rna_profiles.intron_profiles.keys())
 
+        original_isoform = read_id.split('_')[0]
         if isoform is not None:
-            if read_id == isoform:
+            if original_isoform == isoform:
                 gene_stats.correctly_assigned += 1
-            elif read_id in gene_isoform_ids:
+            elif original_isoform in gene_isoform_ids:
                 gene_stats.incorrectly_assigned_same_gene += 1
                 print("Incorrect assignment: isoform = " + isoform + " ; sequence = " + read_id + "\n")
-            elif read_id in gene_all_isoform_ids:
+            elif original_isoform in gene_all_isoform_ids:
                 gene_stats.incorrectly_assigned_nc += 1
             else:
                 gene_stats.incorrectly_assigned_other_gene += 1
                 print("Alien assignment: isoform = " + isoform + " ; sequence = " + read_id + "\n")
 
         else:
-            if read_id in gene_isoform_ids:
-                if read_id in gene_info.all_rna_profiles.ambiguous:
+            if original_isoform in gene_isoform_ids:
+                if original_isoform in gene_info.all_rna_profiles.ambiguous:
                     gene_stats.unassignable += 1
                     #print_debug("ID " + read_id + " is unassignable")
                 else:
                     gene_stats.unassigned += 1
                     #print_debug("ID " + read_id + " is unassigned")
-            elif read_id in gene_all_isoform_ids:
-                if read_id in gene_info.all_rna_profiles.ambiguous:
+            elif original_isoform in gene_all_isoform_ids:
+                if original_isoform in gene_info.all_rna_profiles.ambiguous:
                     gene_stats.unassignable += 1
                     #print_debug("ID " + read_id + " is unassignable")
                 else:
                     gene_stats.unassigned_nc += 1
                     #print_debug("ID " + read_id + " is unassigned")
-            elif read_id in gene_info.all_rna_profiles.empty:
+            elif original_isoform in gene_info.all_rna_profiles.empty:
                 gene_stats.empty_bc += 1
             else:
                 gene_stats.mismapped += 1
@@ -781,7 +782,7 @@ class GeneDBProcessor:
         processed_ids = set()
         for t in read_profiles.read_mapping_infos.keys():
             if not self.bc_map or len(self.bc_map) == 0:
-                processed_ids.add(t)
+                processed_ids.add(t.split('_'))
             else:
                 processed_ids.add(self.bc_map[t][0])
         for t in gene_isoform_ids:
@@ -952,7 +953,7 @@ def global_stats(bc_map):
     unassigned = 0
 
     for k in global_assignment_map.keys():
-        b = k
+        b = k.split('_')
         if bc_map is not None:
             b = bc_map[k][0]
         matched_isoforms = global_assignment_map[k]
