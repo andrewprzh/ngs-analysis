@@ -782,7 +782,7 @@ class GeneDBProcessor:
         processed_ids = set()
         for t in read_profiles.read_mapping_infos.keys():
             if not self.bc_map or len(self.bc_map) == 0:
-                processed_ids.add(t.split('_'))
+                processed_ids.add(t.split('_')[0])
             else:
                 processed_ids.add(self.bc_map[t][0])
         for t in gene_isoform_ids:
@@ -953,7 +953,7 @@ def global_stats(bc_map):
     unassigned = 0
 
     for k in global_assignment_map.keys():
-        b = k.split('_')
+        b = k.split('_')[0]
         if bc_map is not None:
             b = bc_map[k][0]
         matched_isoforms = global_assignment_map[k]
