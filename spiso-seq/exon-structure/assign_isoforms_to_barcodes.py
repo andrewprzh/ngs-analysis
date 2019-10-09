@@ -20,7 +20,7 @@ READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = True
 CONSIDER_FLANKING_JUNCTIONS = False
-JUNCTION_DELTA = 2
+JUNCTION_DELTA = 1
 LR_JUNCTION_DELTA = 3
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
@@ -636,7 +636,6 @@ class ReadProfilesInfo:
                 add_to_global_stats(read_id, [])
         else:
             if RESOLVE_AMBIGUOUS:
-                # TODO: resolve ambiguous using exons
                 intron_matched_isoforms = \
                     self.resolve_ambiguous(read_mapping_info.junctions_counts.profile,
                                            self.gene_info.all_rna_profiles.intron_profiles, intron_matched_isoforms)
