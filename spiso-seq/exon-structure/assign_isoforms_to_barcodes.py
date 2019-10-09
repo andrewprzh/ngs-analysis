@@ -14,7 +14,7 @@ from common import *
 from traceback import print_exc
 
 # global params, to be fixed
-RESOLVE_AMBIGUOUS = True
+RESOLVE_AMBIGUOUS = False
 DEDUCE_CODONS_FROM_CDS = True
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2

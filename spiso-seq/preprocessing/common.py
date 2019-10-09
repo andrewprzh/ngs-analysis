@@ -51,7 +51,7 @@ def align_fasta(output_dir, contigs_name, short_id_contigs_name, index, method =
         #Simple 
         #command = '{star} --runThreadN 16 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM  --outFileNamePrefix {alignment_out}'.format(star=star_path, ref_index_name=star_index, transcripts=short_id_contigs_name, alignment_out=alignment_sam_path)
         #Hagen options
-        command = '{star} --runThreadN 16 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM --outSAMattributes NH HI NM MD --outFilterMultimapScoreRange 1 \
+        command = '{star} --runThreadN 6 --genomeDir {ref_index_name}  --readFilesIn {transcripts}  --outSAMtype SAM --outSAMattributes NH HI NM MD --outFilterMultimapScoreRange 1 \
                    --outFilterMismatchNmax 2000 --scoreGapNoncan -20 --scoreGapGCAG -4 --scoreGapATAC -8 --scoreDelOpen -1 --scoreDelBase -1 --scoreInsOpen -1 --scoreInsBase -1 \
                    --alignEndsType Local --seedSearchStartLmax 50 --seedPerReadNmax 1000000 --seedPerWindowNmax 1000 --alignTranscriptsPerReadNmax 100000 --alignTranscriptsPerWindowNmax 10000 \
                    --outFileNamePrefix {alignment_out}'.format(star=star_path, ref_index_name=index, transcripts=short_id_contigs_name, alignment_out=alignment_name)
