@@ -70,7 +70,7 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
                 total_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]
                 freq_list.append(float(snp_cov) / float(total_cov))
 
-            if any(freq >= freq_cutoff for freq in freq_list) and any(freq < 0.05 for freq in freq_list):
+            if any(freq >= freq_cutoff for freq in freq_list) and  any(freq < 0.05 for freq in freq_list):
                 snp_frequency_map[pos_id] = freq_list
 
     return snp_frequency_map
@@ -130,12 +130,12 @@ def main():
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
 
-#    print(common_snps(snp_storages))
+    print(common_snps(snp_storages))
 
     snp_freqs = get_intersected_snps(snp_storages, args.tool_id, args.min_cov, args.min_freq)
     print_map(snp_freqs)
 
-#    freq_stat(snp_freqs)
+    freq_stat(snp_freqs)
 
 
 if __name__ == "__main__":

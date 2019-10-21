@@ -165,6 +165,8 @@ class SNPFilter:
         filtered_storage = SNPStorage()
         ref_dict = SeqIO.to_dict(SeqIO.parse(self.args.reference, "fasta"))
         for chr_id in snp_storage.snp_map.keys():
+            if chr_id not in ref_dict:
+                continue
             filtered_storage.snp_map[chr_id] = {}
             self.filter_chromosome(ref_dict[chr_id], snp_storage.snp_map[chr_id], filtered_storage.snp_map[chr_id])
 

@@ -29,25 +29,25 @@ def parse_args():
 def split_by_barcode(args):
     inf = pysam.AlignmentFile(args.bam, "rb")
     barcode_files = {}
-    for read in samfile.fetch():
+    for read in inf:
         barcode = read.get_tag("CB")
         barcode = barcode.split(":")[-1][:-2]
         if barcode not in barcode_files:
-            barcode_files[barcode] = pysam.AlignmentFile(args.output_prefix + barcode + ".bam", "wb", template=samfile)
+            barcode_files[barcode] = pysam.AlignmentFile(args.output_prefix + barcode + ".bam", "wb", template=inf)
         barcode_files[barcode].write(read)
 
     inf.close()
     for bc in barcode_files.keys():
         barcode_files[bc].close()
         barcode_file_name = args.output_prefix + bc + ".bam"
-        pysam.sort(barcode_file_name, 'tmp')
+        pysam.sort("-o", 'tmp.bam', barcode_file_name)
         os.rename('tmp.bam', barcode_file_name)
         pysam.index(barcode_file_name)
 
 
 def main():
     args = parse_args()
-
+    split_by_barcode(args)
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here

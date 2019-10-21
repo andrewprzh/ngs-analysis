@@ -28,7 +28,7 @@ COUNT_ISOFORM_STATS = True
 # ignore_overlaps --- do not output overlapping genes at all
 # shared_exons --- merge ones with at least 2 shared exons
 CODON_OUTPUT = "separate"
-WRITE_CODON_COORDINATES = False
+WRITE_CODON_COORDINATES = True
 
 # global variables for carrying out the stats
 global_assignment_map = {}
