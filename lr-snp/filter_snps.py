@@ -234,6 +234,7 @@ def main():
     set_params(args)
 
     sample_ids = process_sample_ids(args.sample_ids)
+    print(sample_ids)
     snp_writer = SNPMapTSVWriter(args.output_prefix, map(str, sample_ids))
 
     snp_storage = SNPStorage()
