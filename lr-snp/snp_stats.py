@@ -156,7 +156,8 @@ def main():
     snp_storages = []
     for f in args.tsv_file:
         print("Reading from " + f)
-        reader = TSVParser(f, [0, 1, 2], args)
+        reader = TSVParser(f, [], args)
+        print("Detected " + str(len(reader.sample_ids)) + " samples")
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
         snp_abundance_stat(snp_storages[-1].snp_map)

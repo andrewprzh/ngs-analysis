@@ -31,6 +31,11 @@ class TSVParser:
         self.sample_start_column = 5
         self.infile = infile
         self.sample_ids = sample_ids
+        if len(self.sample_ids) == 0:
+            f = open(self.infile)
+            header = f.readline()
+            sample_count = (len(header.strip().split()) - 5) / 3
+            self.sample_ids = range(sample_count)
         self.args = args
         self.no_filter = args.no_cov_filter
 
