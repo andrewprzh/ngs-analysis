@@ -202,7 +202,7 @@ def parse_args():
 def set_params(args):
     if args.min_freq < 0 or args.min_freq > 1:
         raise Exception("ERROR: minimal SNP frequency should be between 0.0 and 1.0, but set to " + str(args.min_freq))
-    if args.min_cov < 1:
+    if args.min_cov < 0:
         raise Exception("ERROR: minimal SNP coverage should be positive, but set to " + str(args.min_cov))
     if args.min_freq_factor < 1:
         raise Exception("ERROR: minimal SNP frequency factor should be larger than 1.0, but set to " + str(args.min_freq))
@@ -222,7 +222,7 @@ def process_sample_ids(sample_ids_string):
         if len(id_range) == 1:
             sample_ids.append(int(id_range[0]))
         else:
-            sample_ids.append(range(int(id_range[0]), int(id_range[1]) + 1))
+            sample_ids.extend(range(int(id_range[0]), int(id_range[1]) + 1))
 
     return sample_ids
 
@@ -232,7 +232,7 @@ def main():
     set_params(args)
 
     sample_ids = process_sample_ids(args.sample_ids)
-    snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names)
+    snp_writer = SNPMapTSVWriter(args.output_prefix, map(str, sample_ids))
 
     snp_storage = SNPStorage()
     reader = None
