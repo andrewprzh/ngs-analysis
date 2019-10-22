@@ -214,12 +214,24 @@ def set_params(args):
     args.poly_at_percentage = 0.5
 
 
+def process_sample_ids(sample_ids_string):
+    sample_ids = []
+    tokens = sample_ids_string.split(',')
+    for t in tokens:
+        id_range = t.split('-')
+        if len(id_range) == 1:
+            sample_ids.append(int(id_range[0]))
+        else:
+            sample_ids.append(range(int(id_range[0]), int(id_range[1]) + 1))
+
+    return sample_ids
+
+
 def main():
     args = parse_args()
     set_params(args)
 
-    sample_names = args.sample_ids.split(',')
-    sample_ids = map(int, sample_names)
+    sample_ids = process_sample_ids(args.sample_ids)
     snp_writer = SNPMapTSVWriter(args.output_prefix, sample_names)
 
     snp_storage = SNPStorage()
