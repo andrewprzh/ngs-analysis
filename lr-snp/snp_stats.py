@@ -106,17 +106,18 @@ def snp_abundance_stat(snp_storage):
             for snp in snp_storage[chr_id][pos]:
                 for cov in min_covs:
                     snp_abundance = map(lambda x: x >= cov, snp.sample_coverage).count(True)
-                    total_samples = snp.sample_coverage
+                    total_samples = len(snp.sample_coverage)
                     if snp_abundance not in abunances[cov]:
                         abunances[cov][snp_abundance] = 0
                     abunances[cov][snp_abundance] += 1
 
+    print(total_samples)
     percentiles = range(0, 100, 10)
     for cov in min_covs:
         abundance_hists = [0 for i in range(len(percentiles) - 1)]
         for a in abunances[cov]:
             percentile_index = int(math.floor(float(a * 10) / float(total_samples)))
-            if percentile_index == 10:
+            if percentile_index >= 10:
                 percentile_index = 9
             abundance_hists[percentile_index] += abunances[cov][a]
         print("Histogram for min coverage " + str(cov))
@@ -131,6 +132,7 @@ def parse_args():
     required_group.add_argument("--min_freq", help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
     required_group.add_argument("--min_cov", help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
     required_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=2)
+    required_group.add_argument("--no_cov_filter", help="do not use coverage filters", action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -154,10 +156,10 @@ def main():
     snp_storages = []
     for f in args.tsv_file:
         print("Reading from " + f)
-        reader = TSVParser(f, [0, 1, 2], args, no_filter=True)
+        reader = TSVParser(f, [0, 1, 2], args)
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
-        snp_abundance_stat(snp_storages[-1])
+        snp_abundance_stat(snp_storages[-1].snp_map)
 
     print(common_snps(snp_storages))
 
