@@ -11,7 +11,7 @@ from traceback import print_exc
 from lr_snp_caller import *
 from filter_snps import *
 import numpy
-
+import math
 
 def common_snps(snp_storages):
     all_chromosomes = set()
@@ -94,6 +94,34 @@ def freq_stat(snp_frequency_map):
         print('{:.2f}'.format(key[i]) + '\t' + '\t'.join(map(str, [values[j][i] for j in range(3)])))
 
 
+def snp_abundance_stat(snp_storage):
+    min_covs = [1, 5, 10, 20]
+    total_samples = 0
+    abunances = {}
+    for cov in min_covs:
+        abunances[cov] = {}
+
+    for chr_id in snp_storage:
+        for pos in snp_storage[chr_id]:
+            for snp in snp_storage[chr_id][pos]:
+                for cov in min_covs:
+                    snp_abundance = map(lambda x: x >= cov, snp.sample_coverage).count(True)
+                    total_samples = snp.sample_coverage
+                    if snp_abundance not in abunances[cov]:
+                        abunances[cov][snp_abundance] = 0
+                    abunances[cov][snp_abundance] += 1
+
+    percentiles = range(0, 100, 10)
+    for cov in min_covs:
+        abundance_hists = [0 for i in range(len(percentiles) - 1)]
+        for a in abunances[cov]:
+            percentile_index = int(math.floor(float(a * 10) / float(total_samples)))
+            if percentile_index == 10:
+                percentile_index = 9
+            abundance_hists[percentile_index] += abunances[cov][a]
+        print("Histogram for min coverage " + str(cov))
+        print(abundance_hists)
+
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
                                      description="Get stats for several SNP files ")
@@ -129,6 +157,7 @@ def main():
         reader = TSVParser(f, [0, 1, 2], args, no_filter=True)
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
+        snp_abundance_stat(snp_storages[-1])
 
     print(common_snps(snp_storages))
 
