@@ -234,7 +234,8 @@ class SNPMapTSVWriter:
         l = self.delim.join([chromosome, str(pos), snp.reference_nucl, snp.alternative_nucl, snp.snp_type])
         for i in range(len(snp.sample_counts)):
             l += self.delim + self.delim.join(map(str, [snp.sample_coverage[i], snp.sample_counts[i]]))
-            l += self.delim + '{:.2f}'.format(float(snp.sample_counts[i]) / float(snp.sample_coverage[i]))
+            freq = 0 if snp.sample_coverage[i] == 0 else float(snp.sample_counts[i]) / float(snp.sample_coverage[i])
+            l += self.delim + '{:.2f}'.format(freq)
         return l + '\n'
 
     def dump_to_file(self, snp_map):

@@ -32,7 +32,7 @@ class TSVParser:
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
-        self.no_filter = args.no_filter
+        self.no_filter = args.no_cov_filter
 
     def fill_map(self, snp_storage):
         header = True
@@ -60,7 +60,7 @@ class VarScanParser:
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
-        self.no_filter = args.no_filter
+        self.no_filter = args.no_cov_filter
 
     def fill_map(self, snp_storage):
         header = True
@@ -100,7 +100,7 @@ class VCFParser:
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
-        self.no_filter = args.no_filter
+        self.no_filter = args.no_cov_filter
 
     def fill_map(self, snp_storage):
         for l in open(self.infile):
@@ -187,6 +187,7 @@ def parse_args():
     optional_group.add_argument("--vcf", help="SNPs in VCF format (monovar)", type=str)
     optional_group.add_argument("--tsv", help="SNPs in TSV format (this tool)", type=str)
     optional_group.add_argument("--no_filter", help="do not filter  SNP clusters and SNPs in poly-A/T regions", action='store_true', default=False)
+    optional_group.add_argument("--no_cov_filter", help="do not use coverage filters", action='store_true', default=False)
     optional_group.add_argument("--min_freq", "-f", help="minimal SNP frequency within a sample, between 0.0 and 1.0 [0.2]", type=float, default=0.2)
     optional_group.add_argument("--min_freq_factor", "-m", help="minimal SNP frequency factor, > 1.0 [2.0]", type=float, default=2.0)
     optional_group.add_argument("--min_cov", "-c", help="minimal SNP read coverage depth within a sample, > 0 [50]", type=int, default=50)
