@@ -27,12 +27,12 @@ class SNPStorage:
 
 
 class TSVParser:
-    def __init__(self, infile, sample_ids, args, no_filter = False):
+    def __init__(self, infile, sample_ids, args):
         self.sample_start_column = 5
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
-        self.no_filter = no_filter
+        self.no_filter = args.no_filter
 
     def fill_map(self, snp_storage):
         header = True
@@ -60,6 +60,7 @@ class VarScanParser:
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
+        self.no_filter = args.no_filter
 
     def fill_map(self, snp_storage):
         header = True
@@ -87,7 +88,7 @@ class VarScanParser:
                     snp_cov.append(0 if sample_data[3] == '-' else int(sample_data[3]))
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
@@ -99,6 +100,7 @@ class VCFParser:
         self.infile = infile
         self.sample_ids = sample_ids
         self.args = args
+        self.no_filter = args.no_filter
 
     def fill_map(self, snp_storage):
         for l in open(self.infile):
@@ -126,7 +128,7 @@ class VCFParser:
                     total_cov.append(int(cov[0]) + int(cov[1]))
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq:
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
