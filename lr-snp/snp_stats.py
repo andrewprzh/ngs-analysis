@@ -111,12 +111,12 @@ def snp_abundance_stat(snp_storage):
                         abunances[cov][snp_abundance] = 0
                     abunances[cov][snp_abundance] += 1
 
-    print(total_samples)
     percentiles = range(0, 100, 10)
     for cov in min_covs:
-        abundance_hists = [0 for i in range(len(percentiles) - 1)]
+        abundance_hists = [0 for i in range(len(percentiles))]
         for a in abunances[cov]:
             percentile_index = int(math.floor(float(a * 10) / float(total_samples)))
+#            print(percentile_index,total_samples)
             if percentile_index >= 10:
                 percentile_index = 9
             abundance_hists[percentile_index] += abunances[cov][a]
