@@ -1,13 +1,7 @@
-setwd("~/Desktop/ngs-analysis/rna_fischer/")
-library("Matrix")
-pvalues <- c()
-matrix <- matrix()
-matrices <- list()
-uncompressed_matrices <- list()
-gene_names <- c()
 
-gene_name <- ""
-processTable = function(table, uncompressed_table, gene_id) {
+library("Matrix")
+
+processTable = function(table, uncompressed_table, gene_id, sample_name_prefix) {
   
   if ( sum(table) < 50)  {
     return(0)
@@ -24,8 +18,8 @@ processTable = function(table, uncompressed_table, gene_id) {
   if ( (min(colSums(table))*min(rowSums(table))/sum(table)) < 5)  {
     return(0)
   }
-  write.table(table, file = "tables.csv", row.names = FALSE, col.names = FALSE, append = TRUE)
-  write("=====", file = "tables.csv", append = TRUE)
+  write.table(table, file = paste(sample_name_prefix, "tables.tsv", sep =""), row.names = FALSE, col.names = FALSE, append = TRUE)
+  write("=====", file = paste(sample_name_prefix, "tables.tsv", sep =""), append = TRUE)
   matrix <<- table
 #  if ( all(rowSums(table == table[1,][col(table)]) == ncol(table)) )  {
 #    return(0)
@@ -45,7 +39,7 @@ processTable = function(table, uncompressed_table, gene_id) {
   print(fisher$p.value)
   p <- fisher$p.value
   if (p < 0.01) {
-    write(gene_name, file = "genes.csv", append = TRUE)
+    write(gene_name, file = paste(sample_name_prefix, "genes.tsv", sep =""), append = TRUE)
   }
   pvalues <<- c(pvalues, fisher$p.value)
 }
@@ -82,7 +76,7 @@ preprocessTable = function(table) {
   return(table)
 }
 
-processFile = function(filepath) {
+processFile = function(filepath, output_prefix) {
   con = file(filepath, "r")
   m = matrix(ncol = 2, nrow = 0)
   while ( TRUE ) {
@@ -91,8 +85,8 @@ processFile = function(filepath) {
       break
     }
     
-    if ( substring(line, 1, 1) == "=" ) {
-      try(processTable(preprocessTable(m), m, gene_name))
+    if ( substring(line, 1, 1) == "=" || substring(line, 1, 1) == "E") {
+      try(processTable(preprocessTable(m), m, gene_name, output_prefix))
       m = matrix(ncol = 2, nrow = 0)
       gene_name <<- line
       next
@@ -107,10 +101,22 @@ processFile = function(filepath) {
   close(con)
 }
 
-processFile("reads.wd.codon_stats.tsv")
+output_prefix = "mouse/mouse_isoseq_"
+close( file( paste(output_prefix, "genes.tsv", sep =""), open="w" ) )
+close( file( paste(output_prefix, "tables.tsv", sep =""), open="w" ) )
+close( file( paste(output_prefix, "results.tsv", sep =""), open="w" ) )
+pvalues <- c()
+matrix <- matrix()
+matrices <- list()
+uncompressed_matrices <- list()
+gene_names <- c()
+gene_name <- ""
+
+processFile("mouse/mouse_isoseq_all.codon_stats.tsv", output_prefix)
+sorted_pvalues_2 <- NULL
 sorted_pvalues_2 <- sort(pvalues, index.return=TRUE, decreasing=FALSE)
 #CTCF
 a <- p.adjust(sorted_pvalues_2$x, method = "BH")
 df <- data.frame(gene_names = gene_names[sorted_pvalues_2$ix])
 df$pvalues <- a
-write.table(df, file = "reads.csv",row.names=FALSE, col.names = FALSE)
+write.table(df, file = paste(output_prefix, "results.tsv", sep =""), row.names=FALSE, col.names = FALSE)
