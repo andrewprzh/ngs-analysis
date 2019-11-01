@@ -4,7 +4,7 @@ def read_genes(inf):
     d = set()
     for l in open(inf):
         if l.strip() != "":
-            d.add(l.strip().split()[0].split('.')[0])
+            d.add(l.strip().split()[0])
     return d
 
 genes1 = read_genes(sys.argv[1])

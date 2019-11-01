@@ -95,7 +95,7 @@ def freq_stat(snp_frequency_map):
 
 
 def snp_abundance_stat(snp_storage):
-    min_covs = [1, 5, 10, 20]
+    min_covs = [1, 2]
     total_samples = 0
     abunances = {}
     for cov in min_covs:
