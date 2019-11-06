@@ -37,7 +37,7 @@ class TSVParser:
             sample_count = (len(header.strip().split()) - 5) / 3
             self.sample_ids = range(sample_count)
         self.args = args
-        self.no_filter = args.no_cov_filter
+        self.no_filter = args is None or  args.no_cov_filter
 
     def fill_map(self, snp_storage):
         header = True

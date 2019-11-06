@@ -105,7 +105,7 @@ def snp_abundance_stat(snp_storage):
         for pos in snp_storage[chr_id]:
             for snp in snp_storage[chr_id][pos]:
                 for cov in min_covs:
-                    snp_abundance = map(lambda x: x >= cov, snp.sample_coverage).count(True)
+                    snp_abundance = map(lambda x: x >= cov, snp.sample_counts).count(True)
                     total_samples = len(snp.sample_coverage)
                     if snp_abundance not in abunances[cov]:
                         abunances[cov][snp_abundance] = 0

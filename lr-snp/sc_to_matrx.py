@@ -13,14 +13,17 @@ groups = [(0, 141), (141, 271), (272, 376)]
 def freqs(snp):
     freq = []
     for i in range(len(snp.sample_coverage)):
-        freq.append(float(snp.sample_counts[i]) / float(snp.sample_coverage[i]))
+        if snp.sample_coverage[i] == 0:
+            freq.append(0.0)
+        else:
+            freq.append(float(snp.sample_counts[i]) / float(snp.sample_coverage[i]))
     return freq
 
 
 def frac_within_range(freq_list, r1, r2):
     total_abundancy = 0
     for i in range(r1, r2):
-        if freq[i] >= MIN_FREQ:
+        if freq_list[i] >= MIN_FREQ:
             total_abundancy += 1
     return float(total_abundancy) / float(r2 - r1)
 
@@ -28,15 +31,16 @@ def frac_within_range(freq_list, r1, r2):
 def is_snp_ok(snp):
     freq = freqs(snp)
 
-    total_frac = frac_within_range(freq, 0, len(freq))
-    if total_frac >= MIN_TOTAL_FRAC:
-        return True
+    res = []
+    res.append(frac_within_range(freq, 0, len(freq)))
+#    if total_frac >= MIN_TOTAL_FRAC:
+#        return True
 
     for g in groups:
-        group_frac = frac_within_range(freq, g[0], g[1] + 1)
-        if group_frac >= MIN_GROUP_FRAC:
-            return True
-    return False
+        res.append(frac_within_range(freq, g[0], g[1] + 1))
+#        if group_frac >= MIN_GROUP_FRAC:
+#            return True
+    return res
 
 
 def snp_to_tsv(snp, chr_id, pos):
@@ -52,17 +56,17 @@ def snp_to_tsv(snp, chr_id, pos):
 
 def main():
     f = sys.argv[1]
-    print("Reading from " + f)
-    reader = TSVParser(f, [], args)
-    print("Detected " + str(len(reader.sample_ids)) + " samples")
+#    print("Reading from " + f)
+    reader = TSVParser(f, [], None)
+#    print("Detected " + str(len(reader.sample_ids)) + " samples")
     snp_storage = SNPStorage()
     reader.fill_map(snp_storage)
 
     for chr_id in snp_storage.snp_map:
         for pos in snp_storage.snp_map[chr_id]:
-            for snp in np_storage.snp_map[chr_id][pos]:
-                if is_snp_ok(snp):
-                    print(snp_to_tsv(snp, chr_id,pos))
+            for snp in snp_storage.snp_map[chr_id][pos]:
+                frac = is_snp_ok(snp)
+                print(chr_id + "\t" + str(pos) + "\t" + snp.reference_nucl + "\t" + snp.alternative_nucl + "\t" + "\t".join(map('{:.2f}'.format, frac)))
 
 
 if __name__ == "__main__":
