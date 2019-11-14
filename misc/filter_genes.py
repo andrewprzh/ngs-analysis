@@ -115,6 +115,8 @@ def main():
         if len(gene_name) == 0:
             continue
         ids = get_gene_ids(gene_name)
+        if ids is None:
+            continue
         for gid in ids:
             if check_gene_description(gid, gene_name):
                 print(gene_name)
