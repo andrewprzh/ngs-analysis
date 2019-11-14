@@ -20,8 +20,8 @@ def get_barcodes(contig_id, delim1, delim2):
 def convert_fasta_with_barcodes(inf, args):
     contigs_file = inf
     contigs_name, ext = os.path.splitext(contigs_file.split('/')[-1])
-    short_id_contigs_name = os.path.join(args.output_prefix, contigs_name + "_short_ids.fasta")
-    map_file_name = os.path.join(args.output_prefix, contigs_name + "_map.txt")
+    short_id_contigs_name = args.output_prefix + contigs_name + "_short_ids.fasta"
+    map_file_name = args.output_prefix + contigs_name + "_map.txt"
     mapf = open(map_file_name, "w")
 
     new_fasta = []
@@ -48,7 +48,7 @@ def align_fasta(contigs_infile, args, out_name = ""):
     if out_name == "":
         out_name = contigs_name
 
-    alignment_name = os.path.join(args.output_prefix, out_name)
+    alignment_name = args.output_prefix + out_name
     alignment_sam_path = alignment_name + '.sam'
     alignment_bam_path = alignment_name + '.bam'
 
@@ -63,7 +63,6 @@ def align_fasta(contigs_infile, args, out_name = ""):
 
         if exit_code != 0:
             print("GMAP finished with errors")
-
         os.system('samtools sort -o ' + alignment_bam_path + ' ' + alignment_sam_path)
 
     elif method.lower() == "star":
@@ -88,12 +87,12 @@ def align_fasta(contigs_infile, args, out_name = ""):
                                                                alignment_out=alignment_name)
 
         exit_code = os.system(command)
-        os.system('mv ' + alignment_name + 'Aligned.out.sam ' + alignment_bam_path)
+        os.system('mv ' + alignment_name + 'Aligned.sortedByCoord.out.bam ' + alignment_bam_path)
 
         if exit_code != 0:
             print("STAR finished with errors")
 
-    elif method.lower == "minimap":
+    elif method.lower() == "minimap":
         minimap_path = '/Bmo/prjbel/tools/minimap2-2.8_x64-linux/minimap2'
         command =  minimap_path+ ' {ref_index_name} {transcripts} -a -x splice -t {threads} ' \
                               '> {alignment_out} '.format(ref_index_name=args.index,
@@ -103,6 +102,7 @@ def align_fasta(contigs_infile, args, out_name = ""):
         exit_code = os.system(command)
         if exit_code != 0:
             print("minimap finished with errors")
+        os.system('samtools sort -o ' + alignment_bam_path + ' ' + alignment_sam_path)
 
     else:
         print("Method " + method + " is not supported")
