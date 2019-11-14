@@ -164,6 +164,8 @@ class SNPFilter:
                         or (snp.reference_nucl == 'A' and snp.alternative_nucl == 'G'):
                     # ignore X->A in polyA, X->T in polyT, A->G
                     continue
+                if float(map(lambda x: x >= 1, snp.sample_coverage).count(True)) >= args.min_fraq * float(len(snp.sample_coverage)):
+                    continue
                 passed_snp_list.append(snp)
             if len(passed_snp_list) > 0:
                 filtered_chr_map[position] = passed_snp_list
@@ -197,6 +199,7 @@ def parse_args():
     optional_group.add_argument("--min_freq_factor", "-m", help="minimal SNP frequency factor, > 1.0 [2.0]", type=float, default=2.0)
     optional_group.add_argument("--min_cov", "-c", help="minimal SNP read coverage depth within a sample, > 0 [50]", type=int, default=50)
     optional_group.add_argument("--sample_ids", help="comma-separated 0-based sample indices, e.g. 1,3,6", type=str, default='')
+    optional_group.add_argument("--min_fraq", help="minimal faction of samples for which SNP is covered, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
 
     args = parser.parse_args()
 
