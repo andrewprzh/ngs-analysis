@@ -15,12 +15,12 @@ from traceback import print_exc
 
 # global params, to be fixed
 RESOLVE_AMBIGUOUS = False
-DEDUCE_CODONS_FROM_CDS = True
+DEDUCE_CODONS_FROM_CDS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = True
-CONSIDER_FLANKING_JUNCTIONS = False
-JUNCTION_DELTA = 1
+CONSIDER_FLANKING_JUNCTIONS = True
+JUNCTION_DELTA = 2
 LR_JUNCTION_DELTA = 3
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
