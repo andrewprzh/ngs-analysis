@@ -164,7 +164,7 @@ class SNPFilter:
                         or (snp.reference_nucl == 'A' and snp.alternative_nucl == 'G'):
                     # ignore X->A in polyA, X->T in polyT, A->G
                     continue
-                if float(map(lambda x: x >= 1, snp.sample_coverage).count(True)) >= args.min_frac * float(len(snp.sample_coverage)):
+                if float(map(lambda x: x >= 1, snp.sample_coverage).count(True)) < self.args.min_frac * float(len(snp.sample_coverage)):
                     continue
                 passed_snp_list.append(snp)
             if len(passed_snp_list) > 0:

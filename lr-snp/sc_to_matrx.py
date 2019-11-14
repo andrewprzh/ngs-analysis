@@ -65,8 +65,9 @@ def main():
     for chr_id in snp_storage.snp_map:
         for pos in snp_storage.snp_map[chr_id]:
             for snp in snp_storage.snp_map[chr_id][pos]:
-                frac = is_snp_ok(snp)
-                print(chr_id + "\t" + str(pos) + "\t" + snp.reference_nucl + "\t" + snp.alternative_nucl + "\t" + "\t".join(map('{:.2f}'.format, frac)))
+                print(snp_to_tsv(snp, chr_id, pos))
+#                frac = is_snp_ok(snp)
+#                print(chr_id + "\t" + str(pos) + "\t" + snp.reference_nucl + "\t" + snp.alternative_nucl + "\t" + "\t".join(map('{:.2f}'.format, frac)))
 
 
 if __name__ == "__main__":
