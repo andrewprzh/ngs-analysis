@@ -105,8 +105,8 @@ def snp_abundance_stat(snp_storage):
         for pos in snp_storage[chr_id]:
             for snp in snp_storage[chr_id][pos]:
                 for cov in min_covs:
-                    snp_abundance = map(lambda x: x >= cov, snp.sample_counts).count(True)
-                    total_samples = len(snp.sample_coverage)
+                    snp_abundance = map(lambda x: x >= cov, snp.sample_coverage).count(True)
+                    total_samples = len(snp.sample_counts)
                     if snp_abundance not in abunances[cov]:
                         abunances[cov][snp_abundance] = 0
                     abunances[cov][snp_abundance] += 1
@@ -162,6 +162,7 @@ def main():
         reader.fill_map(snp_storages[-1])
         snp_abundance_stat(snp_storages[-1].snp_map)
 
+    sys.exit(0)
     print(common_snps(snp_storages))
 
     snp_freqs = get_intersected_snps(snp_storages, args.tool_id, args.min_cov, args.min_freq)
