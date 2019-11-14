@@ -53,6 +53,24 @@ def snp_to_tsv(snp, chr_id, pos):
             res += '\t' + '{:.2f}'.format(freq[i])
     return res
 
+def snp_to_tsv_avg(snp, chr_id, pos):
+    freq = freqs(snp)
+    res = chr_id + "_" + str(pos) + "_" + snp.reference_nucl + "_" + snp.alternative_nucl
+    mean = 0.0
+    count = 0
+    for i in range(len(snp.sample_coverage)):
+        if snp.sample_coverage[i] != 0:
+            mean += freq[i]
+            count += 1
+    mean /= count
+
+    for i in range(len(snp.sample_coverage)):
+        if snp.sample_coverage[i] == 0:
+            res += '\t' + '{:.2f}'.format(mean)
+        else:
+            res += '\t' + '{:.2f}'.format(freq[i])
+    return res
+
 
 def main():
     f = sys.argv[1]
