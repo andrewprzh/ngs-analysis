@@ -39,7 +39,7 @@ processTable = function(table, uncompressed_table, gene_id, sample_name_prefix) 
   print(fisher$p.value)
   p <- fisher$p.value
   if (p < 0.01) {
-    write(gene_name, file = paste(sample_name_prefix, "genes.tsv", sep =""), append = TRUE)
+    write(sub("====", "", gene_name), file = paste(sample_name_prefix, "genes.tsv", sep =""), append = TRUE)
   }
   pvalues <<- c(pvalues, fisher$p.value)
 }
@@ -101,7 +101,7 @@ processFile = function(filepath, output_prefix) {
   close(con)
 }
 
-output_prefix = "mouse/mouse_isoseq_"
+output_prefix = "/home/andrey/ablab/analysis/RNA_10x/codon_dependency/human/contigs_10x/15.11.19/human.10x_contigs.d2.ann_"
 close( file( paste(output_prefix, "genes.tsv", sep =""), open="w" ) )
 close( file( paste(output_prefix, "tables.tsv", sep =""), open="w" ) )
 close( file( paste(output_prefix, "results.tsv", sep =""), open="w" ) )
@@ -112,7 +112,7 @@ uncompressed_matrices <- list()
 gene_names <- c()
 gene_name <- ""
 
-processFile("mouse/mouse_isoseq_all.codon_stats.tsv", output_prefix)
+processFile("/home/andrey/ablab/analysis/RNA_10x/codon_dependency/human/contigs_10x/15.11.19/human.10x_contigs.d2.annotated_codons.codon_stats.raw.tsv", output_prefix)
 sorted_pvalues_2 <- NULL
 sorted_pvalues_2 <- sort(pvalues, index.return=TRUE, decreasing=FALSE)
 #CTCF
