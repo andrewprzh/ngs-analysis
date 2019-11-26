@@ -17,7 +17,6 @@ def parse_args():
 
     required_group = parser.add_argument_group('required parameters')
     required_group.add_argument("--bam", help="BAM file with CB tag", type=str)
-    required_group.add_argument("--output_prefix", "-o", help="output prefix", type=str, default="./")
     required_group.add_argument("--table", help="table with read ids, barcodes and UMIs", type=str)
     required_group.add_argument("--split_by", help="split by: UMI, BC (barcode) or GR (group)", type=str)
 
@@ -46,7 +45,7 @@ def get_read_table(table_file):
             continue
 
         read_table[read_id] = tokens[1:]
-    print("Loaded table with " + str(len(read_table)) + " reads")
+#    print("Loaded table with " + str(len(read_table)) + " reads")
     return read_table
 
 
@@ -64,41 +63,22 @@ def get_split_by_column_index(args):
 
 def split_by_barcode(args, read_table):
     inf = pysam.AlignmentFile(args.bam, "rb")
-    splitted_reads = {}
+    splitted_reads = set()
     split_by_column_index = get_split_by_column_index(args)
     if split_by_column_index is None:
         return
 
     count = 0
     for read in inf:
-        count += 1
-        if count % 100000 == 0:
-            sys.stdout.write("Processed " + str(count) + " reads\r")
-
         read_id = read.query_name.split(':')[-1]
         if read_id not in read_table:
             continue
 
         property = read_table[read_id][split_by_column_index]
-        if property not in splitted_reads:
-            splitted_reads[property] = []
-        splitted_reads[property].append(read)
-    print("Done                    ")
+        splitted_reads.add(property)
+    sys.stdout.write(str(len(splitted_reads)) + "\n")
     inf.close()
 
-    print("Dumping reads to files")
-    for property in splitted_reads.keys():
-        bc_file = pysam.AlignmentFile(args.output_prefix + property + ".bam", "wb", template=inf)
-        for read in splitted_reads[property]:
-            bc_file.write(read)
-        bc_file.close()
-
-    print("Sorting files")
-    for bc in splitted_reads.keys():
-        splitted_file_name = args.output_prefix + bc + ".bam"
-        pysam.sort("-o", 'tmp.bam', splitted_file_name)
-        os.rename('tmp.bam', splitted_file_name)
-        pysam.index(splitted_file_name)
 
 
 def main():
