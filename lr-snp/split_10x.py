@@ -36,21 +36,29 @@ def parse_args():
 def split_by_barcode(args, get_tag_function):
     inf = pysam.AlignmentFile(args.bam, "rb")
     splitted_reads = {}
+    count = 0
     for read in inf:
+        count += 1
+        if count % 100000 == 0:
+            sys.stdout.write("Processed " + str(count) + " reads\r")
+
         tag = get_tag_function(read)
         if tag is None:
             continue
         if tag not in splitted_reads:
             splitted_reads[tag] = []
         splitted_reads[tag].append(read)
+    print("Done                    ")
     inf.close()
 
+    print("Dumping reads to files")
     for tag in splitted_reads.keys():
         bc_file = pysam.AlignmentFile(args.output_prefix + tag + ".bam", "wb", template=inf)
         for read in splitted_reads[tag]:
             bc_file.write(read)
         bc_file.close()
 
+    print("Sorting files")
     for bc in splitted_reads.keys():
         tag_file_name = args.output_prefix + bc + ".bam"
         pysam.sort("-o", 'tmp.bam', tag_file_name)
