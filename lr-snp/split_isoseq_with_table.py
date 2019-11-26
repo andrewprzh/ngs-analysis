@@ -40,12 +40,13 @@ def get_read_table(table_file):
         tokens = l.strip().split()
         if len(tokens) != 4:
             continue
-        read_id = tokens[0]
+        read_id = tokens[0][1:]
         if read_id in read_table:
             print("Duplicated read id")
             continue
 
         read_table[read_id] = tokens[1:3]
+    print("Loaded table with " + str(len(read_table)) + " reads")
     return read_table
 
 
@@ -68,7 +69,12 @@ def split_by_barcode(args, read_table):
     if split_by_column_index is None:
         return
 
+    count = 0
     for read in inf:
+        count += 1
+        if count % 100000 == 0:
+            sys.stdout.write("Processed " + str(count) + " reads\r")
+
         read_id = read.query_name
         if read_id not in read_table:
             continue
@@ -77,14 +83,17 @@ def split_by_barcode(args, read_table):
         if property not in splitted_reads:
             splitted_reads[property] = []
         splitted_reads[property].append(read)
+    print("Done                    ")
     inf.close()
 
+    print("Dumping reads to files")
     for property in splitted_reads.keys():
         bc_file = pysam.AlignmentFile(args.output_prefix + property + ".bam", "wb", template=inf)
         for read in splitted_reads[property]:
             bc_file.write(read)
         bc_file.close()
 
+    print("Sorting files")
     for bc in splitted_reads.keys():
         splitted_file_name = args.output_prefix + bc + ".bam"
         pysam.sort("-o", 'tmp.bam', splitted_file_name)
