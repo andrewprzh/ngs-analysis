@@ -107,6 +107,13 @@ class VCFParser:
         self.args = args
         self.no_filter = args.no_cov_filter
 
+    def set_sample_data_format(self, format_str):
+        tokens = format_str.split(':')
+        self.total_fields = len(tokens)
+        self.ad_index = tokens.index('AD')
+        self.dp_index = tokens.index('DP')
+        self.format_set = True
+
     def fill_map(self, snp_storage):
         for l in open(self.infile):
             if l.startswith("#"):
@@ -117,23 +124,30 @@ class VCFParser:
                 # ignore multiple variants so far
                 continue
 
+            if not self.format_set:
+                self.set_sample_data_format(tokens[self.sample_start_column - 1])
+
             sample_tokens = [tokens[self.sample_start_column + i] for i in self.sample_ids]
             snp_cov = []
             freqs = []
             total_cov = []
             for sample_record in sample_tokens:
                 sample_data = sample_record.split(':')
-                if len(sample_data) < 5:
+                if len(sample_data) < self.total_fields:
                     total_cov.append(0)
                     snp_cov.append(0)
                     freqs.append(0.0)
                 else:
-                    cov = sample_data[1].split(',')
+                    cov = sample_data[self.ad_index].split(',')
                     snp_cov.append(int(cov[1]))
-                    total_cov.append(int(cov[0]) + int(cov[1]))
+                    dp = int(cov[0]) + int(cov[1])
+                    if dp != int(sample_data[self.dp_index]):
+                        sys.stderr.write("DP != sum(AD), line = " + l + '\n')
+                    total_cov.append(dp)
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq):
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or
+                                       (max(freqs) < self.args.min_freq) and sum(freqs) < self.args.min_freq):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
@@ -161,7 +175,7 @@ class SNPFilter:
             poly_t_region = float(snp_region.count('T')) / float(region_len) >= self.args.poly_at_percentage
             for snp in chr_map[position]:
                 if (poly_a_region and snp.alternative_nucl == 'A') or (poly_t_region and snp.alternative_nucl == 'T') \
-                        or (snp.reference_nucl == 'A' and snp.alternative_nucl == 'G'):
+                        or (snp.reference_nucl == 'A' and snp.alternative_nucl == 'G') or (snp.reference_nucl == 'T' and snp.alternative_nucl == 'C'):
                     # ignore X->A in polyA, X->T in polyT, A->G
                     continue
                 if float(map(lambda x: x >= 1, snp.sample_coverage).count(True)) < self.args.min_frac * float(len(snp.sample_coverage)):
@@ -191,7 +205,7 @@ def parse_args():
     required_group.add_argument("--output_prefix", "-o", help="output prefix", type=str)
     optional_group = parser.add_argument_group('optional parameters')
     optional_group.add_argument("--varscan", help="SNPs in VarScan format", type=str)
-    optional_group.add_argument("--vcf", help="SNPs in VCF format (monovar)", type=str)
+    optional_group.add_argument("--vcf", help="SNPs in VCF format (monovar/bcftools)", type=str)
     optional_group.add_argument("--tsv", help="SNPs in TSV format (this tool)", type=str)
     optional_group.add_argument("--no_filter", help="do not filter  SNP clusters and SNPs in poly-A/T regions", action='store_true', default=False)
     optional_group.add_argument("--no_cov_filter", help="do not use coverage filters", action='store_true', default=False)
