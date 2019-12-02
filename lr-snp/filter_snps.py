@@ -151,7 +151,10 @@ class VCFParser:
                                        (max(freqs) < self.args.min_freq) and sum(freqs) < self.args.min_freq):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
-            snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
+            chr_id = tokens[0]
+            if chr_id.startswith('chr'):
+                chr_id = chr_id[3:]
+            snp_storage.add(chr_id, int(tokens[1]), SelectedSNP(tokens[3], tokens[4], snp_type, total_cov, snp_cov))
 
 
 class SNPFilter:
