@@ -44,6 +44,19 @@ def common_snps(snp_storages):
     return intersect_map, total_counts
 
 
+def merge_storages(snp_storages):
+    common_chromosomes = set(snp_storages[0].snp_map.keys())
+    for i in range(1, len(snp_storages)):
+        common_chromosomes =  common_chromosomes.intersection(set(snp_storages[i].snp_map.keys()))
+
+    merged_storage = SNPStorage()
+    for chr_id in common_chromosomes:
+        common_positions = set(snp_storages[0].snp_map[chr_id].keys())
+        for i in range(1, len(snp_storages)):
+            common_positions = common_positions.intersection(set(snp_storages[i].snp_map[chr_id].keys()))
+
+
+
 def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutoff = 0):
     common_chromosomes = set(snp_storages[0].snp_map.keys())
     for i in range(1, len(snp_storages)):
@@ -57,19 +70,33 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
             common_positions = common_positions.intersection(set(snp_storages[i].snp_map[chr_id].keys()))
 
         for pos in common_positions:
-            if any(len(snp_storages[i].snp_map[chr_id][pos]) > 1 for i in range(len(snp_storages))):
+            if any(len(snp_storages[j].snp_map[chr_id][pos]) > 1 for j in range(len(snp_storages))):
                 continue
             sample_count = len(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage)
-            if any(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i] <
-                   cov_cutoff for i in range(sample_count)):
+            if any(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[j] <
+                   cov_cutoff for j in range(sample_count)):
                 continue
 
-            pos_id = chr_id + ":" + str(pos)
+            ref_nucl = snp_storages[storage_index].snp_map[chr_id][pos][0].reference_nucl
+            alt_nucl = snp_storages[storage_index].snp_map[chr_id][pos][0].alternative_nucl
+            if any(snp_storages[j].snp_map[chr_id][pos][0].reference_nucl != ref_nucl for j in range(len(snp_storages))) \
+                    or any(snp_storages[j].snp_map[chr_id][pos][0].alternative_nucl != alt_nucl  for j in range(len(snp_storages))):
+                print("Inconsistent alternative variant at " + chr_id + " " + str(pos))
+                continue
+
+            pos_id = chr_id + ":" + str(pos) + "_" + ref_nucl + "_" + alt_nucl
             freq_list = []
 
             for i in range(sample_count):
-                snp_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_counts[i]
-                total_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]
+                snp_coverage = []
+                for j in range(len(snp_storages))(sc == 0 for sc in snp_coverage):
+                    snp_coverage.append(snp_storages[j].snp_map[chr_id][pos][0].sample_counts[i])
+                if any(sc == 0 for sc in snp_coverage) and any(sc == 0 for sc in snp_coverage):
+                    print("Inconsistent variant for sample " + str(i) + " at " + chr_id + " " + str(pos))
+
+            for i in range(sample_count):
+                snp_cov = sum(snp_storages[j].snp_map[chr_id][pos][0].sample_counts[i] for j in range(len(snp_storages)))
+                total_cov = sum(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]  for j in range(len(snp_storages)))
                 freq_list.append(float(snp_cov) / float(total_cov))
 
             if any(freq >= freq_cutoff for freq in freq_list):
@@ -133,7 +160,7 @@ def parse_args():
     required_group.add_argument('--tsv', dest='tsv_file', nargs='+', help='list of TSV files')
     required_group.add_argument("--min_freq", help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
     required_group.add_argument("--min_cov", help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
-    required_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=2)
+    required_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=1)
     required_group.add_argument("--no_cov_filter", help="do not use coverage filters", action='store_true', default=False)
 
     args = parser.parse_args()
@@ -162,7 +189,7 @@ def main():
         print("Detected " + str(len(reader.sample_ids)) + " samples")
         snp_storages.append(SNPStorage())
         reader.fill_map(snp_storages[-1])
-        snp_abundance_stat(snp_storages[-1].snp_map)
+        #snp_abundance_stat(snp_storages[-1].snp_map)
 
     print(common_snps(snp_storages))
 
