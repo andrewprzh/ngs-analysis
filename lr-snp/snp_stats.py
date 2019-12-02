@@ -96,6 +96,9 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
                 if any(sc == 0 for sc in snp_coverage) and any(sc >  0 for sc in snp_coverage):
                     print("Inconsistent variant for sample " + str(i) + " at " + chr_id + " " + str(pos))
                     print(snp_coverage, total_coverage)
+                    if total_coverage[snp_coverage.index(0)] > 5:
+                        print("Significant inconsistency, skipping")
+                        continue
 
             for i in range(sample_count):
                 snp_cov = sum(snp_storages[j].snp_map[chr_id][pos][0].sample_counts[i] for j in range(len(snp_storages)))
