@@ -106,6 +106,7 @@ class VCFParser:
         self.sample_ids = sample_ids
         self.args = args
         self.no_filter = args.no_cov_filter
+        self.format_set = False
 
     def set_sample_data_format(self, format_str):
         tokens = format_str.split(':')
