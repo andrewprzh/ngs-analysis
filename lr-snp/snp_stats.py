@@ -59,18 +59,20 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
         for pos in common_positions:
             if any(len(snp_storages[i].snp_map[chr_id][pos]) > 1 for i in range(len(snp_storages))):
                 continue
-            if any(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i] < cov_cutoff for i in range(3)):
+            sample_count = len(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage)
+            if any(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i] <
+                   cov_cutoff for i in range(sample_count)):
                 continue
 
             pos_id = chr_id + ":" + str(pos)
             freq_list = []
-            sample_count = len(snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage)
+
             for i in range(sample_count):
                 snp_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_counts[i]
                 total_cov = snp_storages[storage_index].snp_map[chr_id][pos][0].sample_coverage[i]
                 freq_list.append(float(snp_cov) / float(total_cov))
 
-            if any(freq >= freq_cutoff for freq in freq_list) and  any(freq < 0.05 for freq in freq_list):
+            if any(freq >= freq_cutoff for freq in freq_list):
                 snp_frequency_map[pos_id] = freq_list
 
     return snp_frequency_map
@@ -162,7 +164,6 @@ def main():
         reader.fill_map(snp_storages[-1])
         snp_abundance_stat(snp_storages[-1].snp_map)
 
-    sys.exit(0)
     print(common_snps(snp_storages))
 
     snp_freqs = get_intersected_snps(snp_storages, args.tool_id, args.min_cov, args.min_freq)

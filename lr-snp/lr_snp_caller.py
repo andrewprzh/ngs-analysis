@@ -216,18 +216,22 @@ class SNPMapTSVWriter:
     def __init__(self, out_prefix, sample_names):
         self.gemline_file_name = out_prefix + "germline_SNPs.tsv"
         self.somatic_file_name = out_prefix + "somatic_SNPs.tsv"
+        self.file_name = out_prefix + "SNPs.tsv"
         self.sample_names = sample_names
         print("Outputting results to " + self.somatic_file_name + " and " + self.gemline_file_name)
         somatic_file = open(self.somatic_file_name, 'w')
         germline_file = open(self.gemline_file_name, 'w')
+        all_file = open(self.gemline_file_name, 'w')
         header = self.delim.join(self.main_header)
         for sample in self.sample_names:
             for h in self.sample_header:
                 header += self.delim + sample + '_' + h
         somatic_file.write(header + '\n')
         germline_file.write(header + '\n')
+        all_file.write(header + '\n')
         somatic_file.close()
         germline_file.close()
+        all_file.close()
 
     def form_line(self, chromosome, pos, snp):
         #TODO: +1 to position
@@ -241,6 +245,7 @@ class SNPMapTSVWriter:
     def dump_to_file(self, snp_map):
         somatic_file = open(self.somatic_file_name, 'a+')
         germline_file = open(self.gemline_file_name, 'a+')
+        all_file = open(self.file_name, 'a+')
 
         for chromosome in sorted(snp_map.keys()):
             #print("Processing chromosome " + chromosome)
@@ -249,10 +254,12 @@ class SNPMapTSVWriter:
                 multi_snp = snps[pos]
                 for snp in multi_snp:
                     l = self.form_line(chromosome, pos, snp)
+                    all_file.write(l)
                     if snp.snp_type == SOMATIC_SNP:
                         somatic_file.write(l)
                     else:
                         germline_file.write(l)
         somatic_file.close()
         germline_file.close()
+        all_file.close()
 
