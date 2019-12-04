@@ -150,12 +150,13 @@ class FeatureVector:
     fill_gaps = True
     block_comparator = None
     
-    def __init__(self, num, check_flanking, fill_gaps, block_comparator):
+    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = False):
         self.profile = [0 for i in range(0, num)]  
         self.reads = 0
         self.check_flanking = check_flanking
         self.fill_gaps = fill_gaps
         self.block_comparator = block_comparator
+        self.ignore_flanking_blocks = ignore_flanking_blocks
 
     # update vector using features from alignment
     def add_from_blocks(self, read_features, known_features): 
@@ -166,6 +167,8 @@ class FeatureVector:
         #print known_features
 
         features_present = [0 for i in range(0, len(known_features) + 2)]
+        starting_matched = False
+        terminating_matched = False
 
         if self.check_flanking:
             if len(read_features) > 0 and len(known_features) > 0  and left_of(read_features[0], known_features[0]):
@@ -186,6 +189,10 @@ class FeatureVector:
                 break
 
             if self.block_comparator(known_features[ref_pos], read_features[read_pos]):
+                if read_pos == 0:
+                    starting_matched = True
+                elif read_pos ==  len(read_features) - 1:
+                    terminating_matched = True
                 features_present[ref_pos + 1] = 1
                 ref_pos += 1
             elif overlaps(known_features[ref_pos], read_features[read_pos]):
@@ -195,10 +202,20 @@ class FeatureVector:
                 ref_pos += 1
             else:
                 read_pos +=1
-               
-        #print features_present
+
+        # filling gaps between included / excluded features
         if self.fill_gaps:
             self.fill_gaps_in_profile(features_present)
+
+        # if ignoring inexact 1st and last blocks, mark overlapping blocks with 0 (as unknown) in case not exact match is found
+        if self.ignore_flanking_blocks and not starting_matched:
+            for ref_pos in range(len(known_features)):
+                if overlaps(known_features[ref_pos], read_features[0]):
+                    features_present[ref_pos + 1] = 0
+        if self.ignore_flanking_blocks and not terminating_matched:
+            for ref_pos in range(len(known_features)):
+                if overlaps(known_features[ref_pos], read_features[-1]):
+                    features_present[ref_pos + 1] = 0
 
         self.reads += 1
         for i in range(0, len(self.profile)):
@@ -224,12 +241,17 @@ class ReadMappingInfo:
     junctions_counts = None
     exons_counts = None
 
-    def __init__(self, read_id, introns_count, exons_count, check_flanking = CONSIDER_FLANKING_JUNCTIONS):
+    def __init__(self, read_id, introns_count, exons_count,
+                 check_flanking = CONSIDER_FLANKING_JUNCTIONS,
+                 exon_counting_mode = False):
         self.read_id = read_id
+        self.exon_counting_mode = exon_counting_mode
         self.total_reads = 0
         self.junctions_counts = \
             FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
-        self.exons_counts = \
+        self.exons_counts = FeatureVector(exons_count, check_flanking = False, fill_gaps = True,
+                                          block_comparator = equal_ranges, ignore_flanking_blocks = True) \
+            if self.exon_counting_mode else \
             FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps)
 
     def add_read(self, alignment, known_introns, known_exons):
@@ -238,7 +260,7 @@ class ReadMappingInfo:
         #second coordinate is not converted since alignment block is end-exclusive, i.e. [x, y)
         blocks = map(lambda x: (x[0] + 1, x[1]), sorted(alignment.get_blocks()))
 
-        if len(blocks) >= 2:
+        if len(blocks) >= 2 and not self.exon_counting_mode:
             read_junctions = junctions_from_blocks(blocks)
             self.junctions_counts.add_from_blocks(read_junctions, known_introns)
             print_debug("ID " + self.read_id + "\n" + str(read_junctions))
@@ -293,13 +315,13 @@ class GeneInfo:
     all_rna_profiles = IsoformProfileStorage()
     # sorted list of all known introns (pairs of coordinates)
     introns = []
-    # sorted list of non-overlapping
+    # sorted list of exons or non-overlapping exon regions (depends on split_exons option)
     exons = []
     args = None
 
     # args: parameters of the tool
     # chr_bam_prefix: additional string used when bam files were aligned to different reference that has difference in chromosome names (e.g. 1 and chr1)
-    def __init__(self, gene_db_list, db, args, chr_bam_prefix = ""):
+    def __init__(self, gene_db_list, db, args, chr_bam_prefix = "", split_exons = True):
         self.args = args
         self.db = db
         self.gene_db_list = gene_db_list
@@ -311,8 +333,11 @@ class GeneInfo:
         self.coding_rna_profiles = IsoformProfileStorage()
         self.all_rna_profiles = IsoformProfileStorage()
 
+        self.exon_to_geneid = {}
         i_introns, i_exons = self.set_introns_and_exons(True)
-        self.exons = self.split_exons(self.exons)
+        self.split_exons = split_exons
+        if self.split_exons:
+            self.exons = self.split_exons(self.exons)
         print_debug(self.exons)
 
         self.set_junction_profiles(self.coding_rna_profiles, i_introns, i_exons, False)
@@ -366,6 +391,7 @@ class GeneInfo:
         all_isoforms_introns = {}
         # dictionary: isoform id -> ordered list of exon coordinates
         all_isoforms_exons = {}
+        self.exon_to_geneid = {}
 
         for gene_db in self.gene_db_list:
             for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
@@ -375,7 +401,11 @@ class GeneInfo:
                 all_isoforms_exons[t.id] = []
                 for e in self.db.children(t, order_by='start'):
                     if e.featuretype == 'exon':
-                        all_isoforms_exons[t.id].append((e.start, e.end))
+                        exon_block = (e.start, e.end)
+                        all_isoforms_exons[t.id].append(exon_block)
+                        if exon_block not in self.exon_to_geneid:
+                            self.exon_to_geneid[exon_block] = set()
+                        self.exon_to_geneid[exon_block].add(gene_db.id)
 
                 all_isoforms_introns[t.id] = junctions_from_blocks(all_isoforms_exons[t.id])
 
@@ -509,8 +539,9 @@ class ReadProfilesInfo:
     read_mapping_infos = {}
     args = None
 
-    def __init__(self, gene_db_list, db, args, chr_bam_prefix = ""):
-        self.gene_info = GeneInfo(gene_db_list, db, args, chr_bam_prefix)
+    def __init__(self, gene_db_list, db, args, chr_bam_prefix = "", exon_count_mode = False):
+        self.exon_count_mode = exon_count_mode
+        self.gene_info = GeneInfo(gene_db_list, db, args, chr_bam_prefix, split_exons=not self.exon_count_mode)
         self.args = args
         self.codon_pairs = self.gene_info.get_codon_pairs(self.gene_info.gene_db_list)
         self.read_mapping_infos = {}
@@ -532,7 +563,9 @@ class ReadProfilesInfo:
 
         if read_id not in self.read_mapping_infos:
             self.read_mapping_infos[read_id] = \
-                ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2, CONSIDER_FLANKING_JUNCTIONS)
+                ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2,
+                                check_flanking=CONSIDER_FLANKING_JUNCTIONS,
+                                exon_counting_mode=self.exon_count_mode)
         self.read_mapping_infos[read_id].add_read(alignment, self.gene_info.introns, self.gene_info.exons)
 
     # match barcode/sequence junction profile to a known isoform junction profile, hint - potential candidates
@@ -587,6 +620,10 @@ class ReadProfilesInfo:
                 return set([t])
 
         return matched_isoforms
+
+    # TODO
+    def count_exons(self, read_id):
+        pass
 
     # assign barcode/sequence alignment to a known isoform
     def assign_isoform(self, read_id, stat, coverage_cutoff):
@@ -693,7 +730,7 @@ class GeneDBProcessor:
         self.bc_map = self.get_barcode_map(args.bam)
         self.bamfile_name = args.bam
         if not os.path.isfile(self.bamfile_name):
-            raise Exception("BAM file " + self.samfile_nam + " does not exist")
+            raise Exception("BAM file " + self.bamfile_name + " does not exist")
         samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
         if not samfile_in.has_index:
             raise Exception("BAM file " + self.bamfile_name + " is not indexed, run samtools index")
@@ -789,7 +826,7 @@ class GeneDBProcessor:
                 gene_stats.unmapped += 1
 
     # assign all reads/barcodes mapped to gene region
-    def assign_all_reads(self, read_profiles):
+    def process_all_reads(self, read_profiles):
         samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
         gene_chr, gene_start, gene_end = read_profiles.gene_info.get_gene_region()
 
@@ -801,6 +838,10 @@ class GeneDBProcessor:
             seq_id = self.get_sequence_id(alignment.query_name)
             read_profiles.add_read(alignment, seq_id)
         samfile_in.close()
+
+    # assign all reads/barcodes mapped to gene region
+    def assign_all_reads(self, read_profiles):
+        self.process_all_reads(read_profiles)
 
         # read / barcode id -> (isoform, codon pair)
         assigned_reads = {}
@@ -831,6 +872,30 @@ class GeneDBProcessor:
 
         return assigned_reads
 
+    # calculate exon counts
+    def calculate_exon_counts(self, read_profiles):
+        self.process_all_reads(read_profiles)
+
+        # cell group -> two list of counts for each exon inclusion/exclusion
+        exon_counts = {}
+
+        # iterate over all barcodes / sequences and assign them to known isoforms
+        for read_id in read_profiles.read_mapping_infos.keys():
+            #TODO
+            group_id = read_id.split(':')[0]
+            if group_id not in exon_counts:
+                # first list for exon inclusion, second for exlusion
+                exon_counts[group_id] = ([0 for i in range(len(read_profiles.gene_info.exons))],
+                                         [0 for i in range(len(read_profiles.gene_info.exons))])
+
+            exon_count_profile = read_profiles.read_mapping_infos[read_id].exons_counts.profile
+            for i in  range(len(exon_count_profile) - 1):
+                if exon_count_profile[i] > 0:
+                    exon_counts[group_id][0][i - 1] += exon_count_profile[i]
+                elif exon_count_profile[i] < 0:
+                    exon_counts[group_id][1][i - 1] -= exon_count_profile[i]
+
+        return exon_counts
 
     def gene_list_id_str(self, gene_db_list, delim = "_"):
         gene_names = [g.id for g in gene_db_list]
@@ -897,25 +962,51 @@ class GeneDBProcessor:
             outf.write(table_to_str(codon_count_table, WRITE_CODON_COORDINATES))
             outf.close()
 
+    def write_exon_counts(self, exon_counts, read_profiles, chr_id):
+        for i in range(len(read_profiles.gene_info.exons)):
+            exon = read_profiles.gene_info.exons[i]
+            exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
+            out_exons = open(self.out_exon_counts, "a+")
+            for group_id in exon_counts.keys():
+                out_exons.write(group_id + "\t" + exon_id + "\tIN\t" + str(exon_counts[group_id][0][i]) + "\n")
+                out_exons.write(group_id + "\t" + exon_id + "\tEX\t" + str(exon_counts[group_id][1][i]) + "\n")
+            out_exons.close()
+
+            out_exon_info = open(self.out_exon_genes, "a+")
+            out_exon_info.write(exon_id + "\t" + ",".join(list(read_profiles.gene_info.exon_to_geneid[exon])) + "\n")
+            out_exon_info.close()
 
     # Process a set of genes given in gene_db_list
     def process_gene_list(self, gene_db_list):
         print("Processing " + str(len(gene_db_list)) + " gene(s): " + self.gene_list_id_str(gene_db_list, ", "))
 
-        read_profiles = ReadProfilesInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix)
-        assigned_reads = self.assign_all_reads(read_profiles)
+        read_profiles = ReadProfilesInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix,
+                                         exon_count_mode=self.args.exon_count_mode)
+        if self.args.exon_count_mode:
+            exon_counts = self.calculate_exon_counts(read_profiles)
+            self.write_exon_counts(exon_counts, read_profiles, gene_db_list[0].seqid)
+        else:
+            assigned_reads = self.assign_all_reads(read_profiles)
 
-        self.write_gene_stats(gene_db_list, assigned_reads)
-        self.write_codon_tables(gene_db_list, read_profiles.gene_info, assigned_reads)
+            self.write_gene_stats(gene_db_list, assigned_reads)
+            self.write_codon_tables(gene_db_list, read_profiles.gene_info, assigned_reads)
 
     #Run though all genes in db and count stats according to alignments given in bamfile_name
     def process_all_genes(self):
-        self.out_tsv = self.output_prefix + ".assigned_reads.tsv"
-        outf = open(self.out_tsv, "w")
-        outf.close()
-        self.out_codon_stats = self.output_prefix + ".codon_stats.tsv"
-        outf = open(self.out_codon_stats, "w")
-        outf.close()
+        if self.args.exon_count_mode:
+            self.out_exon_counts = self.output_prefix + ".exon_counts.tsv"
+            outf = open(self.out_exon_counts, "w")
+            outf.close()
+            self.out_exon_genes = self.output_prefix + ".exon_to_geneid.tsv"
+            outf = open(self.out_exon_genes, "w")
+            outf.close()
+        else:
+            self.out_tsv = self.output_prefix + ".assigned_reads.tsv"
+            outf = open(self.out_tsv, "w")
+            outf.close()
+            self.out_codon_stats = self.output_prefix + ".codon_stats.tsv"
+            outf = open(self.out_codon_stats, "w")
+            outf.close()
         
         gene_db_list = []
         current_chromosome = ""
@@ -935,9 +1026,12 @@ class GeneDBProcessor:
 
         self.process_gene_list(gene_db_list)
 
-        print("\nFinished. Total stats " + self.stats.to_str())
-        if self.args.count_isoform_stats:
-            print("Finished. Isoform stats " + self.stats.isoform_stats() + "\n")
+        if self.args.exon_count_mode:
+            print("Done")
+        else:
+            print("\nFinished. Total stats " + self.stats.to_str())
+            if self.args.count_isoform_stats:
+                print("Finished. Isoform stats " + self.stats.isoform_stats() + "\n")
 
 
 #Print global stats for isoform assignment
@@ -1003,6 +1097,7 @@ def set_params(args):
     args.consider_flanking_junctions = CONSIDER_FLANKING_JUNCTIONS and args.data_type != "10x" 
     args.junction_delta = LR_JUNCTION_DELTA  if args.data_type == "long_reads" else JUNCTION_DELTA
     args.count_isoform_stats = COUNT_ISOFORM_STATS and args.data_type == "isoforms"
+    args.exon_count_mode = False
 
 
 def main():
