@@ -720,7 +720,7 @@ class GeneDBProcessor:
     bc_map = None
     db = None
     args = None
-    bamfile_name = ""
+    bamfile_names = []
     output_prefix = ""
     stats = None
     chr_bam_prefix = ""
@@ -728,16 +728,17 @@ class GeneDBProcessor:
     def __init__(self, args):
         self.args = args
         self.bc_map = self.get_barcode_map(args.bam)
-        self.bamfile_name = args.bam
-        if not os.path.isfile(self.bamfile_name):
-            raise Exception("BAM file " + self.bamfile_name + " does not exist")
-        samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
-        if not samfile_in.has_index:
-            raise Exception("BAM file " + self.bamfile_name + " is not indexed, run samtools index")
-        if args.change_chr_prefix and samfile_in.references[0].startswith('chr'):
-            print("Changing chomosome prefix")
-            self.chr_bam_prefix = 'chr'
-        samfile_in.close()
+        self.bamfile_names = args.bam
+        for bamfile_name in self.bamfile_names:
+            if not os.path.isfile(bamfile_name):
+                raise Exception("BAM file " + bamfile_name + " does not exist")
+            bamfile_in = pysam.AlignmentFile(bamfile_name, "rb")
+            if not bamfile_in.has_index:
+                raise Exception("BAM file " + bamfile_name + " is not indexed, run samtools index")
+            if args.change_chr_prefix and bamfile_in.references[0].startswith('chr'):
+                print("Changing chomosome prefix")
+                self.chr_bam_prefix = 'chr'
+            bamfile_in.close()
 
         if not os.path.isfile(args.genedb):
             raise Exception("Gene database " + args.genedb + " does not exist")
@@ -747,9 +748,11 @@ class GeneDBProcessor:
         self.output_prefix = args.output_prefix
 
     # read barcode map file generated along with a BAM file
-    def get_barcode_map(self, sam_file_name):
+    def get_barcode_map(self, bam_file_names):
+        if len(bam_file_names) > 1:
+            return None
         barcode_map = {}
-        contigs_name, ext = os.path.splitext(sam_file_name)
+        contigs_name, ext = os.path.splitext(bam_file_names[0])
         barcode_map_file = contigs_name + "_map.txt"
         if not os.path.isfile(barcode_map_file):
             print("Barcode file was not found")
@@ -826,8 +829,8 @@ class GeneDBProcessor:
                 gene_stats.unmapped += 1
 
     # assign all reads/barcodes mapped to gene region
-    def process_all_reads(self, read_profiles):
-        samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
+    def process_all_reads_from_file(self, read_profiles, bamfile_name):
+        samfile_in = pysam.AlignmentFile(bamfile_name, "rb")
         gene_chr, gene_start, gene_end = read_profiles.gene_info.get_gene_region()
 
         # process all alignments
@@ -838,6 +841,10 @@ class GeneDBProcessor:
             seq_id = self.get_sequence_id(alignment.query_name)
             read_profiles.add_read(alignment, seq_id)
         samfile_in.close()
+
+    def process_all_reads(self, read_profiles):
+        for bamfile_name in self.bamfile_names:
+            self.process_all_reads_from_file(read_profiles, bamfile_name)
 
     # assign all reads/barcodes mapped to gene region
     def assign_all_reads(self, read_profiles):
@@ -991,7 +998,7 @@ class GeneDBProcessor:
             self.write_gene_stats(gene_db_list, assigned_reads)
             self.write_codon_tables(gene_db_list, read_profiles.gene_info, assigned_reads)
 
-    #Run though all genes in db and count stats according to alignments given in bamfile_name
+    #R un though all genes in db and count stats according to alignments given in bamfile_names
     def process_all_genes(self):
         if self.args.exon_count_mode:
             self.out_exon_counts = self.output_prefix + ".exon_counts.tsv"
@@ -1082,7 +1089,7 @@ def global_stats(bc_map):
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('bam', metavar='BAM_FILE', type=str,  help='sorted and indexed BAM file')
+    parser.add_argument('bam', metavar='BAM_FILE', nargs='+', type=str,  help='sorted and indexed BAM file(s)')
     parser.add_argument("--data_type", "-d", help="type of data to process, supported types are: contigs, 10x, long_reads, isoforms", type=str, default = "10x")
     parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)

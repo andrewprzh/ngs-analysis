@@ -16,7 +16,7 @@ from traceback import print_exc
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('bam', metavar='BAM_FILE', type=str,  help='sorted and indexed BAM file')
+    parser.add_argument('bam', metavar='BAM_FILE', nargs='+', type=str, help='sorted and indexed BAM file(s)')
     parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)
     args = parser.parse_args()
