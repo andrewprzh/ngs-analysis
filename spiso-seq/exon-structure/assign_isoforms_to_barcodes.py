@@ -975,8 +975,7 @@ class GeneDBProcessor:
             exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
             out_exons = open(self.out_exon_counts, "a+")
             for group_id in exon_counts.keys():
-                out_exons.write(group_id + "\t" + exon_id + "\tIN\t" + str(exon_counts[group_id][0][i]) + "\n")
-                out_exons.write(group_id + "\t" + exon_id + "\tEX\t" + str(exon_counts[group_id][1][i]) + "\n")
+                out_exons.write(exon_id + "\t" + group_id + "\t" + str(exon_counts[group_id][0][i]) + "\t" + str(exon_counts[group_id][1][i]) + "\n")
             out_exons.close()
 
             out_exon_info = open(self.out_exon_genes, "a+")
