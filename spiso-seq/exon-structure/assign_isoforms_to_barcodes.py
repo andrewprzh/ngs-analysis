@@ -974,8 +974,9 @@ class GeneDBProcessor:
             exon = read_profiles.gene_info.exons[i]
             exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
             out_exons = open(self.out_exon_counts, "a+")
+            exon_tag = "" if len(read_profiles.gene_info.exon_to_geneid[exon]) == 1 else "_MULT"
             for group_id in exon_counts.keys():
-                out_exons.write(exon_id + "\t" + group_id + "\t" + str(exon_counts[group_id][0][i]) + "\t" + str(exon_counts[group_id][1][i]) + "\n")
+                out_exons.write(exon_id + exon_tag + "\t" + group_id + "\t" + str(exon_counts[group_id][0][i]) + "\t" + str(exon_counts[group_id][1][i]) + "\n")
             out_exons.close()
 
             out_exon_info = open(self.out_exon_genes, "a+")
