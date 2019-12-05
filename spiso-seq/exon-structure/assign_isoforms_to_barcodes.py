@@ -976,7 +976,11 @@ class GeneDBProcessor:
             out_exons = open(self.out_exon_counts, "a+")
             exon_id += "" if len(read_profiles.gene_info.exon_to_geneid[exon]) == 1 else "_MULT"
             for group_id in exon_counts.keys():
-                out_exons.write(exon_id + "\t" + group_id + "\t" + str(exon_counts[group_id][0][i]) + "\t" + str(exon_counts[group_id][1][i]) + "\n")
+                include_counts = exon_counts[group_id][0][i]
+                exclude_counts = exon_counts[group_id][1][i]
+                if exclude_counts == 0 and include_counts == 0:
+                    continue
+                out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts) + "\n")
             out_exons.close()
 
             out_exon_info = open(self.out_exon_genes, "a+")
