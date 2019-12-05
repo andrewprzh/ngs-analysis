@@ -317,12 +317,10 @@ class GeneInfo:
     introns = []
     # sorted list of exons or non-overlapping exon regions (depends on split_exons option)
     exons = []
-    args = None
 
     # args: parameters of the tool
     # chr_bam_prefix: additional string used when bam files were aligned to different reference that has difference in chromosome names (e.g. 1 and chr1)
-    def __init__(self, gene_db_list, db, args, chr_bam_prefix = "", split_exons = True):
-        self.args = args
+    def __init__(self, gene_db_list, db, chr_bam_prefix = "", split_exons = True):
         self.db = db
         self.gene_db_list = gene_db_list
         self.chr_id, self.start, self.end = self.get_gene_region()
@@ -335,8 +333,8 @@ class GeneInfo:
 
         self.exon_to_geneid = {}
         i_introns, i_exons = self.set_introns_and_exons(True)
-        self.split_exons = split_exons
-        if self.split_exons:
+        self.need_to_split_exons = split_exons
+        if self.need_to_split_exons:
             self.exons = self.split_exons(self.exons)
         print_debug(self.exons)
 
@@ -541,7 +539,7 @@ class ReadProfilesInfo:
 
     def __init__(self, gene_db_list, db, args, chr_bam_prefix = "", exon_count_mode = False):
         self.exon_count_mode = exon_count_mode
-        self.gene_info = GeneInfo(gene_db_list, db, args, chr_bam_prefix, split_exons=not self.exon_count_mode)
+        self.gene_info = GeneInfo(gene_db_list, db, chr_bam_prefix, split_exons=not self.exon_count_mode)
         self.args = args
         self.codon_pairs = self.gene_info.get_codon_pairs(self.gene_info.gene_db_list)
         self.read_mapping_infos = {}
