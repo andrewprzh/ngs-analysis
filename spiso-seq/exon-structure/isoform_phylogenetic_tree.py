@@ -9,11 +9,13 @@ import os
 import sys
 import gffutils
 import argparse
+import Bio.Phylo as Phylo
 from assign_isoforms_to_barcodes import *
 from traceback import print_exc
 from Bio.Phylo.TreeConstruction import DistanceMatrix
 from Bio.Phylo.TreeConstruction import DistanceCalculator
 from Bio.Phylo.TreeConstruction import DistanceTreeConstructor
+import pylab
 
 def hamming_rel_dist(l1, l2):
     if len(l1) != len(l2):
@@ -40,7 +42,7 @@ class IsoformPhylogeneticTreeConstructor:
 
         self.gene_info = GeneInfo(gene_db_list, db)
 
-    def construct_distance_matrix(self):
+    def make_tree(self):
         exon_profiles = self.gene_info.all_rna_profiles.exon_profiles
         self.isoform_list = sorted(exon_profiles.keys())
         dm = []
@@ -54,12 +56,10 @@ class IsoformPhylogeneticTreeConstructor:
             dm.append(matrix_row)
 
         self.distance_matrix = DistanceMatrix(self.isoform_list, dm)
-        print(self.distance_matrix)
         constructor = DistanceTreeConstructor()
-        tree = constructor.nj(self.distance_matrix)
-        print(tree)
-        tree2 = constructor.upgma(self.distance_matrix)
-        print(tree2)
+        self.tree = constructor.upgma(self.distance_matrix)
+        Phylo.draw_graphviz(self.tree)
+        pylab.show()
 
 
 def parse_args():
@@ -78,7 +78,7 @@ def main():
     db = gffutils.FeatureDB(args.genedb, keep_order=True)
 
     isoform_tree_constructor = IsoformPhylogeneticTreeConstructor(db, args.gene_ids)
-    isoform_tree_constructor.construct_distance_matrix()
+    isoform_tree_constructor.make_tree()
 
 
 if __name__ == "__main__":

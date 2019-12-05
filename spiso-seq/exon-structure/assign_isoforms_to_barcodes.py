@@ -409,10 +409,13 @@ class GeneInfo:
 
         self.introns = set()
         self.exons = set()
+        self.terminal_exons = set()
         for i in all_isoforms_introns.keys():
             self.introns.update(all_isoforms_introns[i])
         for i in all_isoforms_exons.keys():
             self.exons.update(all_isoforms_exons[i])
+            self.terminal_exons.add(all_isoforms_exons[i][0])
+            self.terminal_exons.add(all_isoforms_exons[i][-1])
 
         self.introns = sorted(list(self.introns))
         self.exons = sorted(list(self.exons))
@@ -618,10 +621,6 @@ class ReadProfilesInfo:
                 return set([t])
 
         return matched_isoforms
-
-    # TODO
-    def count_exons(self, read_id):
-        pass
 
     # assign barcode/sequence alignment to a known isoform
     def assign_isoform(self, read_id, stat, coverage_cutoff):
@@ -886,7 +885,6 @@ class GeneDBProcessor:
 
         # iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
-            #TODO
             group_id = read_id.split(':')[0]
             if group_id not in exon_counts:
                 # first list for exon inclusion, second for exlusion
@@ -970,14 +968,16 @@ class GeneDBProcessor:
     def write_exon_counts(self, exon_counts, read_profiles, chr_id):
         for i in range(len(read_profiles.gene_info.exons)):
             exon = read_profiles.gene_info.exons[i]
+            if exon in read_profiles.gene_info.terminal_exons:
+                continue
             exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
             out_exons = open(self.out_exon_counts, "a+")
             exon_id += "" if len(read_profiles.gene_info.exon_to_geneid[exon]) == 1 else "_MULT"
             for group_id in exon_counts.keys():
                 include_counts = exon_counts[group_id][0][i]
                 exclude_counts = exon_counts[group_id][1][i]
-                if exclude_counts == 0 and include_counts == 0:
-                    continue
+                #if exclude_counts == 0 and include_counts == 0:
+                #    continue
                 out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts) + "\n")
             out_exons.close()
 
