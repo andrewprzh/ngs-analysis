@@ -43,7 +43,6 @@ def process_exon(single_exon_counts):
         if cell_type not in exon_count_tables:
             exon_count_tables[cell_type] = {"P7Hipp" : [0, 0], "P7PFC" : [0, 0]}
         tissue = cell_info[0]
-        print(cell_type, tissue)
         exon_count_tables[cell_type][tissue][0] += single_exon_counts[cell_group][0]
         exon_count_tables[cell_type][tissue][1] += single_exon_counts[cell_group][1]
 
@@ -52,6 +51,8 @@ def process_exon(single_exon_counts):
 
 def write_exon_count_table(exon_id, exon_count_tables, outf):
     for ct in exon_count_tables.keys():
+        if exon_count_tables[ct]["P7Hipp"] == [0, 0] or exon_count_tables[ct]["P7PFC"] == [0,0]:
+            continue
         outf.write("====" + exon_id + "_" + ct + "\n")
         outf.write("\t".join(map(str, exon_count_tables[ct]["P7Hipp"])) + "\n")
         outf.write("\t".join(map(str, exon_count_tables[ct]["P7PFC"])) + "\n")
@@ -59,7 +60,7 @@ def write_exon_count_table(exon_id, exon_count_tables, outf):
 
 def process_all_counts(exon_counts_map, out_file_name):
     outf = open(out_file_name, "w")
-    for exon_id in exon_counts_map.keys():
+    for exon_id in sorted(exon_counts_map.keys()):
         exon_count_tables = process_exon(exon_counts_map[exon_id])
         write_exon_count_table(exon_id, exon_count_tables, outf)
     outf.close()
