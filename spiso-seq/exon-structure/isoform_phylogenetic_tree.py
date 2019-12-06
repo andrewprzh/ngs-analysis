@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 
 MIN_NODE_SIZE = 20
-MAX_NODE_SIZE = 500
+MAX_NODE_SIZE = 1000
 EDGE_LEN_SCALE = 20
 DEFAULT_NODE_SIZE = 200
 
@@ -136,7 +136,7 @@ def main():
     db = gffutils.FeatureDB(args.genedb, keep_order=True)
 
     isoform_tree_constructor = IsoformPhylogeneticTreeConstructor(db, args.gene_ids)
-    isoform_counts = {'ENSMUST00000001712.7' : 151, 'ENSMUST00000217664.1' : 61, 'ENSMUST00000217810.1' : 215, 'ENSMUST00000218469.1' : 29, 'ENSMUST00000218480.1' : 81}
+    isoform_counts = {'ENSMUST00000217664.1' : 61, 'ENSMUST00000217810.1' : 215, 'ENSMUST00000218469.1' : 29, 'ENSMUST00000218480.1' : 81}
     isoform_tree_constructor.make_tree(isoform_counts)
     isoform_tree_constructor.draw_tree()
 
