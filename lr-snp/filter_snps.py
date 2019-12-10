@@ -147,8 +147,7 @@ class VCFParser:
                     total_cov.append(dp)
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or
-                                       (max(freqs) < self.args.min_freq) and sum(freqs) < self.args.min_freq):
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq or max(snp_cov) < 5):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             chr_id = tokens[0]
