@@ -3,7 +3,7 @@ library("Matrix")
 
 processTable = function(table, uncompressed_table, gene_id, sample_name_prefix) {
   
-  if ( sum(table) < 50)  {
+  if ( sum(table) < 100)  {
     return(0)
   }
   if ( nrow(table) < 2)  {
@@ -16,6 +16,9 @@ processTable = function(table, uncompressed_table, gene_id, sample_name_prefix) 
     return(0)
   }
   if ( (min(colSums(table))*min(rowSums(table))/sum(table)) < 5)  {
+    return(0)
+  }
+  if (max(colSums(table)/sum(table)) > 0.9)  {
     return(0)
   }
   write.table(table, file = paste(sample_name_prefix, "tables.tsv", sep =""), row.names = FALSE, col.names = FALSE, append = TRUE)
@@ -34,9 +37,9 @@ processTable = function(table, uncompressed_table, gene_id, sample_name_prefix) 
   matrices <<- unlist(list(matrices, list(table)), recursive=FALSE)
   uncompressed_matrices <<- unlist(list(uncompressed_matrices, list(uncompressed_table)), recursive=FALSE)
   gene_names <<- c(gene_names, gene_id)
-  print(table)
+#  print(table)
   fisher <- chisq.test(table)
-  print(fisher$p.value)
+  #print(fisher$p.value)
   p <- fisher$p.value
   if (p < 0.01) {
     write(sub("====", "", gene_name), file = paste(sample_name_prefix, "genes.tsv", sep =""), append = TRUE)
@@ -51,7 +54,7 @@ preprocessTable = function(table) {
   if ( ncol(table) < 2)  {
     return(table)
   }
-  print(table)
+  #print(table)
   while ( nrow(table) > 2) {
     smallest_index <- which.min(rowSums(table))
     smallest_row <- table[smallest_index,]
@@ -101,7 +104,7 @@ processFile = function(filepath, output_prefix) {
   close(con)
 }
 
-output_prefix = "/home/andrey/ablab/analysis/RNA_10x/codon_dependency/human/contigs_10x/15.11.19/human.10x_contigs.d2.ann_"
+output_prefix = "/home/andrey/ablab/analysis/RNA_10x/exon_counts/Hipp_vs_Pfc/NoTerminal."
 close( file( paste(output_prefix, "genes.tsv", sep =""), open="w" ) )
 close( file( paste(output_prefix, "tables.tsv", sep =""), open="w" ) )
 close( file( paste(output_prefix, "results.tsv", sep =""), open="w" ) )
@@ -112,7 +115,7 @@ uncompressed_matrices <- list()
 gene_names <- c()
 gene_name <- ""
 
-processFile("/home/andrey/ablab/analysis/RNA_10x/codon_dependency/human/contigs_10x/15.11.19/human.10x_contigs.d2.annotated_codons.codon_stats.raw.tsv", output_prefix)
+processFile("/home/andrey/ablab/analysis/RNA_10x/exon_counts/Hipp_vs_Pfc/Hipp.Pfc.mapping.bestperRead.RNAdirection.withConsensIntrons.NoTerminal.exon_tables.tsv", output_prefix)
 sorted_pvalues_2 <- NULL
 sorted_pvalues_2 <- sort(pvalues, index.return=TRUE, decreasing=FALSE)
 #CTCF
