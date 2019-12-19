@@ -48,13 +48,12 @@ class TSVParser:
 
             tokens = l.strip().split('\t')
             total_cov = [int(tokens[self.sample_start_column + 3 * i]) for i in self.sample_ids]
-            if not self.no_filter and any(cov < self.args.min_cov for cov in total_cov):
-                continue
             freqs = [float(tokens[self.sample_start_column + 3 * i + 2]) for i in self.sample_ids]
-            if not self.no_filter and max(freqs) < self.args.min_freq:
+            snp_cov = [int(tokens[self.sample_start_column + 3 * i + 1]) for i in self.sample_ids]
+
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq or max(snp_cov) < self.args.min_snp_cov):
                 continue
             snp_type = GERMLINE_SNP if not self.no_filter and is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
-            snp_cov = [int(tokens[self.sample_start_column + 3 * i + 1]) for i in self.sample_ids]
 
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
 
@@ -93,7 +92,7 @@ class VarScanParser:
                     snp_cov.append(0 if sample_data[3] == '-' else int(sample_data[3]))
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq):
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq or max(snp_cov) < self.args.min_snp_cov):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             snp_storage.add(tokens[0], int(tokens[1]), SelectedSNP(tokens[2], tokens[3], snp_type, total_cov, snp_cov))
@@ -147,7 +146,7 @@ class VCFParser:
                     total_cov.append(dp)
                     freqs.append(0.0 if total_cov[-1] == 0 else float(snp_cov[-1]) / float(total_cov[-1]))
 
-            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq or max(snp_cov) < 5):
+            if not self.no_filter and (any(cov < self.args.min_cov for cov in total_cov) or max(freqs) < self.args.min_freq or max(snp_cov) < self.args.min_snp_cov):
                 continue
             snp_type = GERMLINE_SNP if is_germline(min(freqs), max(freqs), self.args) else SOMATIC_SNP
             chr_id = tokens[0]
@@ -214,7 +213,8 @@ def parse_args():
     optional_group.add_argument("--no_cov_filter", help="do not use coverage filters", action='store_true', default=False)
     optional_group.add_argument("--min_freq", "-f", help="minimal SNP frequency within a sample, between 0.0 and 1.0 [0.2]", type=float, default=0.2)
     optional_group.add_argument("--min_freq_factor", "-m", help="minimal SNP frequency factor, > 1.0 [2.0]", type=float, default=2.0)
-    optional_group.add_argument("--min_cov", "-c", help="minimal SNP read coverage depth within a sample, > 0 [50]", type=int, default=50)
+    optional_group.add_argument("--min_cov", "-c", help="minimal SNP read coverage depth within a sample, > 0 [5]", type=int, default=5)
+    optional_group.add_argument("--min_snp_cov", "-s", help="variant should be confirmed by at least this number of reads at least in one sample, > 0 [5]", type=int, default=5)
     optional_group.add_argument("--sample_ids", help="comma-separated 0-based sample indices, e.g. 1,3,6", type=str, default='')
     optional_group.add_argument("--min_frac", help="minimal faction of samples for which SNP is covered, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
 
