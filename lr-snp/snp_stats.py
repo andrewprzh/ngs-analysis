@@ -111,9 +111,15 @@ def get_intersected_snps(snp_storages, storage_index, cov_cutoff = 0, freq_cutof
     return snp_frequency_map
 
 
-def print_map(snp_frequency_map):
+def print_map(snp_frequency_map, args):
+    outf = open(args.output, 'w')
+    if args.labels:
+        outf.write('VAR'  + '\t' + '\t'.join(args.labels) + '\n')
     for pos in sorted(snp_frequency_map.keys()):
-        print(pos + '\t' + '\t'.join(map('{:.2f}'.format, snp_frequency_map[pos])))
+        if all(f > 0.1 for f in  snp_frequency_map[pos]):
+            continue
+        outf.write(pos + '\t' + '\t'.join(map('{:.2f}'.format, snp_frequency_map[pos])) + '\n')
+    outf.close()
 
 
 def freq_stat(snp_frequency_map):
@@ -164,12 +170,15 @@ def parse_args():
 
     required_group = parser.add_argument_group('parameters')
     required_group.add_argument('--tsv', dest='tsv_file', nargs='+', help='list of TSV files')
-    required_group.add_argument("--min_freq", help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
-    required_group.add_argument("--min_cov", help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
+    required_group.add_argument('--output', '-o', help='output in simple frequency table')
+    required_group.add_argument('--labels', '-l', dest='labels', nargs='+', help='list of column labels, must be equal to number of samples')
+    required_group.add_argument("--min_freq", '-f', help="absolute frequency cutoff, between 0.0 and 1.0 [0.0]", type=float, default=0.0)
+    required_group.add_argument("--min_cov", '-c', help="absolute coverage cutoff, >= 0 [0]", type=int, default=0)
     required_group.add_argument("--tool_id", help="tools id taken for further analysis", type=int, default=1)
     required_group.add_argument("--no_cov_filter", help="do not use coverage filters", action='store_true', default=False)
 
     args = parser.parse_args()
+    args.min_snp_cov = 0
 
     if args.tsv_file is None or len(args.tsv_file) == 0: # or args.output_prefix is None:
         parser.print_help()
@@ -200,7 +209,7 @@ def main():
     print(common_snps(snp_storages))
 
     snp_freqs = get_intersected_snps(snp_storages, args.tool_id, args.min_cov, args.min_freq)
-    print_map(snp_freqs)
+    print_map(snp_freqs, args)
 
     freq_stat(snp_freqs)
 
