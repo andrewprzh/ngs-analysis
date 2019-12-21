@@ -722,8 +722,9 @@ class GeneDBProcessor:
     stats = None
     chr_bam_prefix = ""
     
-    def __init__(self, args):
+    def __init__(self, args, property_getter = None):
         self.args = args
+        self.property_getter = property_getter
         self.bc_map = self.get_barcode_map(args.bam)
         self.bamfile_names = args.bam
         for bamfile_name in self.bamfile_names:
@@ -885,7 +886,7 @@ class GeneDBProcessor:
 
         # iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
-            group_id = read_id.split(':')[0]
+            group_id = self.property_getter.get_property(read_id)
             if group_id not in exon_counts:
                 # first list for exon inclusion, second for exlusion
                 exon_counts[group_id] = ([0 for i in range(len(read_profiles.gene_info.exons))],

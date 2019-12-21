@@ -15,11 +15,24 @@ from traceback import print_exc
 
 
 def read_property_table(property_file, column):
+    table = {}
     for l in open(property_file):
+        tokens = l.strip().split()
+        table[tokens[0][1:]] = tokens[column]
+    return table
 
 
-class 
-def get_property_from_read_id(read_id)
+class ReadIdPropertyGetter:
+    def get_property(read_id):
+        return
+
+
+class TablePropertyGetter:
+    def __init__(self, table):
+        self.table = table
+
+    def get_property(read_id):
+        return self.table[read_id]
 
 
 def parse_args():
@@ -50,7 +63,12 @@ def main():
     args = parse_args()
     set_codon_count_params(args)
 
-    db_processor = GeneDBProcessor(args)
+    property_getter = ReadIdPropertyGetter()
+    if args.readmap:
+        table = read_property_table(args.readmap, args.property_column)
+        property_getter = TablePropertyGetter(table)
+
+    db_processor = GeneDBProcessor(args, property_getter)
     db_processor.process_all_genes()
 
 
