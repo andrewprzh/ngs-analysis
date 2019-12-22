@@ -597,6 +597,13 @@ class ReadProfilesInfo:
             return
 
         blocks = alignment.get_blocks()
+        if read_id == 'e44d07f3-1abc-41f8-918a-8547c40d511a':
+            print(len(alignment.cigartuples))
+            print(alignment.cigartuples)
+            print(len(alignment.get_blocks()))
+            print(sorted(alignment.get_blocks() == blocks))
+            print(alignment.get_blocks())
+
         if len(blocks) == 0:
             return
 

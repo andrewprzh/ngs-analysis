@@ -1,4 +1,4 @@
-############################################################################
+	############################################################################
 # Copyright (c) 2019 Saint Petersburg State University
 # # All Rights Reserved
 # See file LICENSE for details.
@@ -23,15 +23,19 @@ def read_property_table(property_file, column):
 
 
 class ReadIdPropertyGetter:
-    def get_property(read_id):
+    def get_property(self, read_id):
         return
 
 
 class TablePropertyGetter:
     def __init__(self, table):
+        self.missed = 0
         self.table = table
 
-    def get_property(read_id):
+    def get_property(self, read_id):
+        if read_id not in self.table:
+            self.missed += 1
+            return "unknown"
         return self.table[read_id]
 
 
@@ -70,7 +74,7 @@ def main():
 
     db_processor = GeneDBProcessor(args, property_getter)
     db_processor.process_all_genes()
-
+    print(property_getter.missed)
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
