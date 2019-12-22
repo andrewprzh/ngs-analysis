@@ -601,7 +601,7 @@ class ReadProfilesInfo:
             print(len(alignment.cigartuples))
             print(alignment.cigartuples)
             print(len(alignment.get_blocks()))
-            print(sorted(alignment.get_blocks() == blocks))
+            print(sorted(alignment.get_blocks()) == blocks)
             print(alignment.get_blocks())
 
         if len(blocks) == 0:
