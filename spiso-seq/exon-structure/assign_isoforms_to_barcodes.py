@@ -267,7 +267,7 @@ class ReadMappingInfo:
             if current_block is None:
                 #init new block from match
                 if cigar_list[cigar_index][0] == 0:
-                    current_block = (blocks[block_index][0] + deletions_before_block, blocks[block_index][1])
+                    current_block = (blocks[block_index][0] - deletions_before_block, blocks[block_index][1])
                     block_index += 1
                 # keep track of deletions before matched block
                 elif cigar_list[cigar_index][0] == 2:
@@ -281,12 +281,16 @@ class ReadMappingInfo:
                 current_block = (current_block[0], current_block[1] + cigar_list[cigar_index][1])
             # found match - merge blocks
             elif cigar_list[cigar_index][0] == 0:
-                current_block = (current_block[0], blocks[block_index][1])
                 if abs(current_block[1] - blocks[block_index]) > 1:
                     print("Distant blocks")
                     print(current_block, blocks[block_index])
+                current_block = (current_block[0], blocks[block_index][1])
+
                 block_index += 1
             cigar_index += 1
+
+        if current_block is not None:
+            resulting_blocks.append(current_block)
 
         return resulting_blocks
 
