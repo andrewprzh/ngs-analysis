@@ -254,11 +254,50 @@ class ReadMappingInfo:
             if self.exon_counting_mode else \
             FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps)
 
+    def concat_gapless_blocks(self, blocks, cigar_list):
+        cigar_index = 0
+        block_index = 0
+        resulting_blocks = []
+
+        current_block = None
+        deletions_before_block = 0
+
+        while cigar_index < len(cigar_list) and block_index < len(blocks):
+            #init new block
+            if current_block is None:
+                #init new block from match
+                if cigar_list[cigar_index][0] == 0:
+                    current_block = (blocks[block_index][0] + deletions_before_block, blocks[block_index][1])
+                    block_index += 1
+                # keep track of deletions before matched block
+                elif cigar_list[cigar_index][0] == 2:
+                    deletions_before_block = cigar_list[cigar_index][1]
+            # found intron, add current block
+            elif cigar_list[cigar_index][0] == 3:
+                resulting_blocks.append(current_block)
+                current_block = None
+            # add deletion to block
+            elif cigar_list[cigar_index][0] == 2:
+                current_block = (current_block[0], current_block[1] + cigar_list[cigar_index][1])
+            # found match - merge blocks
+            elif cigar_list[cigar_index][0] == 0:
+                current_block = (current_block[0], blocks[block_index][1])
+                if abs(current_block[1] - blocks[block_index]) > 1:
+                    print("Distant blocks")
+                    print(current_block, blocks[block_index])
+                block_index += 1
+            cigar_index += 1
+
+        return resulting_blocks
+
     def add_read(self, alignment, known_introns, known_exons):
         self.total_reads += 1
         #converting to 1-based coordinates
         #second coordinate is not converted since alignment block is end-exclusive, i.e. [x, y)
-        blocks = map(lambda x: (x[0] + 1, x[1]), sorted(alignment.get_blocks()))
+        blocks = map(lambda x: (x[0] + 1, x[1]), self.concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples))
+
+        if alignment.query_name == 'e44d07f3-1abc-41f8-918a-8547c40d511a':
+            print(blocks)
 
         if len(blocks) >= 2 and not self.exon_counting_mode:
             read_junctions = junctions_from_blocks(blocks)
@@ -553,7 +592,7 @@ class ReadProfilesInfo:
         if chr_name != self.gene_info.chr_id:
             return
 
-        blocks = sorted(alignment.get_blocks())
+        blocks = alignment.get_blocks()
         if len(blocks) == 0:
             return
 
