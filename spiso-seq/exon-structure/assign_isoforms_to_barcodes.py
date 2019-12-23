@@ -268,6 +268,7 @@ class ReadMappingInfo:
                 #init new block from match
                 if cigar_list[cigar_index][0] == 0:
                     current_block = (blocks[block_index][0] - deletions_before_block, blocks[block_index][1])
+                    deletions_before_block = 0
                     block_index += 1
                 # keep track of deletions before matched block
                 elif cigar_list[cigar_index][0] == 2:
@@ -281,7 +282,7 @@ class ReadMappingInfo:
                 current_block = (current_block[0], current_block[1] + cigar_list[cigar_index][1])
             # found match - merge blocks
             elif cigar_list[cigar_index][0] == 0:
-                if abs(current_block[1] - blocks[block_index]) > 1:
+                if abs(current_block[1] - blocks[block_index][0]) > 1:
                     print("Distant blocks")
                     print(current_block, blocks[block_index])
                 current_block = (current_block[0], blocks[block_index][1])
@@ -300,8 +301,8 @@ class ReadMappingInfo:
         #second coordinate is not converted since alignment block is end-exclusive, i.e. [x, y)
         blocks = map(lambda x: (x[0] + 1, x[1]), self.concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples))
 
-        if alignment.query_name == 'e44d07f3-1abc-41f8-918a-8547c40d511a':
-            print(blocks)
+#        if alignment.query_name == 'e44d07f3-1abc-41f8-918a-8547c40d511a' or alignment.query_name == 'b6922288-7e4c-4aec-a6dd-a440fc19837f':
+#            print(blocks)
 
         if len(blocks) >= 2 and not self.exon_counting_mode:
             read_junctions = junctions_from_blocks(blocks)
@@ -597,12 +598,12 @@ class ReadProfilesInfo:
             return
 
         blocks = alignment.get_blocks()
-        if read_id == 'e44d07f3-1abc-41f8-918a-8547c40d511a':
-            print(len(alignment.cigartuples))
-            print(alignment.cigartuples)
-            print(len(alignment.get_blocks()))
-            print(sorted(alignment.get_blocks()) == blocks)
-            print(alignment.get_blocks())
+#        if read_id == 'e44d07f3-1abc-41f8-918a-8547c40d511a':
+#            print(len(alignment.cigartuples))
+#            print(alignment.cigartuples)
+#            print(len(alignment.get_blocks()))
+#            print(sorted(alignment.get_blocks()) == blocks)
+#            print(alignment.get_blocks())
 
         if len(blocks) == 0:
             return
@@ -1027,8 +1028,11 @@ class GeneDBProcessor:
             for group_id in exon_counts.keys():
                 include_counts = exon_counts[group_id][0][i]
                 exclude_counts = exon_counts[group_id][1][i]
-                #if exclude_counts == 0 and include_counts == 0:
-                #    continue
+                if group_id == 'unknown':
+                    continue 
+
+                if exclude_counts == 0 and include_counts == 0:
+                    continue
                 out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts) + "\n")
             out_exons.close()
 

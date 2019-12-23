@@ -18,7 +18,7 @@ def read_property_table(property_file, column):
     table = {}
     for l in open(property_file):
         tokens = l.strip().split()
-        table[tokens[0][1:]] = tokens[column]
+        table[tokens[0].replace('@','')] = tokens[column]
     return table
 
 
