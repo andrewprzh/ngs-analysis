@@ -797,6 +797,8 @@ class GeneDBProcessor:
     def count_clipped_fractions(self, left_pos, right_pos, isoform_id, gene_info):
         total_len = 0
         strand = '+'
+        #print('====')
+        #print(left_pos, right_pos)
         left_clipped_bases = 0
         right_clipped_bases = 0
         for gene_db in gene_info.gene_db_list:
@@ -807,11 +809,16 @@ class GeneDBProcessor:
                 strand = t.strand
                 for e in self.db.children(t, order_by='start'):
                     if e.featuretype == 'exon':
-                        total_len = e.end - e.start + 1
+                        total_len += e.end - e.start + 1
                         left_clipped_bases += max(0, min(e.end, left_pos) - e.start + 1)
                         right_clipped_bases += max(0, e.end - max(e.start, right_pos) + 1)
+        #                print("Exon: " + str(e.start) + ' ' + str(e.end))
+        #                print(max(0, min(e.end, left_pos) - e.start + 1),  max(0, e.end - max(e.start, right_pos) + 1))
+        #print(total_len, left_clipped_bases, right_clipped_bases)
         left_fraction = float(left_clipped_bases) / float(total_len)
         right_fraction = float(right_clipped_bases) / float(total_len)
+        #print(left_fraction, right_fraction)
+        #print('----')
         if strand == "+":
             return (left_fraction, right_fraction)
         else:
@@ -834,10 +841,10 @@ class GeneDBProcessor:
             read_profiles.add_read(alignment, seq_id)
             if seq_id not in read_counts:
                 read_counts[seq_id] = 0
-                left_pos[seq_id] = alignment.get_blocks[0][0]
-                right_pos[seq_id] = alignment.get_blocks[-1][1]
-            left_pos[seq_id] = min(left_pos[seq_id], alignment.get_blocks[0][0])
-            right_pos[seq_id] = max(right_pos[seq_id], alignment.get_blocks[-1][1])
+                left_pos[seq_id] = alignment.get_blocks()[0][0]
+                right_pos[seq_id] = alignment.get_blocks()[-1][1]
+            left_pos[seq_id] = min(left_pos[seq_id], alignment.get_blocks()[0][0])
+            right_pos[seq_id] = max(right_pos[seq_id], alignment.get_blocks()[-1][1])
             read_counts[seq_id] += 1
 
         samfile_in.close()
@@ -992,7 +999,7 @@ class GeneDBProcessor:
 
         self.process_gene_list(gene_db_list)
 
-
+        self.write_barcode_stats()
 
         print("\nFinished. Total stats " + self.stats.to_str())
         if self.args.count_isoform_stats:
