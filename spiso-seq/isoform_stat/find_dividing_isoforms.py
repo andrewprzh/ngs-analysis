@@ -39,7 +39,7 @@ def get_all_info_table(all_info_file):
             continue
         read_id = tokens[0]
         gene_id = tokens[1]
-        group_name = tokes[2]
+        group_name = tokens[2]
         barcode = tokens[3]
         umi = tokens[4]
 
@@ -50,13 +50,14 @@ def get_all_info_table(all_info_file):
             print("Duplicated read id " + read_id)
         all_read_map[group_name][gene_id][barcode][read_id] = ReadInfo(umi, isoform)
 
-    print("Loaded " + str(len(all_read_map)) + " cell groups")
+    #print("Loaded " + str(len(all_read_map)) + " cell groups")
     return all_read_map
 
 
 def process_gene(gene_map):
     isoform_map = {}
     for barcode in gene_map:
+        #print(barcode)
         umis = set([read_info.UMI for read_info in gene_map[barcode].values()])
         if len(umis) < MIN_UMIS:
             continue
@@ -73,10 +74,12 @@ def process_gene(gene_map):
 def has_diff_isoform(isoform_map):
     total_cells = sum(map(len, isoform_map.values()))
     total_isoforms = len(isoform_map.keys())
-    if total_isoforms != 2 or total_cells < MIN_CELLS:
+    #print("Checking map " + str(total_isoforms) + " " + str(total_cells))
+    if total_isoforms < 2 or total_cells < MIN_CELLS:
         return False
 
     sorted_isoforms = sorted(isoform_map.items(), reverse=True, key = lambda x: len(x[1]))
+    #print(sorted_isoforms)
     if len(sorted_isoforms[1][1]) >= float(total_cells) * MIN_FRAC:
         return True
     return False
@@ -84,11 +87,13 @@ def has_diff_isoform(isoform_map):
 
 def process_table(all_read_map):
     for cell_type in all_read_map.keys():
+        #print("cell type: " + cell_type + " " + str(len(all_read_map[cell_type])))
         for gene_id in all_read_map[cell_type].keys():
+            #print(gene_id + " " + str(len(all_read_map[cell_type][gene_id])))
             isoform_map = process_gene( all_read_map[cell_type][gene_id])
             if has_diff_isoform(isoform_map):
                 sorted_isoforms = sorted(isoform_map.items(), reverse=True, key=lambda x: len(x[1]))
-                print(cell_type + "\t" + gene_id + "\t" + sorted_isoforms[0][0] + "\t" + str(len(sorted_isoforms[0][1]))
+                print(cell_type + "\t" + gene_id + "\t" + str(len(sorted_isoforms)) + "\t" + sorted_isoforms[0][0] + "\t" + str(len(sorted_isoforms[0][1]))
                       + "\t" + sorted_isoforms[1][0] + "\t" + str(len(sorted_isoforms[1][1])))
                 print("\t".join(sorted_isoforms[0][1]))
                 print("\t".join(sorted_isoforms[1][1]))
@@ -99,7 +104,7 @@ def main():
         print("Provide read info table")
         sys.exit(-1)
 
-    read_info_table = get_all_info_table(sys.argv)
+    read_info_table = get_all_info_table(sys.argv[1])
     process_table(read_info_table)
 
 if __name__ == "__main__":
