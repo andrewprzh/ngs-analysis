@@ -676,6 +676,11 @@ class ReadProfilesInfo:
 
         return transcript_id, codon_pair
 
+class BarcodeStats:
+    def __init__(self):
+        self.read_counts = []
+        self.clipped3 = []
+        self.clipped5 = []
 
 
 # Class for processing entire bam file agains gene database
@@ -708,6 +713,7 @@ class GeneDBProcessor:
         
         self.stats = ReadAssignmentStats()
         self.output_prefix = args.output_prefix
+        self.barcode_stats = BarcodeStats()
 
     # read barcode map file generated along with a BAM file
     def get_barcode_map(self, sam_file_name):
@@ -788,6 +794,29 @@ class GeneDBProcessor:
             if t not in processed_ids:
                 gene_stats.unmapped += 1
 
+    def count_clipped_fractions(self, left_pos, right_pos, isoform_id, gene_info):
+        total_len = 0
+        strand = '+'
+        left_clipped_bases = 0
+        right_clipped_bases = 0
+        for gene_db in gene_info.gene_db_list:
+            for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
+                if t.id != isoform_id:
+                    continue
+
+                strand = t.strand
+                for e in self.db.children(t, order_by='start'):
+                    if e.featuretype == 'exon':
+                        total_len = e.end - e.start + 1
+                        left_clipped_bases += max(0, min(e.end, left_pos) - e.start + 1)
+                        right_clipped_bases += max(0, e.end - max(e.start, right_pos) + 1)
+        left_fraction = float(left_clipped_bases) / float(total_len)
+        right_fraction = float(right_clipped_bases) / float(total_len)
+        if strand == "+":
+            return (left_fraction, right_fraction)
+        else:
+            return (right_fraction, left_fraction)
+
     # assign all reads/barcodes mapped to gene region
     def assign_all_reads(self, read_profiles):
         samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
@@ -795,11 +824,22 @@ class GeneDBProcessor:
 
         # process all alignments
         # prefix is needed when bam file has chrXX chromosome names, but reference has XX names
+        read_counts = {}
+        left_pos = {}
+        right_pos = {}
         for alignment in samfile_in.fetch(self.chr_bam_prefix + gene_chr, gene_start, gene_end):
             if alignment.reference_id == -1 or alignment.is_secondary:
                 continue
             seq_id = self.get_sequence_id(alignment.query_name)
             read_profiles.add_read(alignment, seq_id)
+            if seq_id not in read_counts:
+                read_counts[seq_id] = 0
+                left_pos[seq_id] = alignment.get_blocks[0][0]
+                right_pos[seq_id] = alignment.get_blocks[-1][1]
+            left_pos[seq_id] = min(left_pos[seq_id], alignment.get_blocks[0][0])
+            right_pos[seq_id] = max(right_pos[seq_id], alignment.get_blocks[-1][1])
+            read_counts[seq_id] += 1
+
         samfile_in.close()
 
         # read / barcode id -> (isoform, codon pair)
@@ -809,6 +849,12 @@ class GeneDBProcessor:
         #iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
             isoform, codons = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
+
+            self.barcode_stats.read_counts.append(read_counts[read_id])
+            if isoform is not None:
+                clipped_fractions = self.count_clipped_fractions(left_pos[read_id], right_pos[read_id], isoform, read_profiles.gene_info)
+                self.barcode_stats.clipped5.append(clipped_fractions[0])
+                self.barcode_stats.clipped3.append(clipped_fractions[1])
 
             seq_id = read_id
             if self.bc_map is not None:
@@ -908,6 +954,17 @@ class GeneDBProcessor:
         self.write_gene_stats(gene_db_list, assigned_reads)
         self.write_codon_tables(gene_db_list, read_profiles.gene_info, assigned_reads)
 
+    def write_barcode_stats(self):
+        outf = open('barcode_counts.tsv', "w")
+        outf.write('\n'.join(map(str, self.barcode_stats.read_counts)))
+        outf.close()
+        outf = open('five_prime_clips.tsv', "w")
+        outf.write('\n'.join(map(str, self.barcode_stats.clipped5)))
+        outf.close()
+        outf = open('three_prime_clips.tsv', "w")
+        outf.write('\n'.join(map(str, self.barcode_stats.clipped3)))
+        outf.close()
+
     #Run though all genes in db and count stats according to alignments given in bamfile_name
     def process_all_genes(self):
         self.out_tsv = self.output_prefix + ".assigned_reads.tsv"
@@ -934,6 +991,8 @@ class GeneDBProcessor:
                 gene_db_list = [gene_db]
 
         self.process_gene_list(gene_db_list)
+
+
 
         print("\nFinished. Total stats " + self.stats.to_str())
         if self.args.count_isoform_stats:
