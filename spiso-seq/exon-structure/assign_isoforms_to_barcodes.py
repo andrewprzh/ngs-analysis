@@ -12,6 +12,7 @@ import argparse
 import pysam
 from common import *
 from traceback import print_exc
+import numpy
 
 # global params, to be fixed
 RESOLVE_AMBIGUOUS = False
@@ -965,11 +966,30 @@ class GeneDBProcessor:
         outf = open('barcode_counts.tsv', "w")
         outf.write('\n'.join(map(str, self.barcode_stats.read_counts)))
         outf.close()
+        bins = range(0, 50000, 100)
+        bins.append(1000000)
+        count_hist = numpy.histogram(self.barcode_stats.read_counts, bins=bins, range=(0, 1000000))
+        outf = open('count_hist.tsv', "w")
+        for i in range(len(count_hist[0])):
+            outf.write(str(count_hist[1][i]) + '\t' + str(count_hist[0][i]) + '\n')
+        outf.close()
+
         outf = open('five_prime_clips.tsv', "w")
         outf.write('\n'.join(map(str, self.barcode_stats.clipped5)))
         outf.close()
+        five_prime_hist = numpy.histogram(self.barcode_stats.clipped5, bins=10, range=(0, 1))
+        outf = open('five_prime_hist.tsv', "w")
+        for i in range(len(five_prime_hist[0])):
+            outf.write(str(five_prime_hist[1][i]) + '\t' + str(five_prime_hist[0][i]) + '\n')
+        outf.close()
+
         outf = open('three_prime_clips.tsv', "w")
         outf.write('\n'.join(map(str, self.barcode_stats.clipped3)))
+        outf.close()
+        three_prime_hist = numpy.histogram(self.barcode_stats.clipped3, bins=10, range=(0, 1))
+        outf = open('three_prime_hist.tsv', "w")
+        for i in range(len(three_prime_hist[0])):
+            outf.write(str(three_prime_hist[1][i]) + '\t' + str(three_prime_hist[0][i]) + '\n')
         outf.close()
 
     #Run though all genes in db and count stats according to alignments given in bamfile_name
