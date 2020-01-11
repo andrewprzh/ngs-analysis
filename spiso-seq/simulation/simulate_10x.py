@@ -53,14 +53,16 @@ def simulate_10x(args):
 
         left_reads = []
         for read in SeqIO.parse(outfq_prefix + '_R1.fastq', 'fastq'):
-            read.id = read.id.split('/')[0] + '___' + isoform_id + '_' + str(isoform_counts[isoform_id]) + '/2'
+            read.id = read.id.split('/')[0] + ':1___' + isoform_id + '_' + str(isoform_counts[isoform_id])
+            read.description = ''
             left_reads.append(read)
         left_fq = os.path.join(args.output, isoform_name) + '_R1.fastq'
         SeqIO.write(left_reads, left_fq, 'fastq')
 
         right_reads = []
         for read in SeqIO.parse(outfq_prefix + '_R2.fastq', 'fastq'):
-            read.id = read.id.split('/')[0] + '___' + isoform_id + '_' + str(isoform_counts[isoform_id]) + '/1'
+            read.id = read.id.split('/')[0] + ':2___' + isoform_id + '_' + str(isoform_counts[isoform_id])
+            read.description = ''
             right_reads.append(read)
         right_fq = os.path.join(args.output, isoform_name) + '_R2.fastq'
         SeqIO.write(right_reads, right_fq, 'fastq')
