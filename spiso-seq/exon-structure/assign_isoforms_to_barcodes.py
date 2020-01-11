@@ -19,7 +19,7 @@ RESOLVE_AMBIGUOUS = False
 DEDUCE_CODONS_FROM_CDS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
-ASSIGN_CODONS_WHEN_AMBIGUOUS = True
+ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 CONSIDER_FLANKING_JUNCTIONS = True
 JUNCTION_DELTA = 2
 LR_JUNCTION_DELTA = 3
@@ -798,8 +798,11 @@ class GeneDBProcessor:
     def count_clipped_fractions(self, left_pos, right_pos, isoform_id, gene_info):
         total_len = 0
         strand = '+'
-        #print('====')
-        #print(left_pos, right_pos)
+#        print('==== ' + isoform_id)
+#        print(gene_info.all_rna_profiles.intron_profiles[isoform_id])
+#        print(gene_info.all_rna_profiles.exon_profiles[isoform_id])
+
+#        print(left_pos, right_pos)
         left_clipped_bases = 0
         right_clipped_bases = 0
         for gene_db in gene_info.gene_db_list:
@@ -813,13 +816,13 @@ class GeneDBProcessor:
                         total_len += e.end - e.start + 1
                         left_clipped_bases += max(0, min(e.end, left_pos) - e.start + 1)
                         right_clipped_bases += max(0, e.end - max(e.start, right_pos) + 1)
-        #                print("Exon: " + str(e.start) + ' ' + str(e.end))
-        #                print(max(0, min(e.end, left_pos) - e.start + 1),  max(0, e.end - max(e.start, right_pos) + 1))
-        #print(total_len, left_clipped_bases, right_clipped_bases)
+#                        print("Exon: " + str(e.start) + ' ' + str(e.end))
+#                        print(max(0, min(e.end, left_pos) - e.start + 1),  max(0, e.end - max(e.start, right_pos) + 1))
+#        print(total_len, left_clipped_bases, right_clipped_bases)
         left_fraction = float(left_clipped_bases) / float(total_len)
         right_fraction = float(right_clipped_bases) / float(total_len)
-        #print(left_fraction, right_fraction)
-        #print('----')
+#        print(left_fraction, right_fraction)
+#        print(strand)
         if strand == "+":
             return (left_fraction, right_fraction)
         else:
@@ -856,6 +859,12 @@ class GeneDBProcessor:
 
         #iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
+            if read_id == '':
+                continue 
+#            print(" > " + read_id)
+#            print(read_profiles.read_mapping_infos[read_id].total_reads, read_counts[read_id])
+#            print(read_profiles.read_mapping_infos[read_id].junctions_counts.profile)
+#            print(read_profiles.read_mapping_infos[read_id].exons_counts.profile)
             isoform, codons = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
 
             self.barcode_stats.read_counts.append(read_counts[read_id])
@@ -963,11 +972,13 @@ class GeneDBProcessor:
         self.write_codon_tables(gene_db_list, read_profiles.gene_info, assigned_reads)
 
     def write_barcode_stats(self):
+        self.barcode_stats.read_counts = filter(lambda x: x >= 10, self.barcode_stats.read_counts)
         outf = open('barcode_counts.tsv', "w")
         outf.write('\n'.join(map(str, self.barcode_stats.read_counts)))
         outf.close()
-        bins = range(0, 50000, 100)
+        bins = range(0, 1000, 10)
         bins.append(1000000)
+        print(bins)
         count_hist = numpy.histogram(self.barcode_stats.read_counts, bins=bins, range=(0, 1000000))
         outf = open('count_hist.tsv', "w")
         for i in range(len(count_hist[0])):
@@ -977,7 +988,7 @@ class GeneDBProcessor:
         outf = open('five_prime_clips.tsv', "w")
         outf.write('\n'.join(map(str, self.barcode_stats.clipped5)))
         outf.close()
-        five_prime_hist = numpy.histogram(self.barcode_stats.clipped5, bins=10, range=(0, 1))
+        five_prime_hist = numpy.histogram(self.barcode_stats.clipped5, bins=100, range=(0, 1))
         outf = open('five_prime_hist.tsv', "w")
         for i in range(len(five_prime_hist[0])):
             outf.write(str(five_prime_hist[1][i]) + '\t' + str(five_prime_hist[0][i]) + '\n')
@@ -986,7 +997,7 @@ class GeneDBProcessor:
         outf = open('three_prime_clips.tsv', "w")
         outf.write('\n'.join(map(str, self.barcode_stats.clipped3)))
         outf.close()
-        three_prime_hist = numpy.histogram(self.barcode_stats.clipped3, bins=10, range=(0, 1))
+        three_prime_hist = numpy.histogram(self.barcode_stats.clipped3, bins=100, range=(0, 1))
         outf = open('three_prime_hist.tsv', "w")
         for i in range(len(three_prime_hist[0])):
             outf.write(str(three_prime_hist[1][i]) + '\t' + str(three_prime_hist[0][i]) + '\n')
