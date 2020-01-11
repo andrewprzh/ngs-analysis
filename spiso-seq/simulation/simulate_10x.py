@@ -50,7 +50,7 @@ def simulate_10x(args, isoforms):
         if os.path.exists(outfq_prefix + '_R2.fastq'):
             os.remove(outfq_prefix + '_R2.fastq')
 
-        os.system('iss generate --genomes ' + outf + ' --n_reads ' + str(nreads) + ' --model HiSeq  -a uniform -o ' + outfq_prefix)
+        os.system('~/.local/bin/iss generate --genomes ' + outf + ' --n_reads ' + str(nreads) + ' --model HiSeq  -a uniform -o ' + outfq_prefix)
 
         isoform_name = isoform_id + '_' + str(isoform_counts[isoform_id])
 
