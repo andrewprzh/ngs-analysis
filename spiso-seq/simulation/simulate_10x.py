@@ -10,6 +10,7 @@ import argparse
 from Bio import SeqIO
 import numpy
 from traceback import print_exc
+import gffutils
 
 
 def read_probs(args):
@@ -22,7 +23,7 @@ def read_probs(args):
     return values, probs
 
 
-def simulate_10x(args):
+def simulate_10x(args, isoforms):
     values, probs = read_probs(args)
     outf = os.path.join(args.output, 'tmp.fa')
     outfq_prefix = os.path.join(args.output, 'tmp')
@@ -31,8 +32,10 @@ def simulate_10x(args):
     for record in SeqIO.parse(args.fasta, 'fasta'):
         if len(record.seq) < 200:
             continue
-
         isoform_id = record.description.strip().split()[1]
+        if len(isoforms) > 0 and isoform_id not in isoforms:
+            continue
+
         if isoform_id not in isoform_counts:
             isoform_counts[isoform_id] = 0
         isoform_counts[isoform_id] += 1
@@ -68,11 +71,27 @@ def simulate_10x(args):
         SeqIO.write(right_reads, right_fq, 'fastq')
 
 
+def get_isoform_set(args):
+    isoforms = set()
+    if args.genedb is None or args.gene_id is None:
+        return isoforms
+
+    db = gffutils.FeatureDB(args.genedb)
+    gene = db[args.gene_id]
+
+    for t in db.children(gene, featuretype='transcript'):
+        isoforms.add(t.id)
+    return isoforms
+
+
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--fasta", "-f", help="initial file with sequences", type=str)
     parser.add_argument("--hist", help="probability values", type=str)
     parser.add_argument("--output", "-o", help="output folder", type=str)
+    parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
+    parser.add_argument("--gene_id", help="gene id to take isoforms from", type=str)
+
 
     args = parser.parse_args()
 
@@ -90,7 +109,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    simulate_10x(args)
+    isoforms = get_isoform_set(args)
+    simulate_10x(args, isoforms)
 
 
 if __name__ == "__main__":
