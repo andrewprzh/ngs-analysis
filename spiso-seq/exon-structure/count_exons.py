@@ -45,7 +45,8 @@ def parse_args():
     parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)
     parser.add_argument("--readmap", "-r", help="read property table (first column - read id, other - property)", type=str)
-    parser.add_argument("--property_column", help="read property column", type=int, default=1)
+    parser.add_argument("--property_column", help="0-based read property column index (0th column is read id)", type=int, default=2)
+    parser.add_argument("--barcode_column", help="0-based barcode column index (0th column is read id)", type=int, default=1)
     parser.add_argument("--keep_terminal", help="do not suppress terminal", action='store_true', default=False)
 
     args = parser.parse_args()
@@ -68,9 +69,13 @@ def main():
     set_codon_count_params(args)
 
     property_getter = ReadIdPropertyGetter()
+    args.read_info_map = None
     if args.readmap:
         table = read_property_table(args.readmap, args.property_column)
         property_getter = TablePropertyGetter(table)
+        args.read_info_map = read_property_table(args.readmap, args.barcode_column)
+        args.distinct_barcodes = float(len(set(args.read_info_map.values())))
+        print("Barcode map loaded, total distinct barcodes " + str(args.distinct_barcodes))
 
     db_processor = GeneDBProcessor(args, property_getter)
     db_processor.process_all_genes()

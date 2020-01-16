@@ -884,10 +884,13 @@ class GeneDBProcessor:
 
         # process all alignments
         # prefix is needed when bam file has chrXX chromosome names, but reference has XX names
+
         for alignment in samfile_in.fetch(self.chr_bam_prefix + gene_chr, gene_start, gene_end):
             if alignment.reference_id == -1 or alignment.is_secondary:
                 continue
             seq_id = self.get_sequence_id(alignment.query_name)
+            if self.args.read_info_map is not None and seq_id in self.args.read_info_map:
+                self.found_barcodes.add(self.args.read_info_map[seq_id])
             read_profiles.add_read(alignment, seq_id)
         samfile_in.close()
 
@@ -930,6 +933,7 @@ class GeneDBProcessor:
 
     # calculate exon counts
     def calculate_exon_counts(self, read_profiles):
+        self.found_barcodes = set()
         self.process_all_reads(read_profiles)
 
         # cell group -> two list of counts for each exon inclusion/exclusion
@@ -1018,7 +1022,11 @@ class GeneDBProcessor:
             outf.close()
 
     def write_exon_counts(self, exon_counts, read_profiles, chr_id):
+        gene_coverage = 0 if args.distinct_barcodes == 0 else float(len(self.found_barcodes)) / args.distinct_barcodes
+
         for i in range(len(read_profiles.gene_info.exons)):
+            total_counts = 0
+            total_inclusion = 0
             exon = read_profiles.gene_info.exons[i]
             if not self.args.keep_terminal and exon in read_profiles.gene_info.terminal_exons:
                 continue
@@ -1033,11 +1041,14 @@ class GeneDBProcessor:
 
                 if exclude_counts == 0 and include_counts == 0:
                     continue
+                total_counts += exclude_counts + include_counts
+                total_inclusion += total_inclusion
                 out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts) + "\n")
             out_exons.close()
 
             out_exon_info = open(self.out_exon_genes, "a+")
-            out_exon_info.write(exon_id + "\t" + ",".join(list(read_profiles.gene_info.exon_to_geneid[exon])) + "\n")
+            inclusion_rate = 0 if total_counts == 0 else float(total_inclusion) / float(total_counts)
+            out_exon_info.write(exon_id + "\t" + ",".join(list(read_profiles.gene_info.exon_to_geneid[exon])) + "\t" + str(gene_coverage) + "\t" + str(inclusion_rate) + "\n")
             out_exon_info.close()
 
     # Process a set of genes given in gene_db_list
@@ -1060,9 +1071,11 @@ class GeneDBProcessor:
         if self.args.exon_count_mode:
             self.out_exon_counts = self.output_prefix + ".exon_counts.tsv"
             outf = open(self.out_exon_counts, "w")
+            outf.write('#exon_id\tcell_type\tinclusion\texclusion\n')
             outf.close()
             self.out_exon_genes = self.output_prefix + ".exon_to_geneid.tsv"
             outf = open(self.out_exon_genes, "w")
+            outf.write('#exon_id\tgene_id\tgene_coverage\texon_inclusion\n')
             outf.close()
         else:
             self.out_tsv = self.output_prefix + ".assigned_reads.tsv"
@@ -1081,14 +1094,16 @@ class GeneDBProcessor:
                 print("Processing chromosome " + current_chromosome)
             gene_name = g.id
             gene_db = self.db[gene_name]
+            gene_db_list = [gene_db]
+            self.process_gene_list(gene_db_list)
 
-            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
-                gene_db_list.append(gene_db)
-            else:
-                self.process_gene_list(gene_db_list)
-                gene_db_list = [gene_db]
+            #if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
+            #    gene_db_list.append(gene_db)
+            #else:
+            #    self.process_gene_list(gene_db_list)
+            #    gene_db_list = [gene_db]
 
-        self.process_gene_list(gene_db_list)
+        #self.process_gene_list(gene_db_list)
 
         if self.args.exon_count_mode:
             print("Done")
