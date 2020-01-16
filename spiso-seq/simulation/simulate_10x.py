@@ -32,7 +32,7 @@ def simulate_10x(args, isoforms):
     for record in SeqIO.parse(args.fasta, 'fasta'):
         if len(record.seq) < 200:
             continue
-        isoform_id = record.description.strip().split()[1]
+        isoform_id = record.description.strip().split('_')[1]
         if len(isoforms) > 0 and isoform_id not in isoforms:
             continue
 
@@ -50,7 +50,7 @@ def simulate_10x(args, isoforms):
         if os.path.exists(outfq_prefix + '_R2.fastq'):
             os.remove(outfq_prefix + '_R2.fastq')
 
-        os.system('~/.local/bin/iss generate --genomes ' + outf + ' --n_reads ' + str(nreads) + ' --model HiSeq  -a uniform -o ' + outfq_prefix)
+        os.system('~/.local/bin/iss generate -p 6  --genomes ' + outf + ' --n_reads ' + str(nreads) + ' --model HiSeq  -a uniform -o ' + outfq_prefix + ' 2> /dev/null')
 
         isoform_name = isoform_id + '_' + str(isoform_counts[isoform_id])
 
