@@ -825,7 +825,7 @@ class GeneDBProcessor:
         elif self.args.data_type == "contigs":
             return query_name.strip().split("_barcodeIDs_")[0]
         else:
-            return query_name.strip()
+            return query_name.strip() #.split(':')[-1]
 
     # add isoform stats whem mapping reference sequences
     def count_isoform_stats(self, isoform, read_id, gene_stats, gene_info):
@@ -953,7 +953,7 @@ class GeneDBProcessor:
                     exon_counts[group_id][0][i - 1] += exon_count_profile[i]
                 elif exon_count_profile[i] < 0:
                     exon_counts[group_id][1][i - 1] -= exon_count_profile[i]
-
+        #print(exon_counts)
         return exon_counts
 
     def gene_list_id_str(self, gene_db_list, delim = "_"):
@@ -1022,7 +1022,7 @@ class GeneDBProcessor:
             outf.close()
 
     def write_exon_counts(self, exon_counts, read_profiles, chr_id):
-        gene_coverage = 0 if args.distinct_barcodes == 0 else float(len(self.found_barcodes)) / args.distinct_barcodes
+        gene_coverage = 0 if self.args.distinct_barcodes == 0 else float(len(self.found_barcodes)) / self.args.distinct_barcodes
 
         for i in range(len(read_profiles.gene_info.exons)):
             total_counts = 0
@@ -1042,7 +1042,7 @@ class GeneDBProcessor:
                 if exclude_counts == 0 and include_counts == 0:
                     continue
                 total_counts += exclude_counts + include_counts
-                total_inclusion += total_inclusion
+                total_inclusion += include_counts
                 out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts) + "\n")
             out_exons.close()
 
