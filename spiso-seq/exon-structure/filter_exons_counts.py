@@ -19,7 +19,7 @@ def filter_exon_counts(args):
 
         tokens = l.strip().split()
 
-        exon_type = tokens[5]
+        exon_type = tokens[6]
         if args.terminal <= 1 and exon_type.find('X') != -1:
             continue
         if args.terminal == 0 and exon_type.find('T') != -1:
@@ -27,10 +27,14 @@ def filter_exon_counts(args):
         if args.multiple == 0 and exon_type.find('M') != -1:
             continue
 
-        inclusion_rate = float(tokens[4])
+        total = float(tokens[4])
+        if total < args.min_total:
+            continue
+        inclusion = float(tokens[5])
+        inclusion_rate = inclusion / total
         if inclusion_rate > args.max_inclusion_rate or inclusion_rate < 1.0 - args.max_inclusion_rate:
             continue
-        gene_coverage = float(tokens[7])
+        gene_coverage = float(tokens[8])
         if gene_coverage < args.min_gene_coverage:
             continue
         outf.write(l)
@@ -44,6 +48,7 @@ def parse_args():
     parser.add_argument("--terminal", "-t", help="2 - keep all terminal exons, 1 - keep only terminal which are internal as well, default = 0 - discard all terminal", type=int, default=0)
     parser.add_argument("--max_inclusion_rate", "-i", help="max inclusion/exclusion rate, default = 1.0", type=float, default=1.0)
     parser.add_argument("--min_gene_coverage", help="min faction of cells for which this gene has a read, default = 0.0", type=float, default=0.0)
+    parser.add_argument("--min_total", help="min total reads covering exon, default = 0", type=float, default=0.0)
     parser.add_argument("--output", "-o", help="output file", type=str)
 
     args = parser.parse_args()

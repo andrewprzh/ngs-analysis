@@ -1066,7 +1066,7 @@ class GeneDBProcessor:
                 exclude_counts = exon_counts[group_id][1][i]
                 total_counts += exclude_counts + include_counts
                 total_inclusion += include_counts
-            inclusion_rate = 0 if total_counts == 0 else float(total_inclusion) / float(total_counts)
+            #inclusion_rate = 0 if total_counts == 0 else float(total_inclusion) / float(total_counts)
 
             for group_id in exon_counts.keys():
                 if group_id == 'unknown':
@@ -1076,7 +1076,7 @@ class GeneDBProcessor:
                 if exclude_counts == 0 and include_counts == 0:
                     continue
                 out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts)
-                                + "\t" + "{0:.3f}".format(inclusion_rate) + "\t" + exon_type + "\t" +
+                                + "\t" + str(total_counts) + "\t" + str(total_inclusion) + "\t" + exon_type + "\t" +
                                 ",".join(list(exon_to_genes[exon])) + "\t" + "{0:.4f}".format(gene_coverage) + "\n")
             out_exons.close()
 
@@ -1108,7 +1108,7 @@ class GeneDBProcessor:
         if self.args.exon_count_mode:
             self.out_exon_counts = self.output_prefix + ".exon_counts.tsv"
             outf = open(self.out_exon_counts, "w")
-            outf.write('#exon_id\tcell_type\tinclusion\texclusion\tinclusion_rate\texon_type\tgene_id\tgene_coverage\n')
+            outf.write('#exon_id\tcell_type\tinclusion\texclusion\ttotal_count\ttotal_inclusion\texon_type\tgene_id\tgene_coverage\n')
             outf.close()
             #self.out_exon_genes = self.output_prefix + ".exon_to_geneid.tsv"
             #outf = open(self.out_exon_genes, "w")
