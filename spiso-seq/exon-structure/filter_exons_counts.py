@@ -28,7 +28,7 @@ def filter_exon_counts(args):
             continue
 
         inclusion_rate = float(tokens[4])
-        if inclusion_rate > args.max_inclusion_rate or inclusion_rate < 1.0 - max_inclusion_rate:
+        if inclusion_rate > args.max_inclusion_rate or inclusion_rate < 1.0 - args.max_inclusion_rate:
             continue
         gene_coverage = float(tokens[7])
         if gene_coverage < args.min_gene_coverage:
