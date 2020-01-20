@@ -7,6 +7,7 @@
 
 import os
 import sys
+import copy
 import gffutils
 import argparse
 import pysam
@@ -468,7 +469,7 @@ class GeneInfo:
             self.terminal_exons.add(all_isoforms_exons[i][0])
             self.terminal_exons.add(all_isoforms_exons[i][-1])
 
-        self.terminal_only_exons = self.terminal_exons
+        self.terminal_only_exons = copy.deepcopy(self.terminal_exons)
         for i in all_isoforms_exons.keys():
             non_terminal = set(all_isoforms_exons[i][1:-1])
             for terminal in self.terminal_exons:
