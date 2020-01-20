@@ -109,7 +109,7 @@ def equal_ranges(range1, range2, delta = 1):
 def equal_right_border(range1, range2, delta = 1):
     return abs(range1[1] - range2[1]) <= delta
 
-def equal_ledt_border(range1, range2, delta = 1):
+def equal_left_border(range1, range2, delta = 1):
     return abs(range1[0] - range2[0]) <= delta
 
 def covers_end(bigger_range, smaller_range):
