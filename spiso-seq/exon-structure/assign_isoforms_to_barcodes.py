@@ -634,7 +634,7 @@ class ReadProfilesInfo:
             self.read_mapping_infos[read_id] = \
                 ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2,
                                 check_flanking=CONSIDER_FLANKING_JUNCTIONS,
-                                exon_counting_mode=self.exon_count_mode, delta=args.delta)
+                                exon_counting_mode=self.exon_count_mode, delta=self.args.delta)
         self.read_mapping_infos[read_id].add_read(alignment, self.gene_info.introns, self.gene_info.exons)
 
     # match barcode/sequence junction profile to a known isoform junction profile, hint - potential candidates
