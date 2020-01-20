@@ -1053,7 +1053,7 @@ class GeneDBProcessor:
                 exon_type += "M"
             if exon in read_profiles.gene_info.terminal_only_exons:
                 exon_type += "X"
-            if exon in read_profiles.gene_info.terminal_exons:
+            elif exon in read_profiles.gene_info.terminal_exons:
                 exon_type += "T"
             if exon_type != ".":
                 exon_type = exon_type[1:]
@@ -1075,8 +1075,8 @@ class GeneDBProcessor:
                 if exclude_counts == 0 and include_counts == 0:
                     continue
                 out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts)
-                                + "\t" + str(inclusion_rate) + "\t" + exon_type + "\t" +
-                                ",".join(list(exon_to_genes[exon])) + "\t" + str(gene_coverage) + "\n")
+                                + "\t" + "{0:.3f}".format(inclusion_rate) + "\t" + exon_type + "\t" +
+                                ",".join(list(exon_to_genes[exon])) + "\t" + "{0:.4f}".format(gene_coverage) + "\n")
             out_exons.close()
 
             #out_exon_info = open(self.out_exon_genes, "a+")
