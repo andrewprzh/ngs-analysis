@@ -13,6 +13,7 @@ import argparse
 import pysam
 from common import *
 from traceback import print_exc
+from functools import partial
 
 # global params, to be fixed
 RESOLVE_AMBIGUOUS = False
@@ -22,7 +23,7 @@ MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 CONSIDER_FLANKING_JUNCTIONS = False
 JUNCTION_DELTA = 1
-ONT_JUNCTION_DELTA = 3
+LR_JUNCTION_DELTA = 2
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
 # separate --- count start/stop codons independently for each gene
@@ -249,14 +250,14 @@ class ReadMappingInfo:
 
     def __init__(self, read_id, introns_count, exons_count,
                  check_flanking = CONSIDER_FLANKING_JUNCTIONS,
-                 exon_counting_mode = False):
+                 exon_counting_mode = False, delta = 1):
         self.read_id = read_id
         self.exon_counting_mode = exon_counting_mode
         self.total_reads = 0
         self.junctions_counts = \
             FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
         self.exons_counts = FeatureVector(exons_count, check_flanking = False, fill_gaps = True,
-                                          block_comparator = equal_ranges, ignore_flanking_blocks = True) \
+                                          block_comparator = partial(equal_ranges, delta=delta), ignore_flanking_blocks = True) \
             if self.exon_counting_mode else \
             FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps)
 
@@ -633,7 +634,7 @@ class ReadProfilesInfo:
             self.read_mapping_infos[read_id] = \
                 ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2,
                                 check_flanking=CONSIDER_FLANKING_JUNCTIONS,
-                                exon_counting_mode=self.exon_count_mode)
+                                exon_counting_mode=self.exon_count_mode, delta=args.delta)
         self.read_mapping_infos[read_id].add_read(alignment, self.gene_info.introns, self.gene_info.exons)
 
     # match barcode/sequence junction profile to a known isoform junction profile, hint - potential candidates
@@ -1209,7 +1210,7 @@ def set_params(args):
     args.reads_cutoff = READS_CUTOFF if args.data_type == "10x" else 0
     args.assign_codons_when_ambiguous = ASSIGN_CODONS_WHEN_AMBIGUOUS and args.data_type != "isoforms"
     args.consider_flanking_junctions = CONSIDER_FLANKING_JUNCTIONS and args.data_type != "10x" 
-    args.junction_delta = LR_JUNCTION_DELTA  if args.data_type == "long_reads" else JUNCTION_DELTA
+    args.delta = LR_JUNCTION_DELTA  if args.data_type == "long_reads" else JUNCTION_DELTA
     args.count_isoform_stats = COUNT_ISOFORM_STATS and args.data_type == "isoforms"
     args.exon_count_mode = False
 

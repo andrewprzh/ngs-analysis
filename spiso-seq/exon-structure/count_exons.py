@@ -43,6 +43,7 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('bam', metavar='BAM_FILE', nargs='+', type=str, help='sorted and indexed BAM file(s)')
     parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
+    parser.add_argument("--delta", help="allowed delta when comparing exons (2)", type=int, default=2)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)
     parser.add_argument("--readmap", "-r", help="read property table (first column - read id, other - property)", type=str)
     parser.add_argument("--property_column", help="0-based read property column index (0th column is read id)", type=int, default=2)
@@ -59,7 +60,6 @@ def set_codon_count_params(args):
     args.change_chr_prefix = False
     args.assign_codons_when_ambiguous = False
     args.consider_flanking_junctions = False
-    args.junction_delta = 1
     args.count_isoform_stats = False
     args.exon_count_mode = True
 
