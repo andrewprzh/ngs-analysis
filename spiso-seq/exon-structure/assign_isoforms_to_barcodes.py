@@ -840,7 +840,7 @@ class GeneDBProcessor:
         elif self.args.data_type == "contigs":
             return query_name.strip().split("_barcodeIDs_")[0]
         else:
-            return query_name.strip() #.split(':')[-1]
+            return query_name.strip().split(':')[-1]
 
     # add isoform stats whem mapping reference sequences
     def count_isoform_stats(self, isoform, read_id, gene_stats, gene_info):
