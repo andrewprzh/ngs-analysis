@@ -18,10 +18,10 @@ RESOLVE_AMBIGUOUS = False
 DEDUCE_CODONS_FROM_CDS = False
 READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
-ASSIGN_CODONS_WHEN_AMBIGUOUS = True
-CONSIDER_FLANKING_JUNCTIONS = True
-JUNCTION_DELTA = 2
-LR_JUNCTION_DELTA = 3
+ASSIGN_CODONS_WHEN_AMBIGUOUS = False
+CONSIDER_FLANKING_JUNCTIONS = False
+JUNCTION_DELTA = 1
+ONT_JUNCTION_DELTA = 3
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
 # separate --- count start/stop codons independently for each gene
@@ -146,11 +146,11 @@ class ReadAssignmentStats:
 class FeatureVector:
     profile = []
     reads = 0
-    check_flanking = True
+    check_flanking = False
     fill_gaps = True
     block_comparator = None
     
-    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = False):
+    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = True):
         self.profile = [0 for i in range(0, num)]  
         self.reads = 0
         self.check_flanking = check_flanking
@@ -196,9 +196,14 @@ class FeatureVector:
                 features_present[ref_pos + 1] = 1
                 ref_pos += 1
             elif overlaps(known_features[ref_pos], read_features[read_pos]):
-                features_present[ref_pos + 1] = -1
+                if 0 < read_pos < len(read_features) - 1:
+                    features_present[ref_pos + 1] = -1
+                elif read_pos == 0 and equal_right_border(known_features[ref_pos], read_features[read_pos]):
+                    features_present[ref_pos + 1] = -1
+                elif read_pos == len(read_features) - 1 and equal_left_border(known_features[ref_pos], read_features[read_pos]):
+                    features_present[ref_pos + 1] = -1
                 ref_pos += 1
-            elif known_features[ref_pos] < read_features[read_pos]:
+            elif left_of(known_features[ref_pos], read_features[read_pos]):
                 ref_pos += 1
             else:
                 read_pos +=1
@@ -376,6 +381,8 @@ class GeneInfo:
         self.all_rna_profiles = IsoformProfileStorage()
 
         self.exon_to_geneid = {}
+        self.terminal_exons = set()
+        self.terminal_only_exons = set()
         i_introns, i_exons = self.set_introns_and_exons(True)
         self.need_to_split_exons = split_exons
         if self.need_to_split_exons:
@@ -460,6 +467,14 @@ class GeneInfo:
             self.exons.update(all_isoforms_exons[i])
             self.terminal_exons.add(all_isoforms_exons[i][0])
             self.terminal_exons.add(all_isoforms_exons[i][-1])
+
+        self.terminal_only_exons = self.terminal_exons
+        for i in all_isoforms_exons.keys():
+            non_terminal = set(all_isoforms_exons[i][1:-1])
+            for terminal in self.terminal_exons:
+                if terminal in non_terminal:
+                    self.terminal_only_exons.remove(terminal)
+
 
         self.introns = sorted(list(self.introns))
         self.exons = sorted(list(self.exons))
@@ -948,7 +963,7 @@ class GeneDBProcessor:
                                          [0 for i in range(len(read_profiles.gene_info.exons))])
 
             exon_count_profile = read_profiles.read_mapping_infos[read_id].exons_counts.profile
-            for i in  range(len(exon_count_profile) - 1):
+            for i in range(len(exon_count_profile) - 1):
                 if exon_count_profile[i] > 0:
                     exon_counts[group_id][0][i - 1] += exon_count_profile[i]
                 elif exon_count_profile[i] < 0:
@@ -1021,7 +1036,7 @@ class GeneDBProcessor:
             outf.write(table_to_str(codon_count_table, WRITE_CODON_COORDINATES))
             outf.close()
 
-    def write_exon_counts(self, exon_counts, read_profiles, chr_id):
+    def write_exon_counts(self, exon_counts, read_profiles, chr_id, exon_to_genes):
         gene_coverage = 0 if self.args.distinct_barcodes == 0 else float(len(self.found_barcodes)) / self.args.distinct_barcodes
 
         for i in range(len(read_profiles.gene_info.exons)):
@@ -1032,26 +1047,41 @@ class GeneDBProcessor:
                 continue
             exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
             out_exons = open(self.out_exon_counts, "a+")
-            exon_id += "" if len(read_profiles.gene_info.exon_to_geneid[exon]) == 1 else "_MULT"
-            exon_id += "" if  exon in read_profiles.gene_info.terminal_exons else "_TERM"
+
+            exon_type = "."
+            if len(exon_to_genes[exon]) > 1:
+                exon_type += "M"
+            if exon in read_profiles.gene_info.terminal_only_exons:
+                exon_type += "X"
+            if exon in read_profiles.gene_info.terminal_exons:
+                exon_type += "T"
+            if exon_type != ".":
+                exon_type = exon_type[1:]
 
             for group_id in exon_counts.keys():
+                if group_id == 'unknown':
+                    continue
                 include_counts = exon_counts[group_id][0][i]
                 exclude_counts = exon_counts[group_id][1][i]
-                if group_id == 'unknown':
-                    continue 
-
-                if exclude_counts == 0 and include_counts == 0:
-                    continue
                 total_counts += exclude_counts + include_counts
                 total_inclusion += include_counts
-                out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts) + "\n")
+            inclusion_rate = 0 if total_counts == 0 else float(total_inclusion) / float(total_counts)
+
+            for group_id in exon_counts.keys():
+                if group_id == 'unknown':
+                    continue
+                include_counts = exon_counts[group_id][0][i]
+                exclude_counts = exon_counts[group_id][1][i]
+                if exclude_counts == 0 and include_counts == 0:
+                    continue
+                out_exons.write(exon_id + "\t" + group_id + "\t" + str(include_counts) + "\t" + str(exclude_counts)
+                                + "\t" + str(inclusion_rate) + "\t" + exon_type + "\t" +
+                                ",".join(list(exon_to_genes[exon])) + "\t" + str(gene_coverage) + "\n")
             out_exons.close()
 
-            out_exon_info = open(self.out_exon_genes, "a+")
-            inclusion_rate = 0 if total_counts == 0 else float(total_inclusion) / float(total_counts)
-            out_exon_info.write(exon_id + "\t" + ",".join(list(read_profiles.gene_info.exon_to_geneid[exon])) + "\t" + str(gene_coverage) + "\t" + str(inclusion_rate) + "\n")
-            out_exon_info.close()
+            #out_exon_info = open(self.out_exon_genes, "a+")
+            #out_exon_info.write(exon_id + "\t" + ",".join(list(exon_to_genes[exon])) + "\t" + str(gene_coverage) + "\t" + str(inclusion_rate) + "\n")
+            #out_exon_info.close()
 
     # Process a set of genes given in gene_db_list
     def process_gene_list(self, gene_db_list):
@@ -1059,9 +1089,13 @@ class GeneDBProcessor:
 
         read_profiles = ReadProfilesInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix,
                                          exon_count_mode=self.args.exon_count_mode)
+        exon_to_genes = read_profiles.gene_info.exon_to_geneid
         if self.args.exon_count_mode:
-            exon_counts = self.calculate_exon_counts(read_profiles)
-            self.write_exon_counts(exon_counts, read_profiles, gene_db_list[0].seqid)
+            for gene_db in gene_db_list:
+                single_gene_profiles = ReadProfilesInfo([gene_db], self.db, self.args, self.chr_bam_prefix,
+                                         exon_count_mode=self.args.exon_count_mode)
+                exon_counts = self.calculate_exon_counts(single_gene_profiles)
+                self.write_exon_counts(exon_counts, single_gene_profiles, gene_db_list[0].seqid, exon_to_genes)
         else:
             assigned_reads = self.assign_all_reads(read_profiles)
 
@@ -1073,12 +1107,12 @@ class GeneDBProcessor:
         if self.args.exon_count_mode:
             self.out_exon_counts = self.output_prefix + ".exon_counts.tsv"
             outf = open(self.out_exon_counts, "w")
-            outf.write('#exon_id\tcell_type\tinclusion\texclusion\n')
+            outf.write('#exon_id\tcell_type\tinclusion\texclusion\tinclusion_rate\texon_type\tgene_id\tgene_coverage\n')
             outf.close()
-            self.out_exon_genes = self.output_prefix + ".exon_to_geneid.tsv"
-            outf = open(self.out_exon_genes, "w")
-            outf.write('#exon_id\tgene_id\tgene_coverage\texon_inclusion\n')
-            outf.close()
+            #self.out_exon_genes = self.output_prefix + ".exon_to_geneid.tsv"
+            #outf = open(self.out_exon_genes, "w")
+            #outf.write('#exon_id\tgene_id\tgene_coverage\texon_inclusion\n')
+            #outf.close()
         else:
             self.out_tsv = self.output_prefix + ".assigned_reads.tsv"
             outf = open(self.out_tsv, "w")
@@ -1096,16 +1130,14 @@ class GeneDBProcessor:
                 print("Processing chromosome " + current_chromosome)
             gene_name = g.id
             gene_db = self.db[gene_name]
-            gene_db_list = [gene_db]
-            self.process_gene_list(gene_db_list)
 
-            #if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
-            #    gene_db_list.append(gene_db)
-            #else:
-            #    self.process_gene_list(gene_db_list)
-            #    gene_db_list = [gene_db]
+            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
+                gene_db_list.append(gene_db)
+            else:
+                self.process_gene_list(gene_db_list)
+                gene_db_list = [gene_db]
 
-        #self.process_gene_list(gene_db_list)
+        self.process_gene_list(gene_db_list)
 
         if self.args.exon_count_mode:
             print("Done")
