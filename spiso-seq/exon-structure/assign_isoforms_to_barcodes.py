@@ -1043,8 +1043,8 @@ class GeneDBProcessor:
             total_counts = 0
             total_inclusion = 0
             exon = read_profiles.gene_info.exons[i]
-            if not self.args.keep_terminal and exon in read_profiles.gene_info.terminal_exons:
-                continue
+#            if not self.args.keep_terminal and exon in read_profiles.gene_info.terminal_exons:
+#                continue
             exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
             out_exons = open(self.out_exon_counts, "a+")
 

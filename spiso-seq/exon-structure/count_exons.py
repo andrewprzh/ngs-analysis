@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument("--readmap", "-r", help="read property table (first column - read id, other - property)", type=str)
     parser.add_argument("--property_column", help="0-based read property column index (0th column is read id)", type=int, default=2)
     parser.add_argument("--barcode_column", help="0-based barcode column index (0th column is read id)", type=int, default=1)
-    parser.add_argument("--keep_terminal", help="do not suppress terminal", action='store_true', default=False)
+#    parser.add_argument("--keep_terminal", help="do not suppress terminal", action='store_true', default=False)
 
     args = parser.parse_args()
     return args
