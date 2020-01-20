@@ -12,7 +12,7 @@ from traceback import print_exc
 
 def filter_exon_counts(args):
     outf = open(args.output, "w")
-    for l in open(args.tsv_file):
+    for l in open(args.tsv):
         if l.startswith('#'):
             outf.write(l)
             continue
@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument("--terminal", "-t", help="2 - keep all terminal exons, 1 - keep only terminal which are internal as well, default = 0 - discard all terminal", type=int, default=0)
     parser.add_argument("--max_inclusion_rate", "-i", help="max inclusion/exclusion rate, default = 1.0", type=float, default=1.0)
     parser.add_argument("--min_gene_coverage", help="min faction of cells for which this gene has a read, default = 0.0", type=float, default=0.0)
-    parser.add_argument("--output", help="output file", type=str)
+    parser.add_argument("--output", "-o", help="output file", type=str)
 
     args = parser.parse_args()
     return args
