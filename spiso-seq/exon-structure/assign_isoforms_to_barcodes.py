@@ -473,7 +473,7 @@ class GeneInfo:
         for i in all_isoforms_exons.keys():
             non_terminal = set(all_isoforms_exons[i][1:-1])
             for terminal in self.terminal_exons:
-                if terminal in non_terminal:
+                if terminal in non_terminal and terminal in self.terminal_only_exons:
                     self.terminal_only_exons.remove(terminal)
 
 
