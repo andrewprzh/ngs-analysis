@@ -1033,6 +1033,8 @@ class GeneDBProcessor:
             exon_id = chr_id + "_" + str(exon[0]) + "_" + str(exon[1])
             out_exons = open(self.out_exon_counts, "a+")
             exon_id += "" if len(read_profiles.gene_info.exon_to_geneid[exon]) == 1 else "_MULT"
+            exon_id += "" if  exon in read_profiles.gene_info.terminal_exons else "_TERM"
+
             for group_id in exon_counts.keys():
                 include_counts = exon_counts[group_id][0][i]
                 exclude_counts = exon_counts[group_id][1][i]
