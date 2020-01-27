@@ -10,51 +10,59 @@ import logging
 import argparse
 from traceback import print_exc
 
-import gffutils
-import pysam
-from Bio import SeqIO
+from input_data_storage import *
 
-from src.input_data_storage import *
-from src.gtf2db import *
-from src.map_input import *
-from src.dataset_processor import *
+logger = logging.getLogger('ReadMapping')
 
 
+DATATYPE_TO_ALIGNER = {'assmebly' : 'starlong', 'raw_long_reads' : 'minimap', 'hq_long_reads' : 'starlong',
+                       'barcoded_se_reads' : 'star', 'barcoded_pe_reads' : 'star'}
 
-logger = logging.getLogger('IsoQuant')
+SUPPORTED_ALIGNERS = ['star', 'starlong', 'minimap2', 'gmap', 'hisat2']
+
+
+class DataSetMapper:
+    def __init__(self, args):
+        self.args = args
+        self.aligner = self.choose_aligner()
+        self.index_path = self.create_index()
+
+    def choose_aligner(self,):
+        if self.args.aligner is not None:
+            return self.args.aligner
+        else:
+            return DATATYPE_TO_ALIGNER[args.data_type]
+
+    def create_index(self):
+        return ""
+
+    def map_input(self, input_data):
+        # returns new InputDataStorage
+        pass
+
+    def map_sample(self, sample, output_folder):
+        pass
 
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--bam', nargs='+', type=str,  help='sorted and indexed BAM file(s), '
-                                                            'each file will be treated as a separate sample')
     parser.add_argument('--fastq', nargs='+', type=str, help='input FASTQ file(s), '
                                                              'each file will be treated as a separate sample'
                                                              'reference genome should be provided when using raw reads')
-    parser.add_argument('--bam_list', type=str, help='text file with list of BAM files, one file per line '
-                                                     '(two in case of paired end reads), leave empty line between samples')
     parser.add_argument('--fastq_list', type=str, help='text file with list of FASTQ files, one file per line '
                                                        '(two in case of paired end reads), leave empty line between samples')
-    parser.add_argument('--labels', nargs='+', type=str, help='sample names to be used')
     parser.add_argument("--data_type", "-d", help="type of data to process, supported types are: "
                                                   "assembly, raw_long_reads, hq_long_reads, barcoded_se_reads, barcoded_pe_reads", type=str)
 
-    parser.add_argument("--genedb", "-g", help="gene database in gffutils .db format", type=str)
-    parser.add_argument("--gtf", help="gene database in GTF/GFF format", type=str)
     parser.add_argument("--reference", help="reference genome in FASTA format,"
                                             "should be provided only when raw reads are used as an input", type=str)
     parser.add_argument("--index", help="genome index for specified aligner,"
                                         "should be provided only when raw reads are used as an input", type=str)
 
     parser.add_argument("--output", "-o", help="output folder, will be created automatically", type=str)
-    parser.add_argument("--keep_tmp", help="do not remove temporary files in the end", type=bool, action=set_true, default=False)
-    parser.add_argument("--prefix", help="prefix for output files", type=str, default="")
     parser.add_argument("--threads", "-t", help="number of threads to use", type=int, default="8")
-    parser.add_argument("--read_info", help="text file with tab-separated information about input reads, according to"
-                                            "which counts are groupped, e.g. cell type, barcode, etc.", type=str)
-    parser.add_argument("--aligner", help="force to use this alignment method, can be minimap2, star, gmap, hisat2", type=str)
+    parser.add_argument("--aligner", help="force to use this alignment method, can be minimap2, star, starlong, gmap, hisat2", type=str)
     parser.add_argument("--path_to_aligner", help="folder with the aligner, $PATH is used by default", type=str)
-
 
     args = parser.parse_args()
 
@@ -72,23 +80,17 @@ def parse_args():
 
 # Check user's params
 def check_params(args):
-    input = map(lambda x: x is not None, [args.bam, args.fastq, args.bam_list, fastq_list])
+    input = map(lambda x: x is not None, [args.fastq, fastq_list])
     if input.count(True) == 0:
         logger.critical("No input data was provided")
         exit(-1)
     elif input.count(True) > 1:
         logger.critical("Input data was provided using more than one option")
         exit(-1)
-    args.input_data = InputDataStorage(args)
-    if args.input_data.input_type == "fastq" and args.reference is None and args.index is None:
-        logger.critical("Reference genome or index were not provided, raw reads cannot be processed")
-        exit(-1)
 
-    if args.genedb is None and args.gtf is None:
-        logger.critical("Gene database was not provided")
-        exit(-1)
-    if args.genedb is not None and args.gtf is not None:
-        logger.critical("Gene database was provided twice")
+    args.input_data = InputDataStorage(args)
+    if args.reference is None and args.index is None:
+        logger.critical("Reference genome or index were not provided, raw reads cannot be processed")
         exit(-1)
 
     if args.aligner is not None and args.aligne not in SUPPORTED_ALIGNERS:
@@ -102,52 +104,10 @@ def check_params(args):
         exit(-1)
 
 
-def create_output_dirs(args):
-    args.tmp_dir = ""
-    args.sample_dirs = []
-    pass
-
-
-def set_logger(args, logger_instnace):
-    logger_instnace.setLevel(logging.INFO)
-    fh = logging.FileHandler(os.path.join(args.output, "isoquant.log"))
-    fh.setLevel(logging.INFO)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
-    logger_instnace.addHandler(fh)
-    logger_instnace.addHandler(ch)
-
-
-def run_pipeline(args):
-    # convert GTF/GFF in needed
-    if args.genedb is None:
-        args.genedb = os.path.join(args.output, os.path.splitext(os.path.basename(args.gtf))[0] + ".db")
-        logger.info("Converting gene annotation file to .db format (takes a while)...")
-        gtf2db(args.gtf, args.genedb)
-        logger.info("Gene database written to " + args.genedb)
-        logger.info("Provide this database next time to avoid excessive conversion")
-
-    # map reads if fastqs are provided
-    if args.input_data.input_type == "fastq":
-        # substitute input reads with bams
-        dataset_mapper = DataSetMapper(args)
-        args.input_data = dataset_mapper.map_reads(args)
-
-    # run isoform assignment
-    dataset_processor = DatasetProcessor(args)
-    dataset_processor.process_all_samples()
-
-
 def main():
     args = parse_args()
     set_logger(args, logger)
     check_params(args)
-    create_output_dirs(args)
-    run_pipeline(args)
 
 
 if __name__ == "__main__":
