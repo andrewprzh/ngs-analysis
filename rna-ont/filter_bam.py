@@ -13,8 +13,11 @@ def filter_reads(in_file_name, out_file_name, min_aligned_len):
     lengths = []
 
     for read in inf:
+        if read.reference_id == -1 or read.is_secondary:
+            continue
+
         count += 1
-        if count % 100000 == 0:
+        if count % 10000 == 0:
             sys.stdout.write("Processed " + str(count) + " reads\r")
 
         blocks = sorted(read.get_blocks())
@@ -30,9 +33,9 @@ def filter_reads(in_file_name, out_file_name, min_aligned_len):
     print("Processed " + str(count) + " reads, written " + str(passed))
     inf.close()
     outf.close()
-    v, k = numpy.histogram(lengths, bins = [50 * i for i in range(20)] + [max(lengths)])
+    v, k = numpy.histogram(lengths, bins = [500 * i for i in range(10)] + [max(6000, max(lengths))])
     for i in range(len(v)):
-        print(k[i] + '\t' + v[i])
+        print(str(k[i]) + '\t' + str(v[i]))
 
     pysam.index(out_file_name)
 
