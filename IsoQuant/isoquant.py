@@ -19,8 +19,6 @@ from src.gtf2db import *
 from src.map_input import *
 from src.dataset_processor import *
 
-
-
 logger = logging.getLogger('IsoQuant')
 
 
@@ -47,7 +45,7 @@ def parse_args():
                                         "should be provided only when raw reads are used as an input", type=str)
 
     parser.add_argument("--output", "-o", help="output folder, will be created automatically", type=str)
-    parser.add_argument("--keep_tmp", help="do not remove temporary files in the end", type=bool, action=set_true, default=False)
+    parser.add_argument("--keep_tmp", help="do not remove temporary files in the end", action='store_true', default=False)
     parser.add_argument("--prefix", help="prefix for output files", type=str, default="")
     parser.add_argument("--threads", "-t", help="number of threads to use", type=int, default="8")
     parser.add_argument("--read_info", help="text file with tab-separated information about input reads, according to"

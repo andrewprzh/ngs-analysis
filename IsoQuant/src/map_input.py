@@ -10,7 +10,7 @@ import logging
 import argparse
 from traceback import print_exc
 
-from input_data_storage import *
+from src.input_data_storage import *
 
 logger = logging.getLogger('ReadMapping')
 
