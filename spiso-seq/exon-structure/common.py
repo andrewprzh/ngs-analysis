@@ -130,6 +130,45 @@ def overlaps_to_left(bigger_range, smaller_range):
 def overlaps_to_right(bigger_range, smaller_range):
     return smaller_range[0] >= bigger_range[0] and smaller_range[0] <= bigger_range[1]
 
+# list of of non-overlapping blocks
+def total_nonoverlaped_blocks_length(blocks):
+    total_len = 0
+    for block in sorted(blocks):
+        total_len += blocks[1] - block[0] + 1
+    return total_len
+
+# list of of non-overlapping blocks, list of block coverage of which is interesting (i.e. exons)
+def total_covering_length(read_blocks, region_of_interested):
+    read_pos = 0
+    ref_pos = 0
+    total_len = 0
+
+    while read_pos < len(read_blocks) and ref_pos < len(region_of_interested):
+        while read_pos < len(read_blocks) and left_of(read_blocks[read_pos], region_of_interested[ref_pos]):
+            read_pos += 1
+        if read_pos == len(read_blocks):
+            break
+
+        while ref_pos < len(region_of_interested) and left_of(region_of_interested[ref_pos], read_blocks[read_pos]):
+            ref_pos += 1
+        if ref_pos == len(region_of_interested):
+            break
+
+        if overlaps(region_of_interested[ref_pos], read_blocks[read_pos]):
+            total_len += min(region_of_interested[ref_pos][1], read_blocks[read_pos][1]) - max(region_of_interested[ref_pos][0], read_blocks[read_pos][0]) + 1
+
+            if (read_blocks[read_pos][1] < region_of_interested[ref_pos][1]):
+                read_pos += 1
+            else:
+                ref_pos += 1
+        elif left_of(region_of_interested[ref_pos], read_blocks[read_pos]):
+            ref_pos += 1
+        else:
+            read_pos += 1
+
+    return total_len
+
+
 def junctions_from_blocks(blocks):
     junctions = []
     if len(blocks) >= 2:

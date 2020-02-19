@@ -50,6 +50,10 @@ def print_debug(s):
 
 # class for saving all the stats
 class ReadAssignmentStats:
+    total_reads = 0
+    splice_junctions_covered = []
+    gene_fractions_covered = []
+    isoform_fractions_covered = []
     low_covered = 0
     uniquely_assigned = 0
     unique_extra_exon = 0
@@ -75,6 +79,10 @@ class ReadAssignmentStats:
 
 
     def __init__(self):
+        self.total_reads = 0
+        self.splice_junctions_covered = []
+        self.gene_fractions_covered = []
+        self.isoform_fractions_covered = []
         self.low_covered = 0
         self.uniquely_assigned = 0
         self.unique_extra_exon = 0
@@ -99,6 +107,10 @@ class ReadAssignmentStats:
         self.unassignable = 0
 
     def merge(self, stat):
+        self.total_reads += stat.total_reads
+        self.splice_junctions_covered  += stat.splice_junctions_covered
+        self.gene_fractions_covered += stat.gene_fractions_covered
+        self.isoform_fractions_covered += stat.isoform_fractions_covered
         self.low_covered += stat.low_covered
         self.uniquely_assigned += stat.uniquely_assigned
         self.unique_extra_exon += stat.unique_extra_exon
@@ -137,9 +149,9 @@ class ReadAssignmentStats:
         total_bc = self.low_covered + self.uniquely_assigned + self.unique_extra_exon + self.unique_extra_intros +\
                    self.assigned_to_ncrna + self.contradictory + self.empty + self.ambiguous + self.ambiguous_codon_assigned + \
                    self.ambiguous_subisoform_assigned + self.ambiguous_unassignable
-        s = "\nTotal\t\tlow_covered\tunique\tunique_ee\tunique_ei\t\tncrna\t\tcontradictory\tempty\t\tambiguous\tambiguous_codon\tambiguous_assigned\tunassignable\n"
-        return s + "%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%d" % \
-            (total_bc, self.low_covered, self.uniquely_assigned, self.unique_extra_exon, self.unique_extra_intros,
+        s = "\nTotal\ttotal_reads\t\tlow_covered\tunique\tunique_ee\tunique_ei\t\tncrna\t\tcontradictory\tempty\t\tambiguous\tambiguous_codon\tambiguous_assigned\tunassignable\n"
+        return s + "%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%d" % \
+            (total_bc, self.total_reads, self.low_covered, self.uniquely_assigned, self.unique_extra_exon, self.unique_extra_intros,
              self.assigned_to_ncrna, self.contradictory, self.empty, self.ambiguous, self.ambiguous_codon_assigned,
              self.ambiguous_subisoform_assigned, self.ambiguous_unassignable)
 
@@ -245,6 +257,7 @@ class FeatureVector:
 class ReadMappingInfo:
     read_id = ""
     total_reads = 0
+    aligned_blocks = []
     junctions_counts = None
     exons_counts = None
 
@@ -254,6 +267,7 @@ class ReadMappingInfo:
         self.read_id = read_id
         self.exon_counting_mode = exon_counting_mode
         self.total_reads = 0
+        self.aligned_blocks = []
         self.junctions_counts = \
             FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
         self.exons_counts = FeatureVector(exons_count, check_flanking = False, fill_gaps = True,
@@ -306,7 +320,8 @@ class ReadMappingInfo:
         self.total_reads += 1
         #converting to 1-based coordinates
         #second coordinate is not converted since alignment block is end-exclusive, i.e. [x, y)
-        blocks = map(lambda x: (x[0] + 1, x[1]), self.concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples))
+        self.aligned_blocks = self.concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples)
+        blocks = map(lambda x: (x[0] + 1, x[1]), self.aligned_blocks)
 
 #        if alignment.query_name == 'e44d07f3-1abc-41f8-918a-8547c40d511a' or alignment.query_name == 'b6922288-7e4c-4aec-a6dd-a440fc19837f':
 #            print(blocks)
@@ -397,6 +412,30 @@ class GeneInfo:
         self.coding_rna_profiles.detect_ambiguous()
         self.all_rna_profiles.detect_ambiguous()
         # print("Gene has " + str(len(self.all_rna_profiles.ambiguous)) + " ambiguous isoforms")
+        self.set_lengths()
+
+    def set_lengths(self):
+        self.splitted_exons = self.split_exons(self.exons)
+        self.total_gene_length = total_nonoverlaped_blocks_length(splitted_exons)
+
+        self.isoform_lengths = {}
+        self.isoform_exons = {}
+        for gene_db in self.gene_db_list:
+            for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
+                self.isoform_exons[t.id] = []
+                for e in self.db.children(t, order_by='start'):
+                    if e.featuretype == 'exon':
+                        isoform_exons.append((e.start, e.end))
+                self.isoform_lengths[t.id] = total_nonoverlaped_blocks_length(isoform_exons)
+
+    def get_gene_fraction(self, blocks):
+        return float(total_covering_length(blocks, self.splitted_exons)) / float(self.total_gene_length)
+
+    def get_isoform_fraction(self, blocks, isoform_id):
+        if isoform_id not in self.isoform_exons:
+            return 0
+        else :
+            return float(total_covering_length(blocks, self.isoform_exons[isoform_id])) / float(self.isoform_lengths[isoform_id])
 
     # return start-stop codon pair for a known isoform
     # return None when codon could not be found
@@ -693,6 +732,7 @@ class ReadProfilesInfo:
     # assign barcode/sequence alignment to a known isoform
     def assign_isoform(self, read_id, stat, coverage_cutoff):
         print_debug('=== ' + read_id + ' ===')
+        stat.total_reads += 1
 
         read_mapping_info = self.read_mapping_infos[read_id]
         if read_mapping_info.total_reads < coverage_cutoff:
@@ -701,6 +741,7 @@ class ReadProfilesInfo:
 
         if self.is_empty_alignment(read_mapping_info):
             stat.empty += 1
+            stat.splice_junctions_covered.append(0)
             print_debug("Empty profile ")
             return None, None          
 
@@ -713,11 +754,16 @@ class ReadProfilesInfo:
 
         transcript_id = None
         codon_pair = (None, None)
+        stat.splice_junctions_covered.append(read_mapping_info.junctions_counts.profile[1:-1].count(1))
+        stat.gene_fractions_covered.append(self.gene_info.get_gene_fraction(read_mapping_info.aligned_blocks))
+
         if len(both_mathched_isoforms) == 1:
             stat.uniquely_assigned += 1
             print_debug("Unique match")
             transcript_id = list(both_mathched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
+            stat.isoform_fractions_covered.append()
+            stat.isoform_fractions_covered.append(self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
             add_to_global_stats(read_id, both_mathched_isoforms)
         elif len(both_mathched_isoforms) == 0:
             if len(intron_matched_isoforms) == 1:
@@ -725,12 +771,16 @@ class ReadProfilesInfo:
                 transcript_id = list(intron_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
                 stat.unique_extra_exon += 1
+                stat.isoform_fractions_covered.append(
+                    self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
                 add_to_global_stats(read_id, intron_matched_isoforms)
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
                 transcript_id = list(exon_matched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
                 stat.unique_extra_intros += 1
+                stat.isoform_fractions_covered.append(
+                    self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
                 add_to_global_stats(read_id, exon_matched_isoforms)
             else:
                 stat.contradictory += 1
