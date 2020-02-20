@@ -773,10 +773,13 @@ class ReadProfilesInfo:
             transcript_id = list(both_mathched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
             stat.isoform_fractions_covered.append(self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
-            stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) /
-                                                  float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1)))
-            stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) /
-                                      float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1)))
+
+            sj_count = float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1))
+            if (sj_count > 0):
+                stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) / sj_count)
+            exon_count = float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1))
+            if (exon_count > 0):
+                stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) / exon_count)
             add_to_global_stats(read_id, both_mathched_isoforms)
         elif len(both_mathched_isoforms) == 0:
             if len(intron_matched_isoforms) == 1:
@@ -786,10 +789,13 @@ class ReadProfilesInfo:
                 stat.unique_extra_exon += 1
                 stat.isoform_fractions_covered.append(
                     self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
-                stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) /
-                                                      float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1)))
-                stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) /
-                                          float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1)))
+                sj_count = float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1))
+                if (sj_count > 0):
+                    stat.splice_junctions_fraction.append(
+                        float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) / sj_count)
+                exon_count = float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1))
+                if (exon_count > 0):
+                    stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) / exon_count)
                 add_to_global_stats(read_id, intron_matched_isoforms)
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
@@ -798,10 +804,13 @@ class ReadProfilesInfo:
                 stat.unique_extra_intros += 1
                 stat.isoform_fractions_covered.append(
                     self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
-                stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) /
-                                                      float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1)))
-                stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) /
-                                          float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1)))
+                sj_count = float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1))
+                if (sj_count > 0):
+                    stat.splice_junctions_fraction.append(
+                        float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) / sj_count)
+                exon_count = float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1))
+                if (exon_count > 0):
+                    stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) / exon_count)
                 add_to_global_stats(read_id, exon_matched_isoforms)
             else:
                 stat.contradictory += 1
