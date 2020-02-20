@@ -53,6 +53,8 @@ def print_debug(s):
 class ReadAssignmentStats:
     total_reads = 0
     splice_junctions_covered = []
+    splice_junctions_fraction = []
+    exon_fraction = []
     gene_fractions_covered = []
     isoform_fractions_covered = []
     low_covered = 0
@@ -82,6 +84,8 @@ class ReadAssignmentStats:
     def __init__(self):
         self.total_reads = 0
         self.splice_junctions_covered = []
+        self.splice_junctions_fraction = []
+        self.exon_fraction = []
         self.gene_fractions_covered = []
         self.isoform_fractions_covered = []
         self.low_covered = 0
@@ -110,6 +114,8 @@ class ReadAssignmentStats:
     def merge(self, stat):
         self.total_reads += stat.total_reads
         self.splice_junctions_covered  += stat.splice_junctions_covered
+        self.splice_junctions_fraction += stat.splice_junctions_fraction
+        self.exon_fraction += stat.exon_fraction
         self.gene_fractions_covered += stat.gene_fractions_covered
         self.isoform_fractions_covered += stat.isoform_fractions_covered
         self.low_covered += stat.low_covered
@@ -767,6 +773,10 @@ class ReadProfilesInfo:
             transcript_id = list(both_mathched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
             stat.isoform_fractions_covered.append(self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
+            stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) /
+                                                  float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1)))
+            stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) /
+                                      float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1)))
             add_to_global_stats(read_id, both_mathched_isoforms)
         elif len(both_mathched_isoforms) == 0:
             if len(intron_matched_isoforms) == 1:
@@ -776,6 +786,10 @@ class ReadProfilesInfo:
                 stat.unique_extra_exon += 1
                 stat.isoform_fractions_covered.append(
                     self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
+                stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) /
+                                                      float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1)))
+                stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) /
+                                          float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1)))
                 add_to_global_stats(read_id, intron_matched_isoforms)
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
@@ -784,6 +798,10 @@ class ReadProfilesInfo:
                 stat.unique_extra_intros += 1
                 stat.isoform_fractions_covered.append(
                     self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
+                stat.splice_junctions_fraction.append(float(read_mapping_info.junctions_counts.profile[1:-1].count(1)) /
+                                                      float(self.gene_info.all_rna_profiles.intron_profiles[transcript_id][1:-1].count(1)))
+                stat.exon_fraction.append(float(read_mapping_info.exons_counts.profile[1:-1].count(1)) /
+                                          float(self.gene_info.all_rna_profiles.exon_profiles[transcript_id][1:-1].count(1)))
                 add_to_global_stats(read_id, exon_matched_isoforms)
             else:
                 stat.contradictory += 1
@@ -1198,17 +1216,27 @@ class GeneDBProcessor:
         print("Gene fraction covered histogram")
         v, k = numpy.histogram(self.stats.gene_fractions_covered, bins=[0.1 * i for i in range(11)])
         for i in range(len(v)):
-            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]))
+            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]) + '\t' + '{:.2f}'.format(float(v[i]) / float(sum(v))))
 
         print("Isoform fraction covered histogram")
         v, k = numpy.histogram(self.stats.isoform_fractions_covered, bins=[0.1 * i for i in range(11)])
         for i in range(len(v)):
-            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]))
+            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]) + '\t' + '{:.2f}'.format(float(v[i]) / float(sum(v))))
 
         print("Covered splice junction histogram")
         v, k = numpy.histogram(self.stats.splice_junctions_covered, bins=[i for i in range(51)])
         for i in range(len(v)):
-            print('{:.0f}'.format(k[i]) + '\t' + str(v[i]))
+            print('{:.0f}'.format(k[i]) + '\t' + str(v[i]) + '\t' + '{:.2f}'.format(float(v[i]) / float(sum(v))))
+
+        print("Splice junction fraction covered histogram")
+        v, k = numpy.histogram(self.stats.splice_junctions_fraction, bins=[0.1 * i for i in range(11)])
+        for i in range(len(v)):
+            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]) + '\t' + '{:.2f}'.format(float(v[i]) / float(sum(v))))
+
+        print("Splice junction fraction covered histogram")
+        v, k = numpy.histogram(self.stats.exon_fraction, bins=[0.1 * i for i in range(11)])
+        for i in range(len(v)):
+            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]) + '\t' + '{:.2f}'.format(float(v[i]) / float(sum(v))))
 
         if self.args.exon_count_mode:
             print("Done")
