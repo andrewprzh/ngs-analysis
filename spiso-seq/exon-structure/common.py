@@ -134,7 +134,7 @@ def overlaps_to_right(bigger_range, smaller_range):
 def total_nonoverlaped_blocks_length(blocks):
     total_len = 0
     for block in sorted(blocks):
-        total_len += blocks[1] - block[0] + 1
+        total_len += block[1] - block[0] + 1
     return total_len
 
 # list of of non-overlapping blocks, list of block coverage of which is interesting (i.e. exons)

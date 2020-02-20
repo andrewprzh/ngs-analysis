@@ -10,6 +10,7 @@ import sys
 import copy
 import gffutils
 import argparse
+import numpy
 import pysam
 from common import *
 from traceback import print_exc
@@ -23,7 +24,7 @@ MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 CONSIDER_FLANKING_JUNCTIONS = False
 JUNCTION_DELTA = 1
-LR_JUNCTION_DELTA = 2
+LR_JUNCTION_DELTA = 3
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
 # separate --- count start/stop codons independently for each gene
@@ -263,13 +264,13 @@ class ReadMappingInfo:
 
     def __init__(self, read_id, introns_count, exons_count,
                  check_flanking = CONSIDER_FLANKING_JUNCTIONS,
-                 exon_counting_mode = False, delta = 1):
+                 exon_counting_mode = False, delta = 3):
         self.read_id = read_id
         self.exon_counting_mode = exon_counting_mode
         self.total_reads = 0
         self.aligned_blocks = []
         self.junctions_counts = \
-            FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
+            FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = partial(equal_ranges, delta=delta))
         self.exons_counts = FeatureVector(exons_count, check_flanking = False, fill_gaps = True,
                                           block_comparator = partial(equal_ranges, delta=delta), ignore_flanking_blocks = True) \
             if self.exon_counting_mode else \
@@ -321,7 +322,7 @@ class ReadMappingInfo:
         #converting to 1-based coordinates
         #second coordinate is not converted since alignment block is end-exclusive, i.e. [x, y)
         self.aligned_blocks = self.concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples)
-        blocks = map(lambda x: (x[0] + 1, x[1]), self.aligned_blocks)
+        blocks = list(map(lambda x: (x[0] + 1, x[1]), self.aligned_blocks))
 
 #        if alignment.query_name == 'e44d07f3-1abc-41f8-918a-8547c40d511a' or alignment.query_name == 'b6922288-7e4c-4aec-a6dd-a440fc19837f':
 #            print(blocks)
@@ -416,7 +417,7 @@ class GeneInfo:
 
     def set_lengths(self):
         self.splitted_exons = self.split_exons(self.exons)
-        self.total_gene_length = total_nonoverlaped_blocks_length(splitted_exons)
+        self.total_gene_length = total_nonoverlaped_blocks_length(self.splitted_exons)
 
         self.isoform_lengths = {}
         self.isoform_exons = {}
@@ -425,10 +426,13 @@ class GeneInfo:
                 self.isoform_exons[t.id] = []
                 for e in self.db.children(t, order_by='start'):
                     if e.featuretype == 'exon':
-                        isoform_exons.append((e.start, e.end))
-                self.isoform_lengths[t.id] = total_nonoverlaped_blocks_length(isoform_exons)
+                        self.isoform_exons[t.id].append((e.start, e.end))
+                self.isoform_lengths[t.id] = total_nonoverlaped_blocks_length(self.isoform_exons[t.id])
 
     def get_gene_fraction(self, blocks):
+        #print(blocks)
+        #print(self.splitted_exons)
+        #print(self.total_gene_length)
         return float(total_covering_length(blocks, self.splitted_exons)) / float(self.total_gene_length)
 
     def get_isoform_fraction(self, blocks, isoform_id):
@@ -673,12 +677,12 @@ class ReadProfilesInfo:
             self.read_mapping_infos[read_id] = \
                 ReadMappingInfo(read_id, len(self.gene_info.introns) + 2, len(self.gene_info.exons) + 2,
                                 check_flanking=CONSIDER_FLANKING_JUNCTIONS,
-                                exon_counting_mode=self.exon_count_mode, delta=args.delta)
+                                exon_counting_mode=self.exon_count_mode, delta=self.args.delta)
         self.read_mapping_infos[read_id].add_read(alignment, self.gene_info.introns, self.gene_info.exons)
 
     # match barcode/sequence junction profile to a known isoform junction profile, hint - potential candidates
     def find_matching_isofoms_by_profile(self, read_profile, profiles, hint = set()):
-        read_sign_profile = map(sign, read_profile.profile)
+        read_sign_profile = list(map(sign, read_profile.profile))
         print_debug(read_sign_profile)
 
         matched_isoforms = set()
@@ -693,8 +697,8 @@ class ReadProfilesInfo:
 
     # returns true if alignment has no splice junctions and alignment outside of the gene region
     def is_empty_alignment(self, read_mapping_info):
-        read_intron_profile = map(sign, read_mapping_info.junctions_counts.profile)
-        read_exon_profile = map(sign, read_mapping_info.exons_counts.profile)
+        read_intron_profile = list(map(sign, read_mapping_info.junctions_counts.profile))
+        read_exon_profile = list(map(sign, read_mapping_info.exons_counts.profile))
 #        print_debug(read_mapping_info.read_id)
 #        print_debug(read_intron_profile)
 #        print_debug(read_exon_profile)
@@ -705,7 +709,7 @@ class ReadProfilesInfo:
 
     # resolve assignment ambiguities caused by identical profiles
     def resolve_ambiguous(self, read_count_profile, isoform_profiles, matched_isoforms):
-        read_profile = map(sign, read_count_profile)
+        read_profile = list(map(sign, read_count_profile))
         if all(el != 1 for el in read_profile[1:-1]):
             return matched_isoforms
 
@@ -762,7 +766,6 @@ class ReadProfilesInfo:
             print_debug("Unique match")
             transcript_id = list(both_mathched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
-            stat.isoform_fractions_covered.append()
             stat.isoform_fractions_covered.append(self.gene_info.get_isoform_fraction(read_mapping_info.aligned_blocks, transcript_id))
             add_to_global_stats(read_id, both_mathched_isoforms)
         elif len(both_mathched_isoforms) == 0:
@@ -1183,13 +1186,29 @@ class GeneDBProcessor:
             gene_name = g.id
             gene_db = self.db[gene_name]
 
-            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
-                gene_db_list.append(gene_db)
-            else:
-                self.process_gene_list(gene_db_list)
-                gene_db_list = [gene_db]
+#            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
+#                gene_db_list.append(gene_db)
+#            else:
+#                self.process_gene_list(gene_db_list)
+            gene_db_list = [gene_db]
+            self.process_gene_list(gene_db_list)
 
-        self.process_gene_list(gene_db_list)
+#        self.process_gene_list(gene_db_list)
+
+        print("Gene fraction covered histogram")
+        v, k = numpy.histogram(self.stats.gene_fractions_covered, bins=[0.1 * i for i in range(11)])
+        for i in range(len(v)):
+            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]))
+
+        print("Isoform fraction covered histogram")
+        v, k = numpy.histogram(self.stats.isoform_fractions_covered, bins=[0.1 * i for i in range(11)])
+        for i in range(len(v)):
+            print('{:.2f}'.format(k[i]) + '\t' + str(v[i]))
+
+        print("Covered splice junction histogram")
+        v, k = numpy.histogram(self.stats.splice_junctions_covered, bins=[i for i in range(51)])
+        for i in range(len(v)):
+            print('{:.0f}'.format(k[i]) + '\t' + str(v[i]))
 
         if self.args.exon_count_mode:
             print("Done")
@@ -1263,6 +1282,7 @@ def set_params(args):
     args.delta = LR_JUNCTION_DELTA  if args.data_type == "long_reads" else JUNCTION_DELTA
     args.count_isoform_stats = COUNT_ISOFORM_STATS and args.data_type == "isoforms"
     args.exon_count_mode = False
+    args.read_info_map = None
 
 
 def main():
