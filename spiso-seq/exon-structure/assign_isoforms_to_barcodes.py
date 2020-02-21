@@ -171,7 +171,7 @@ class FeatureVector:
     fill_gaps = True
     block_comparator = None
     
-    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = True):
+    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = False):
         self.profile = [0 for i in range(0, num)]  
         self.reads = 0
         self.check_flanking = check_flanking
@@ -747,13 +747,13 @@ class ReadProfilesInfo:
         read_mapping_info = self.read_mapping_infos[read_id]
         if read_mapping_info.total_reads < coverage_cutoff:
             stat.low_covered += 1
-            return None, None          
+            return None, None, read_mapping_info.junctions_counts.profile, 'Low'
 
         if self.is_empty_alignment(read_mapping_info):
             stat.empty += 1
             stat.splice_junctions_covered.append(0)
             print_debug("Empty profile ")
-            return None, None          
+            return None, None, read_mapping_info.junctions_counts.profile, 'Empty'
 
         # match read profile with isoform profiles
         intron_matched_isoforms = self.find_matching_isofoms_by_profile(read_mapping_info.junctions_counts,
@@ -764,11 +764,13 @@ class ReadProfilesInfo:
 
         transcript_id = None
         codon_pair = (None, None)
+        assignment_type = None
         stat.splice_junctions_covered.append(read_mapping_info.junctions_counts.profile[1:-1].count(1))
         stat.gene_fractions_covered.append(self.gene_info.get_gene_fraction(read_mapping_info.aligned_blocks))
 
         if len(both_mathched_isoforms) == 1:
             stat.uniquely_assigned += 1
+            assignment_type = 'Unique'
             print_debug("Unique match")
             transcript_id = list(both_mathched_isoforms)[0]
             codon_pair = self.codon_pairs[transcript_id]
@@ -785,6 +787,7 @@ class ReadProfilesInfo:
             if len(intron_matched_isoforms) == 1:
                 print_debug("Extra exons, but unique intron profile " + read_id)
                 transcript_id = list(intron_matched_isoforms)[0]
+                assignment_type = 'Unique'
                 codon_pair = self.codon_pairs[transcript_id]
                 stat.unique_extra_exon += 1
                 stat.isoform_fractions_covered.append(
@@ -800,6 +803,7 @@ class ReadProfilesInfo:
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
                 transcript_id = list(exon_matched_isoforms)[0]
+                assignment_type = 'Unique'
                 codon_pair = self.codon_pairs[transcript_id]
                 stat.unique_extra_intros += 1
                 stat.isoform_fractions_covered.append(
@@ -815,6 +819,7 @@ class ReadProfilesInfo:
             else:
                 stat.contradictory += 1
                 print_debug("Contradictory " + read_id)
+                assignment_type = 'Contradictory'
                 add_to_global_stats(read_id, [])
         else:
             if RESOLVE_AMBIGUOUS:
@@ -829,12 +834,14 @@ class ReadProfilesInfo:
 
             if len(both_mathched_isoforms) == 1:
                 stat.ambiguous_subisoform_assigned += 1
+                assignment_type = 'Unique'
                 print_debug("Unique match after resolution")
                 transcript_id = list(both_mathched_isoforms)[0]
                 codon_pair = self.codon_pairs[transcript_id]
                 add_to_global_stats(read_id, both_mathched_isoforms)
             elif len(both_mathched_isoforms) == 0:
                 stat.contradictory += 1
+                assignment_type = 'Contradictory'
                 print_debug("Contradictory " + read_id)
                 add_to_global_stats(read_id, [])
             else:
@@ -847,17 +854,18 @@ class ReadProfilesInfo:
                     codon_pair = list(codons)[0]
                     stat.ambiguous_codon_assigned += 1   
                     transcript_id = list(intron_matched_isoforms)[0]
+                    assignment_type = 'Codon assigned'
                 else:       
                     if any(mi in self.gene_info.all_rna_profiles.ambiguous for mi in both_mathched_isoforms):
                         stat.ambiguous_unassignable += 1
                         print_debug("Unassignable")
+                        assignment_type = 'Unassignable'
                     else:        
                         stat.ambiguous += 1
                         print_debug("Ambigous match")
+                        assignment_type = 'Ambigous'
 
-
-        return transcript_id, codon_pair
-
+        return transcript_id, codon_pair, read_mapping_info.junctions_counts.profile, assignment_type
 
 
 # Class for processing entire bam file agains gene database
@@ -1005,15 +1013,15 @@ class GeneDBProcessor:
 
         #iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
-            isoform, codons = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
+            isoform, codons, intron_profile, assignment_type = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
 
             seq_id = read_id
             if self.bc_map is not None:
                 seq_id = list(self.bc_map[read_id])[0]
                 for bc in self.bc_map[read_id]:
-                    assigned_reads[bc] = (isoform, codons)
+                    assigned_reads[bc] = (isoform, codons, intron_profile, assignment_type)
             else:
-                assigned_reads[read_id] = (isoform, codons)
+                assigned_reads[read_id] = (isoform, codons, intron_profile, assignment_type)
             
             if self.args.count_isoform_stats:
                 self.count_isoform_stats(isoform, seq_id, gene_stats, read_profiles.gene_info)
@@ -1063,8 +1071,7 @@ class GeneDBProcessor:
         outf = open(self.out_tsv, "a+")
         outf.write(self.gene_list_id_str(gene_db_list) + "\t" + str(len(assignments)) + "\n")
         for b in assignments.keys():
-            if b != "" and assignments[b][0] is not None:
-                outf.write(b + "\t" + assignments[b][0] + "\n")
+            outf.write(b + "\t" + str(assignments[b][0]) + "\t" + str(assignments[b][3]) + "\t" + str(assignments[b][2]) + "\n")
         outf.close()
 
     def write_codon_tables(self, gene_db_list, gene_info, assigned_reads):
@@ -1213,14 +1220,13 @@ class GeneDBProcessor:
             gene_name = g.id
             gene_db = self.db[gene_name]
 
-#            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
-#                gene_db_list.append(gene_db)
-#            else:
-#                self.process_gene_list(gene_db_list)
-            gene_db_list = [gene_db]
-            self.process_gene_list(gene_db_list)
+            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
+                gene_db_list.append(gene_db)
+            else:
+                self.process_gene_list(gene_db_list)
+                gene_db_list = [gene_db]
 
-#        self.process_gene_list(gene_db_list)
+        self.process_gene_list(gene_db_list)
 
         print("Gene fraction covered histogram")
         v, k = numpy.histogram(self.stats.gene_fractions_covered, bins=[0.1 * i for i in range(11)])
