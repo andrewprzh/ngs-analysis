@@ -37,7 +37,7 @@ def parse_args():
     optional_group.add_argument("--delim2", help="delimeter between barcodes "
                                                       "(default:comma) ", type=str, default=',')
     optional_group.add_argument("--threads", "-t", help="threads for aligner (16)", type=int, default=16)
-    optional_group.add_argument("--max_len", help="skip contigs longer than (0), valid for 10x assembly only", type=int, default=16)
+    optional_group.add_argument("--max_len", help="skip contigs longer than (0), valid for 10x assembly only", type=int, default=-1)
 
 
     args = parser.parse_args()
@@ -49,6 +49,10 @@ def parse_args():
 
     if args.data_type is None or args.data_type not in DATA_TYPES:
         print("ERROR: specify data type among assembly/10x_assembly/isoseq/ccs/ont")
+
+    if args.max_len == -1:
+        args.max_len = float('inf')
+
 
     if args.aligner is None:
         args.aligner = DATA_TYPES[args.data_type]
