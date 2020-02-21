@@ -747,13 +747,13 @@ class ReadProfilesInfo:
         read_mapping_info = self.read_mapping_infos[read_id]
         if read_mapping_info.total_reads < coverage_cutoff:
             stat.low_covered += 1
-            return None, None, read_mapping_info.junctions_counts.profile, 'Low'
+            return None, None, read_mapping_info.junctions_counts.profile, read_mapping_info.exons_counts.profile, 'Low'
 
         if self.is_empty_alignment(read_mapping_info):
             stat.empty += 1
             stat.splice_junctions_covered.append(0)
             print_debug("Empty profile ")
-            return None, None, read_mapping_info.junctions_counts.profile, 'Empty'
+            return None, None, read_mapping_info.junctions_counts.profile, read_mapping_info.exons_counts.profile, 'Empty'
 
         # match read profile with isoform profiles
         intron_matched_isoforms = self.find_matching_isofoms_by_profile(read_mapping_info.junctions_counts,
@@ -865,7 +865,7 @@ class ReadProfilesInfo:
                         print_debug("Ambigous match")
                         assignment_type = 'Ambigous'
 
-        return transcript_id, codon_pair, read_mapping_info.junctions_counts.profile, assignment_type
+        return transcript_id, codon_pair, read_mapping_info.junctions_counts.profile, read_mapping_info.exons_counts.profile, assignment_type
 
 
 # Class for processing entire bam file agains gene database
@@ -1013,15 +1013,15 @@ class GeneDBProcessor:
 
         #iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
-            isoform, codons, intron_profile, assignment_type = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
+            isoform, codons, intron_profile, exon_profile, assignment_type = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
 
             seq_id = read_id
             if self.bc_map is not None:
                 seq_id = list(self.bc_map[read_id])[0]
                 for bc in self.bc_map[read_id]:
-                    assigned_reads[bc] = (isoform, codons, intron_profile, assignment_type)
+                    assigned_reads[bc] = (isoform, codons, intron_profile, exon_profile, assignment_type)
             else:
-                assigned_reads[read_id] = (isoform, codons, intron_profile, assignment_type)
+                assigned_reads[read_id] = (isoform, codons, intron_profile, exon_profile, assignment_type)
             
             if self.args.count_isoform_stats:
                 self.count_isoform_stats(isoform, seq_id, gene_stats, read_profiles.gene_info)
@@ -1071,7 +1071,7 @@ class GeneDBProcessor:
         outf = open(self.out_tsv, "a+")
         outf.write(self.gene_list_id_str(gene_db_list) + "\t" + str(len(assignments)) + "\n")
         for b in assignments.keys():
-            outf.write(b + "\t" + str(assignments[b][0]) + "\t" + str(assignments[b][3]) + "\t" + str(assignments[b][2]) + "\n")
+            outf.write(b + "\t" + str(assignments[b][0]) + "\t" + str(assignments[b][4]) + "\t" + str(assignments[b][2]) + "\t" + str(assignments[b][3]) + "\n")
         outf.close()
 
     def write_codon_tables(self, gene_db_list, gene_info, assigned_reads):
