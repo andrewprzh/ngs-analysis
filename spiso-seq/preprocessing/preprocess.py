@@ -8,7 +8,7 @@ import os
 import sys
 from traceback import print_exc
 import argparse
-
+import math
 from Bio import SeqIO
 
 from common import *
@@ -37,7 +37,7 @@ def parse_args():
     optional_group.add_argument("--delim2", help="delimeter between barcodes "
                                                       "(default:comma) ", type=str, default=',')
     optional_group.add_argument("--threads", "-t", help="threads for aligner (16)", type=int, default=16)
-    optional_group.add_argument("--max_len", help="skip contigs longer than (0), valid for 10x assembly only", type=int, default=16)
+    optional_group.add_argument("--max_len", help="skip contigs longer than (0), valid for 10x assembly only", type=int, default=-1)
 
 
     args = parser.parse_args()
@@ -55,6 +55,9 @@ def parse_args():
         print(args.aligner + "will be used, make sure index is provided accordingly")
     elif args.aligner not in ALIGNERS:
         print("ERROR: specify aligner among assembly/10x_assembly/isoseq/ccs/ont")
+
+    if args.max_len == -1:
+        args.max_len = float('inf')
 
     return args
 

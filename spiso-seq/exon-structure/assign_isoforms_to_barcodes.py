@@ -22,8 +22,8 @@ READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 CONSIDER_FLANKING_JUNCTIONS = False
-JUNCTION_DELTA = 1
-LR_JUNCTION_DELTA = 2
+JUNCTION_DELTA = 2
+LR_JUNCTION_DELTA = 3
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
 # separate --- count start/stop codons independently for each gene
@@ -337,12 +337,14 @@ class IsoformProfileStorage:
             intron_profile = self.intron_profiles[t]
             exon_profile = self.exon_profiles[t]
             for t2 in self.intron_profiles:
+                if t2 == t:
+                    continue
                 if is_subprofile(intron_profile, self.intron_profiles[t2]) and \
                         is_subprofile(exon_profile, self.exon_profiles[t2]):
                     self.ambiguous.add(t)
-                    #print("Unassignable " + t)
-                    #print(isoform_profile)
-                    #print(self.isoform_profiles[t2])
+                    print("Unassignable " + t)
+                    print(intron_profile)
+                    print(self.intron_profiles[t2])
                     break
         for i in self.ambiguous:
             global_unassignable_set.add(i)
