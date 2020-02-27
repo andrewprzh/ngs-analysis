@@ -130,7 +130,7 @@ class AssignedReadsComparator:
             assigned_reads_map[read_id] = (isoform_id, assignment_type, intron_proflie, exon_profile)
             l = in_file.readline()
 
-        return assigned_reads_map, l.split()[0] if l is not None else None
+        return assigned_reads_map, l
 
     def compare_assignments(self, assignement1, assignement2):
         (isoform_id1, assignment_type1, intron_proflie1, exon_profile1) = assignement1
@@ -180,10 +180,14 @@ class AssignedReadsComparator:
         infile1 = open(self.args.assigned_reads_files[0], "r")
         infile2 = open(self.args.assigned_reads_files[1], "r")
 
-        geneid1 = ""
-        geneid2 = ""
-        while geneid1 is not None and geneid2 is not None:
-            print("Processing " + geneid1.split('_')[0] + ' ' + geneid2.split('_')[0])
+        geneid1 = " "
+        geneid2 = " "
+        count = 0
+        while geneid1 is not None and geneid1 != "" and geneid2 is not None and geneid2 != "":
+            count+=1
+            if count % 5000 == 0:
+                self.print_stat()
+            print("Processing " + geneid1.strip().split('_')[0] + ' ' + geneid2.strip().split('_')[0])
             assigned_reads_map1, geneid1 = self.read_assigned_reads_section(infile1, self.read_info_map1)
             assigned_reads_map2, geneid2 = self.read_assigned_reads_section(infile2, self.read_info_map2)
 
@@ -194,14 +198,14 @@ class AssignedReadsComparator:
         print("Barcode-UMI pairs with > 1 read " +str(self.more_than_one_read))
         print("Assigned to different genes " + str(self.different_genes))
         print("Profile comparison\tequal\tdiff\tassign1\tassign2\tunassigned")
-        print("equal_profiles\t" + self.equal_profiles.to_str())
+        print("equal_profiles     \t" + self.equal_profiles.to_str())
         print("first_intron_longer\t" + self.first_intron_longer.to_str())
         print("second_intron_longer\t" + self.second_intron_longer.to_str())
         print("different_introns\t" + self.different_introns.to_str())
         print("contradictory_introns\t" + self.contradictory_introns.to_str())
         print("first_exons_longer\t" + self.first_exons_longer.to_str())
         print("second_exons_longer\t" + self.second_exons_longer.to_str())
-        print("different_exons\t" + self.different_exons.to_str())
+        print("different_exons    \t" + self.different_exons.to_str())
         print("contradictory_exons\t" + self.contradictory_exons.to_str())
 
 

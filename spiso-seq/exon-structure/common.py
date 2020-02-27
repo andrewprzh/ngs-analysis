@@ -239,11 +239,13 @@ def is_subprofile(short_isoform_profile, long_isoform_profile):
     short_range_start = None
     short_range_end = None
     for i in range(len(short_isoform_profile)):
-        if short_isoform_profile[i] == 1:
+        if short_isoform_profile[i] != 0:
             if short_range_start is None:
                 short_range_start = i
             short_range_end = i
 
+    if short_range_start is None or short_range_end is None:
+        return False
     for i in range(short_range_start, short_range_end + 1):
         if short_isoform_profile[i] != long_isoform_profile[i]:
             return False
