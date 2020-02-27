@@ -46,7 +46,9 @@ def invert_read_infos(read_info_map, inverted_read_info = {}, index = 0):
 def intersect_read_infos(read_info_map1, read_info_map2):
     #barcode -> umi -> (read_ids, read_ids)
     inverted_read_info = invert_read_infos(read_info_map1)
+    print("Inverted map 1")
     inverted_read_info = invert_read_infos(read_info_map2, inverted_read_info, 1)
+    print("Inverted map 2")
 
     found_in1 = 0
     found_in2 = 0
@@ -115,7 +117,7 @@ class AssignedReadsComparator:
         l = in_file.readline()
         while l and not l.startswith("ENSMUS"):
             # m64055_200112_012317/103025403/ccs      None    Empty   [0, 0, 0, 0, 0, 0, 0, 0]        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            tokens = l.strip().split()
+            tokens = l.strip().split('\t')
             read_id = tokens[0]
             isoform_id = tokens[1]
             assignment_type = tokens[2]
@@ -154,6 +156,8 @@ class AssignedReadsComparator:
 
     def compare_two_sets(self, assigned_reads_map1, assigned_reads_map2):
         for read_id1 in assigned_reads_map1:
+            if read_id1 not in self.read_info_map1:
+                continue
             (barcode, umi) = self.read_info_map1[read_id1]
             if len(self.intersected_inverted_read_info[barcode][umi][1]) == 0:
                 continue
