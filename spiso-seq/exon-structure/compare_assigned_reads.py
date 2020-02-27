@@ -183,11 +183,12 @@ class AssignedReadsComparator:
         geneid1 = ""
         geneid2 = ""
         while geneid1 is not None and geneid2 is not None:
-            print("Processing " + geneid1)
+            print("Processing " + geneid1.split('_')[0] + ' ' + geneid2.split('_')[0])
             assigned_reads_map1, geneid1 = self.read_assigned_reads_section(infile1, self.read_info_map1)
             assigned_reads_map2, geneid2 = self.read_assigned_reads_section(infile2, self.read_info_map2)
 
             self.compare_two_sets(assigned_reads_map1, assigned_reads_map2)
+        print("Done                                                    ")
 
     def print_stat(self):
         print("Barcode-UMI pairs with > 1 read " +str(self.more_than_one_read))
