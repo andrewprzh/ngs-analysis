@@ -31,7 +31,8 @@ def get_read_info(inf, args):
 
 
 def invert_read_infos(read_info_map, inverted_read_info = {}, index = 0):
-    for read_id, info in read_info_map:
+    for read_id in read_info_map.keys():
+        info = read_info_map[read_id]
         barcode = info[0]
         umi = info[1]
         if barcode not in inverted_read_info:
@@ -211,9 +212,9 @@ def main():
     args = parse_args()
 
     read_info_map1 = get_read_info(args.read_info[0], args)
-    print("Read " + str(len(read_info_map1)) + "reads from " + args.read_info[1])
+    print("Read " + str(len(read_info_map1)) + " reads from " + args.read_info[0])
     read_info_map2 = get_read_info(args.read_info[1], args)
-    print("Read " + str(len(read_info_map2)) + "reads from " + args.read_info[1])
+    print("Read " + str(len(read_info_map2)) + " reads from " + args.read_info[1])
 
     inverted_read_info, found_in_both, found_in1, found_in2 = intersect_read_infos(read_info_map1, read_info_map2)
     print("Barcode-UMI pairs:")
