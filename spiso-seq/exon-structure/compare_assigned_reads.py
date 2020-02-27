@@ -132,7 +132,7 @@ class AssignedReadsComparator:
 
         return assigned_reads_map, l.split()[0] if l is not None else None
 
-    def compare_assignments(self, assignement1, assignemtn2):
+    def compare_assignments(self, assignement1, assignement2):
         (isoform_id1, assignment_type1, intron_proflie1, exon_profile1) = assignement1
         (isoform_id2, assignment_type2, intron_proflie2, exon_profile2) = assignement2
         if assignment_type1 == 'Empty' and assignment_type2 == 'Empty':
