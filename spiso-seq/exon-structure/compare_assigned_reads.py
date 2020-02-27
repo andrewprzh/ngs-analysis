@@ -100,6 +100,7 @@ class AssignedReadsComparator:
         self.args = args
 
         self.more_than_one_read = 0
+        self.different_genes = 0
 
         self.equal_profiles = IsoformAssignmentStat()
         self.first_intron_longer = IsoformAssignmentStat()
@@ -112,13 +113,16 @@ class AssignedReadsComparator:
         self.different_exons = IsoformAssignmentStat()
         self.contradictory_exons = IsoformAssignmentStat()
 
-    def read_assigned_reads_section(self, in_file):
+    def read_assigned_reads_section(self, in_file, read_info_map):
         assigned_reads_map = {}
         l = in_file.readline()
         while l and not l.startswith("ENSMUS"):
             # m64055_200112_012317/103025403/ccs      None    Empty   [0, 0, 0, 0, 0, 0, 0, 0]        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             tokens = l.strip().split('\t')
             read_id = tokens[0]
+            if read_id not in read_info_map:
+                l = in_file.readline()
+                continue
             isoform_id = tokens[1]
             assignment_type = tokens[2]
             intron_proflie = list(map(int, tokens[3][1:-1].split(',')))
@@ -167,6 +171,9 @@ class AssignedReadsComparator:
                 continue
 
             read_id2 = self.intersected_inverted_read_info[barcode][umi][1][0]
+            if read_id2 not in assigned_reads_map2:
+                self.different_genes += 1
+                continue
             self.compare_assignments(assigned_reads_map1[read_id1], assigned_reads_map2[read_id2])
 
     def process(self):
@@ -177,13 +184,14 @@ class AssignedReadsComparator:
         geneid2 = ""
         while geneid1 is not None and geneid2 is not None:
             print("Processing " + geneid1)
-            assigned_reads_map1, geneid1 = self.read_assigned_reads_section(infile1)
-            assigned_reads_map2, geneid2 = self.read_assigned_reads_section(infile2)
+            assigned_reads_map1, geneid1 = self.read_assigned_reads_section(infile1, self.read_info_map1)
+            assigned_reads_map2, geneid2 = self.read_assigned_reads_section(infile2, self.read_info_map2)
 
             self.compare_two_sets(assigned_reads_map1, assigned_reads_map2)
 
     def print_stat(self):
         print("Barcode-UMI pairs with > 1 read " +str(self.more_than_one_read))
+        print("Assigned to different genes " + str(self.different_genes))
         print("Profile comparison\tequal\tdiff\tassign1\tassign2\tunassigned")
         print("equal_profiles\t" + self.equal_profiles.to_str())
         print("first_intron_longer\t" + self.first_intron_longer.to_str())
