@@ -100,7 +100,7 @@ class AssignedReadsComparator:
         self.args = args
 
         self.more_than_one_read = 0
-        self.different_genes = 0
+        self.different_genes = {}
 
         self.equal_profiles = IsoformAssignmentStat()
         self.first_intron_longer = IsoformAssignmentStat()
@@ -172,7 +172,7 @@ class AssignedReadsComparator:
 
             read_id2 = self.intersected_inverted_read_info[barcode][umi][1][0]
             if read_id2 not in assigned_reads_map2:
-                self.different_genes += 1
+                self.different_genes[(barcode, umi)] = (read_id1, read_id2)
                 continue
             self.compare_assignments(assigned_reads_map1[read_id1], assigned_reads_map2[read_id2])
 
@@ -196,7 +196,7 @@ class AssignedReadsComparator:
 
     def print_stat(self):
         print("Barcode-UMI pairs with > 1 read " +str(self.more_than_one_read))
-        print("Assigned to different genes " + str(self.different_genes))
+        print("Assigned to different genes " + str(len(self.different_genes)))
         print("Profile comparison\tequal\tdiff\tassign1\tassign2\tunassigned")
         print("equal_profiles     \t" + self.equal_profiles.to_str())
         print("first_intron_longer\t" + self.first_intron_longer.to_str())
@@ -207,6 +207,12 @@ class AssignedReadsComparator:
         print("second_exons_longer\t" + self.second_exons_longer.to_str())
         print("different_exons    \t" + self.different_exons.to_str())
         print("contradictory_exons\t" + self.contradictory_exons.to_str())
+
+    def print_diff_reads(self, out_fname):
+        outf = open(out_fname, 'w')
+        for k in self.different_genes.keys():
+            outf.write(k[0] + '\t' + k[1] + '\t' + self.different_genes[k][0] + '\t' + self.different_genes[k][1])
+        outf.close()
 
 
 def parse_args():
@@ -243,6 +249,8 @@ def main():
     comparator = AssignedReadsComparator(read_info_map1, read_info_map2, inverted_read_info, args)
     comparator.process()
     comparator.print_stat()
+
+    comparator.print_diff_reads(args.output_prefix + ".differently_mapped_reads.tsv")
 
 
 if __name__ == "__main__":
