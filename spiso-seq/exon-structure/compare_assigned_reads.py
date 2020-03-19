@@ -176,6 +176,18 @@ class AssignedReadsComparator:
                 continue
             self.compare_assignments(assigned_reads_map1[read_id1], assigned_reads_map2[read_id2])
 
+        for read_id2 in assigned_reads_map2:
+            if read_id2 not in self.read_info_map2:
+                continue
+            (barcode, umi) = self.read_info_map2[read_id2]
+            if len(self.intersected_inverted_read_info[barcode][umi][0]) == 0:
+                continue
+
+            read_id1 = self.intersected_inverted_read_info[barcode][umi][0][0]
+            if read_id1 not in assigned_reads_map1:
+                self.different_genes[(barcode, umi)] = (read_id1, read_id2)
+
+
     def process(self):
         infile1 = open(self.args.assigned_reads_files[0], "r")
         infile2 = open(self.args.assigned_reads_files[1], "r")
