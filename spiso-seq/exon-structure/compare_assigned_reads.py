@@ -88,7 +88,7 @@ class IsoformAssignmentStat:
             self.unequal_isoforms += 1
 
     def to_str(self):
-        return str(self.equal_isoforms) + '\t' + str(self.unequal_isoforms) + '\t' + str(self.equal_isoforms) + \
+        return str(self.equal_isoforms) + '\t' + str(self.unequal_isoforms) + \
                '\t' + str(self.only_first_assigned) + '\t' + str(self.only_second_assigned) + '\t' + str(self.both_unassigned)
 
 
