@@ -28,7 +28,7 @@ def read_info(info_file):
             continue
         barcode_map1[tokens[2]] = (tokens[0], tokens[1])
         barcode_map2[tokens[3]] = (tokens[0], tokens[1])
-        read_pairs = (tokens[2], tokens[3])
+        read_pairs.append((tokens[2], tokens[3]))
     return barcode_map1, barcode_map2, read_pairs
 
 
@@ -55,7 +55,7 @@ def compare_alignment_sets(alignments1, alignments2):
     for a1 in alignments1:
         for a2 in alignments2:
             if a1.reference_id == a2.reference_id:
-                if abs(a1.reference_pos - a2.reference_pos) < POS_DIFF:
+                if abs(a1.reference_start - a2.reference_start) < POS_DIFF:
                     if a1.is_secondary or a1.is_supplementary or a2.is_secondary or a2.is_supplementary:
                         return "close_secondary"
                     else:
@@ -70,8 +70,15 @@ def compare_reads(read_pairs, alignment_map1, alignment_map2, barcode_map1, barc
     for read_pair in read_pairs:
         read_id1 = read_pair[0]
         read_id2 = read_pair[1]
+#        print(read_id1 + " " + read_id2)
         if barcode_map1[read_id1] != barcode_map2[read_id2]:
             print("Unequal barcode/UMI")
+            continue
+        if read_id2 not in alignment_map2:
+            print(read_id2 + " was not found")
+            continue
+        if read_id1 not in alignment_map1:
+            print(read_id1 + " was not found")
             continue
         stats[barcode_map1[read_id1]] = compare_alignment_sets(alignment_map1[read_id1], alignment_map2[read_id2])
 
@@ -96,7 +103,7 @@ def print_stats(stats, out_file):
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bams", nargs=2, help="bam files", type=str)
-    parser.add_argument("--read_info", nargs=1, help="file read ids with the same UMI and barcode but mapped to different genes ", type=str)
+    parser.add_argument("--read_info",  help="file read ids with the same UMI and barcode but mapped to different genes ", type=str)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)
     args = parser.parse_args()
 
@@ -109,10 +116,14 @@ def parse_args():
 
 def main():
     args = parse_args()
+    print("Reading read ids")
     barcode_map1, barcode_map2, read_pairs = read_info(args.read_info)
+    print("Collecting infor from first BAM file")
     alignment_map1 = read_bam_file(args.bams[0], barcode_map1)
+    print("Collecting infor from second BAM file")
     alignment_map2 = read_bam_file(args.bams[1], barcode_map2)
 
+    print("Counting stats")
     stats = compare_reads(read_pairs, alignment_map1, alignment_map2, barcode_map1, barcode_map2)
     print_stats(stats, args.output_prefix)
 
