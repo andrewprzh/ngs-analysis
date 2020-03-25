@@ -223,7 +223,7 @@ class AssignedReadsComparator:
     def print_diff_reads(self, out_fname):
         outf = open(out_fname, 'w')
         for k in self.different_genes.keys():
-            outf.write(k[0] + '\t' + k[1] + '\t' + self.different_genes[k][0] + '\t' + self.different_genes[k][1])
+            outf.write(k[0] + '\t' + k[1] + '\t' + self.different_genes[k][0] + '\t' + self.different_genes[k][1] + '\n')
         outf.close()
 
 
