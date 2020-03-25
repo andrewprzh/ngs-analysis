@@ -177,6 +177,7 @@ def junctions_from_blocks(blocks):
                 junctions.append((blocks[i][1] + 1, blocks[i + 1][0] - 1))
     return junctions
 
+
 def hamming(l1, l2):
     if len(l1) != len(l2):
         return -1
@@ -250,6 +251,45 @@ def is_subprofile(short_isoform_profile, long_isoform_profile):
         if short_isoform_profile[i] != long_isoform_profile[i]:
             return False
     return True
+
+
+def concat_gapless_blocks(blocks, cigar_list):
+    cigar_index = 0
+    block_index = 0
+    resulting_blocks = []
+
+    current_block = None
+    deletions_before_block = 0
+
+    while cigar_index < len(cigar_list) and block_index < len(blocks):
+        #init new block
+        if current_block is None:
+            #init new block from match
+            if cigar_list[cigar_index][0] == 0:
+                current_block = (blocks[block_index][0] - deletions_before_block, blocks[block_index][1])
+                deletions_before_block = 0
+                block_index += 1
+            # keep track of deletions before matched block
+            elif cigar_list[cigar_index][0] == 2:
+                deletions_before_block = cigar_list[cigar_index][1]
+        # found intron, add current block
+        elif cigar_list[cigar_index][0] == 3:
+            resulting_blocks.append(current_block)
+            current_block = None
+        # add deletion to block
+        elif cigar_list[cigar_index][0] == 2:
+            current_block = (current_block[0], current_block[1] + cigar_list[cigar_index][1])
+        # found match - merge blocks
+        elif cigar_list[cigar_index][0] == 0:
+            current_block = (current_block[0], blocks[block_index][1])
+
+            block_index += 1
+        cigar_index += 1
+
+    if current_block is not None:
+        resulting_blocks.append(current_block)
+
+    return resulting_blocks
 
 
 def sign(i):
