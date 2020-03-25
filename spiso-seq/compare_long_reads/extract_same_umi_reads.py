@@ -87,7 +87,7 @@ def main():
             read_ids = inverted_read_info[barcode][umi]
             if len(read_ids[0]) == 0:
                 found_in2 += 1
-            elif len(read_ids[1]) == 1:
+            elif len(read_ids[1]) == 0:
                 found_in1 += 1
             elif len(read_ids[0]) > 1 and len(read_ids[1]) > 1:
                 more_that_one_read += 1
