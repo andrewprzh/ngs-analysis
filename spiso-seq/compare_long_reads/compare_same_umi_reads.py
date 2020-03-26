@@ -53,7 +53,17 @@ def read_bam_file(infile, barcode_map):
 class AligmentComparator:
 
     def __init__(self, args):
+        self.args = args
+        self.contadictory_file = open(args.output_prefix + ".contradictory_reads.tsv", "w")
+        self.diff_locus_file = open(args.output_prefix + ".different_locations.tsv", "w")
+        self.contradictory_alignemts = []
         self.delta = args.delta
+
+    def __del__(self):
+        self.contadictory_file.close()
+        self.diff_locus_file.close()
+
+        print("Closing output files")
 
     def compare_junctions(self, junctions1, junctions2):
         pos1 = 0
@@ -161,12 +171,23 @@ class AligmentComparator:
 
                     if overlaps(region1, region2):
                         res = self.compare_aligments(blocks1, blocks2)
-                        if a1.is_secondary or a1.is_supplementary or a2.is_secondary or a2.is_supplementary:
-                            return "secondary_" + res
-                        else:
-                            return res
+                        if res == "contradictory":
+                            self.contradictory_alignemts.append(a1)
+                            self.contradictory_alignemts.append(a2)
+                            self.contadictory_file.write(a1.query_name + " " + a2.query_name + "\n")
+                            self.contadictory_file.write(str(blocks1) + "\n")
+                            self.contadictory_file.write(str(blocks2) + "\n")
+                        #if a1.is_secondary or a1.is_supplementary or a2.is_secondary or a2.is_supplementary:
+                        #    return "secondary_" + res
+                        #else:
+                        return res
 
-        return "different_chr"
+        if len(alignments1) == 1 and len(alignments2) == 1:
+            self.diff_locus_file.write(alignments1[0].query_name  + " " + alignments2[0].query_name + "\n")
+            self.diff_locus_file.write(alignments1[0].query_sequence + "\n")
+            self.diff_locus_file.write(alignments2[0].query_sequence + "\n")
+
+        return "different_loci"
 
 
     def compare_reads(self, read_pairs, alignment_map1, alignment_map2, barcode_map1, barcode_map2):
@@ -190,9 +211,9 @@ class AligmentComparator:
                 self.stats[barcode_map1[read_id1]] = self.compare_alignment_sets(alignment_map1[read_id1], alignment_map2[read_id2])
 
 
-    def print_stats(self, out_file):
+    def print_stats(self):
         self.aggr_stats = {}
-        outf = open(out_file, "w")
+        outf = open(self.args.output_prefix + ".read_stats.tsv", "w")
         for k in self.stats.keys():
             v = self.stats[k]
             if v not in self.aggr_stats:
@@ -203,6 +224,11 @@ class AligmentComparator:
         outf.close()
         for k in self.aggr_stats.keys():
             print(k + "\t" + str(self.aggr_stats[k]))
+
+        out_bam = pysam.AlignmentFile(self.args.output_prefix + ".contradictory.bam", "wb", template=pysam.AlignmentFile(args.bam[0], "rb"))
+        for read in self.contradictory_alignemts:
+            out_bam.write(read)
+        out_bam.close()
 
 
 def parse_args():
@@ -235,7 +261,7 @@ def main():
     print("Counting stats")
     alignment_comparator = AligmentComparator(args)
     alignment_comparator.compare_reads(read_pairs, alignment_map1, alignment_map2, barcode_map1, barcode_map2)
-    alignment_comparator.print_stats(args.output_prefix)
+    alignment_comparator.print_stats()
 
 
 
