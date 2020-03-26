@@ -85,13 +85,14 @@ class AligmentComparator:
                 pos1 += 1
 
         if any(el == -1 for el in features_present1) or any(el == -1 for el in features_present2):
-            return "different_junctions"
+            return "contradictory"
         elif all(el == 0 for el in features_present1):
-            print("Empty")
-            print(junctions1)
-            print(junctions2)
-            print(features_present1)
-            print(features_present2)
+            if len(features_present1) > 1 or len(features_present1) > 1:
+                print("Empty")
+                print(junctions1)
+                print(junctions2)
+                print(features_present1)
+                print(features_present2)
             if all(el == 0 for el in features_present2):
                 return "both_empty"
             else:
@@ -103,18 +104,21 @@ class AligmentComparator:
             print(features_present1)
             print(features_present2)
             return "second_empty"
-        elif features_present1[0] == 0 and features_present1[-1] == 0:
-            if features_present2[0] == 0 and features_present2[-1] == 0:
-                print("Clipperd tails")
-                print(junctions1)
-                print(junctions2)
-                print(features_present1)
-                print(features_present2)
-            return "first_longer"
-        elif features_present2[0] == 0 and features_present2[-1] == 0:
-            return "second_longer"
+        elif (features_present1[0] == 0 and features_present2[0] == 0) or (features_present1[-1] == 0 and features_present2[-1] == 0):
+            print("Clipperd tails")
+            print(junctions1)
+            print(junctions2)
+            print(features_present1)
+            print(features_present2)
+            return "clipped"
         elif (features_present2[0] == 0 and features_present1[-1] == 0) or (features_present1[0] == 0 and features_present2[-1] == 0):
             return "overlap"
+        elif features_present1[0] == 0 or features_present1[-1] == 0:
+            return "first_longer"
+        elif features_present2[0] == 0 or features_present2[-1] == 0:
+            return "second_longer"
+        elif (features_present2[0] == 1 and features_present1[-1] == 1) and (features_present1[0] == 1 and features_present2[-1] == 1):
+            return "equal"
         else:
             print("Unknown")
             print(junctions1)
@@ -161,8 +165,7 @@ class AligmentComparator:
                             return "secondary_" + res
                         else:
                             return res
-                    else:
-                        return "same_chr_diff_genes"
+
         return "different_chr"
 
 
@@ -194,12 +197,12 @@ class AligmentComparator:
             v = self.stats[k]
             if v not in self.aggr_stats:
                 self.aggr_stats[v] = 0
-                self.aggr_stats[v] += 1
+            self.aggr_stats[v] += 1
             outf.write(k[0] + "\t" + k[1] + "\t" + self.stats[k] + "\n")
 
         outf.close()
-        for k,v in self.aggr_stats:
-            print(k + "\t" + str(v))
+        for k in self.aggr_stats.keys():
+            print(k + "\t" + str(self.aggr_stats[k]))
 
 
 def parse_args():
@@ -221,13 +224,13 @@ def parse_args():
 def main():
     args = parse_args()
     barcode_map1, barcode_map2, read_pairs = read_info(args.read_info)
-    print("Read " + len(read_pairs) + " barcode/UMI pairs")
-    print("Collecting infor from first BAM file")
+    print("Read " + str(len(read_pairs)) + " barcode/UMI pairs")
+    print("Collecting info from first BAM file")
     alignment_map1 = read_bam_file(args.bams[0], barcode_map1)
-    print("Read " + len(alignment_map1) + " entries")
-    print("Collecting infor from second BAM file")
+    print("Read " + str(len(alignment_map1)) + " entries")
+    print("Collecting info from second BAM file")
     alignment_map2 = read_bam_file(args.bams[1], barcode_map2)
-    print("Read " + len(alignment_map2) + " entries")
+    print("Read " + str(len(alignment_map2)) + " entries")
 
     print("Counting stats")
     alignment_comparator = AligmentComparator(args)
