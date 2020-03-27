@@ -184,8 +184,8 @@ class AligmentComparator:
 
         if len(alignments1) == 1 and len(alignments2) == 1:
             self.diff_locus_file.write(alignments1[0].query_name  + " " + alignments2[0].query_name + "\n")
-            self.diff_locus_file.write(alignments1[0].reference_name + ":" +  str(alignments1[0].reference_start) + " " 
-                                       + alignments2[0].reference_name + ":" +  str(alignments2[0].reference_start) + "\n")
+            self.diff_locus_file.write(alignments1[0].reference_name + ":" +  alignments1[0].reference_start + " "
+                                       + alignments2[0].reference_name + ":" +  alignments2[0].reference_start + "\n")
             self.diff_locus_file.write(alignments1[0].query_sequence + "\n")
             self.diff_locus_file.write(alignments2[0].query_sequence + "\n")
 
