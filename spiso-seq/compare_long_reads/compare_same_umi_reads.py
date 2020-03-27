@@ -54,8 +54,8 @@ class AligmentComparator:
 
     def __init__(self, args):
         self.args = args
-        self.contadictory_file = open(args.output_prefix + ".contradictory_reads.tsv", "w")
-        self.diff_locus_file = open(args.output_prefix + ".different_locations.tsv", "w")
+        self.contadictory_file = open(self.args.output_prefix + ".contradictory_reads.tsv", "w")
+        self.diff_locus_file = open(self.args.output_prefix + ".different_locations.tsv", "w")
         self.contradictory_alignemts = []
         self.delta = args.delta
 
@@ -184,6 +184,8 @@ class AligmentComparator:
 
         if len(alignments1) == 1 and len(alignments2) == 1:
             self.diff_locus_file.write(alignments1[0].query_name  + " " + alignments2[0].query_name + "\n")
+            self.diff_locus_file.write(alignments1[0].reference_name + ":" +  str(alignments1[0].reference_start) + " " 
+                                       + alignments2[0].reference_name + ":" +  str(alignments2[0].reference_start) + "\n")
             self.diff_locus_file.write(alignments1[0].query_sequence + "\n")
             self.diff_locus_file.write(alignments2[0].query_sequence + "\n")
 
@@ -225,7 +227,7 @@ class AligmentComparator:
         for k in self.aggr_stats.keys():
             print(k + "\t" + str(self.aggr_stats[k]))
 
-        out_bam = pysam.AlignmentFile(self.args.output_prefix + ".contradictory.bam", "wb", template=pysam.AlignmentFile(args.bam[0], "rb"))
+        out_bam = pysam.AlignmentFile(self.args.output_prefix + ".contradictory.bam", "wb", template=pysam.AlignmentFile(self.args.bams[0], "rb"))
         for read in self.contradictory_alignemts:
             out_bam.write(read)
         out_bam.close()
