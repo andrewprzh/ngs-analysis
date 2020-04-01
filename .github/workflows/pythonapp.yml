@@ -24,6 +24,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r IsoQuant/requirements.txt
+        pip install -r IsoQuant/requirements_tests.txt
     #- name: Lint with flake8
     #  run: |
     #    pip install flake8
@@ -34,4 +35,4 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        pytest
+        pytest --cov=IsoQuant
