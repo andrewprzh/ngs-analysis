@@ -26,9 +26,9 @@ def flush_read_map(output_file, read_map):
 def process_bam(bam_file, group_id, barcode_set):
     read_map = {}
     bamfile = pysam.AlignmentFile(bam_file, "rb")
-    for alignment in bamfile.fetch():
+    for alignment in bamfile:
         read_id = alignment.query_name
-        barcode = alignment.get_tag('CR').split(":")[-1]
+        barcode = alignment.get_tag('CB').split(":")[-1][:-2]
         if barcode not in barcode_set:
             print("Barcode " + barcode + " is not in set for group " + group_id)
         read_map[read_id] = (barcode, group_id)
@@ -44,9 +44,10 @@ def process_dir(dir, output_file):
         print("Processing " + read_group)
         barcode_set = set()
         for l in open(f):
-            barcode_set.add(l.strip())
-        read_map = process_bam(os.path.join(dir, 'O/' + region_name + '_' + read_group), read_group, barcode_set)
+            barcode_set.add(l.strip()[:-2])
+        read_map = process_bam(os.path.join(dir, 'OutputBAM/' + region_name + '_' + read_group + '.bam'), read_group, barcode_set)
         flush_read_map(output_file, read_map)
+        exit(0)
 
 
 def main():
@@ -54,7 +55,7 @@ def main():
 
     for dir in args.dirs:
         print("Processing " + dir)
-        process_dir(dir, output_file)
+        process_dir(dir, args.output_file)
 
 
 if __name__ == "__main__":
