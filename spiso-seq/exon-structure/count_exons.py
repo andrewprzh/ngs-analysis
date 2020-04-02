@@ -10,6 +10,7 @@ import sys
 import gffutils
 import argparse
 import pysam
+import glob
 from assign_isoforms_to_barcodes import *
 from traceback import print_exc
 

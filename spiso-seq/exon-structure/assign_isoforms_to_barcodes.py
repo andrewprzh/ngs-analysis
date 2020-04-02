@@ -11,6 +11,7 @@ import copy
 import gffutils
 import argparse
 import pysam
+import glob
 from common import *
 from traceback import print_exc
 from functools import partial
@@ -257,7 +258,7 @@ class ReadMappingInfo:
         self.junctions_counts = \
             FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
         self.exons_counts = FeatureVector(exons_count, check_flanking = False, fill_gaps = True,
-                                          block_comparator = partial(equal_ranges, delta=delta), ignore_flanking_blocks = True) \
+                                          block_comparator = overlaps, ignore_flanking_blocks = True) \
             if self.exon_counting_mode else \
             FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps)
 
@@ -611,7 +612,11 @@ class ReadProfilesInfo:
     # process alignment within a gene region
     def add_read(self, alignment, read_id):
         chr_name = alignment.reference_name.strip()
-        if chr_name != self.gene_info.chr_id:
+        gene_chr = self.gene_info.chr_id
+        if not chr_name.startswith('chr') and self.gene_info.chr_id.startswith('chr'):
+            gene_chr = self.gene_info.chr_id[3:]
+        if chr_name != gene_chr:
+            print("Unequal chromosomes")
             return
 
         blocks = alignment.get_blocks()
@@ -794,7 +799,9 @@ class GeneDBProcessor:
         self.args = args
         self.property_getter = property_getter
         self.bc_map = self.get_barcode_map(args.bam)
-        self.bamfile_names = args.bam
+        self.bamfile_names = []
+        for f in glob.glob(args.bam):
+            self.bamfile_names.append(f)
         for bamfile_name in self.bamfile_names:
             if not os.path.isfile(bamfile_name):
                 raise Exception("BAM file " + bamfile_name + " does not exist")
@@ -901,6 +908,9 @@ class GeneDBProcessor:
 
         # process all alignments
         # prefix is needed when bam file has chrXX chromosome names, but reference has XX names
+
+        if not samfile_in.references[0].startswith('chr') and gene_chr.startswith('chr'):
+            gene_chr = gene_chr[3:]
 
         for alignment in samfile_in.fetch(self.chr_bam_prefix + gene_chr, gene_start, gene_end):
             if alignment.reference_id == -1 or alignment.is_secondary:
