@@ -902,9 +902,11 @@ class GeneDBProcessor:
                 gene_stats.unmapped += 1
 
     # assign all reads/barcodes mapped to gene region
-    def process_all_reads_from_file(self, read_profiles, bamfile_name):
+    def process_all_reads_from_file(self, read_profiles, bamfile_name, read_map):
         samfile_in = pysam.AlignmentFile(bamfile_name, "rb")
         gene_chr, gene_start, gene_end = read_profiles.gene_info.get_gene_region()
+
+        group_id = os.path.splitext(os.path.basename(bamfile_name))[0]
 
         # process all alignments
         # prefix is needed when bam file has chrXX chromosome names, but reference has XX names
@@ -915,15 +917,18 @@ class GeneDBProcessor:
         for alignment in samfile_in.fetch(self.chr_bam_prefix + gene_chr, gene_start, gene_end):
             if alignment.reference_id == -1 or alignment.is_secondary:
                 continue
-            seq_id = self.get_sequence_id(alignment.query_name)
+            seq_id = alignment.query_name
+            read_map[seq_id] = group_id
             if self.args.read_info_map is not None and seq_id in self.args.read_info_map:
                 self.found_barcodes.add(self.args.read_info_map[seq_id])
             read_profiles.add_read(alignment, seq_id)
         samfile_in.close()
 
     def process_all_reads(self, read_profiles):
+        read_map = {}
         for bamfile_name in self.bamfile_names:
-            self.process_all_reads_from_file(read_profiles, bamfile_name)
+            self.process_all_reads_from_file(read_profiles, bamfile_name, read_map)
+        return read_map
 
     # assign all reads/barcodes mapped to gene region
     def assign_all_reads(self, read_profiles):
@@ -961,14 +966,17 @@ class GeneDBProcessor:
     # calculate exon counts
     def calculate_exon_counts(self, read_profiles):
         self.found_barcodes = set()
-        self.process_all_reads(read_profiles)
+        read_map = self.process_all_reads(read_profiles)
 
+        if self.property_getter.table is None or len(self.property_getter.table) == 0:
+            self.property_getter = TablePropertyGetter(read_map)
         # cell group -> two list of counts for each exon inclusion/exclusion
         exon_counts = {}
 
         # iterate over all barcodes / sequences and assign them to known isoforms
         for read_id in read_profiles.read_mapping_infos.keys():
             group_id = self.property_getter.get_property(read_id)
+
             if group_id not in exon_counts:
                 # first list for exon inclusion, second for exlusion
                 exon_counts[group_id] = ([0 for i in range(len(read_profiles.gene_info.exons))],
@@ -981,6 +989,8 @@ class GeneDBProcessor:
                 elif exon_count_profile[i] < 0:
                     exon_counts[group_id][1][i - 1] -= exon_count_profile[i]
         #print(exon_counts)
+
+        self.property_getter = TablePropertyGetter({})
         return exon_counts
 
     def gene_list_id_str(self, gene_db_list, delim = "_"):

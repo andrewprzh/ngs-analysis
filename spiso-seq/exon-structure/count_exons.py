@@ -70,7 +70,7 @@ def main():
     set_codon_count_params(args)
 
     property_getter = ReadIdPropertyGetter()
-    args.read_info_map = None
+    args.read_info_map = {}
     if args.readmap:
         table = read_property_table(args.readmap, args.property_column)
         property_getter = TablePropertyGetter(table)
