@@ -96,6 +96,11 @@ class AligmentComparator:
                 return False
         return True
 
+    CONTRADICTION_TYPES = set(["first_misses_known_intron", "first_misses_intron", "second_misses_known_intron", "second_misses_intron, ",
+                               "second_intron_shift", "first_intron_shift", "intron_shift", "second_big_intron_shift", "first_big_intron_shift",
+                               "big_intron_shift", "mutual_exons", "first_misses_known_exon", "first_misses_exon", "first_misses_known_exon",
+                               "second_misses_exon", "unknown_contradiction"])
+
     def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2, known_introns):
         if region1 is None:
             if self.are_known_introns(junctions2, region2, known_introns):
@@ -298,8 +303,8 @@ class AligmentComparator:
                     if overlaps(region1, region2):
                         chr_id = a1.get_reference_name()
                         res = self.compare_aligments(blocks1, blocks2, chr_id)
-                        # TODO change to multiple cases
-                        if res == "contradictory":
+                        
+                        if res in self.CONTRADICTION_TYPES:
                             self.contradictory_alignemts.append(a1)
                             self.contradictory_alignemts.append(a2)
                             self.contadictory_file.write(a1.query_name + " " + a2.query_name + "\n")
