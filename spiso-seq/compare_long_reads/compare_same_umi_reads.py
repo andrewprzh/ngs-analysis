@@ -21,6 +21,7 @@ from common import *
 POS_DIFF = 10000
 
 DIFF_DELTA = 20
+BIG_DELTA = 100
 
 def read_info(info_file):
     barcode_map1 = {}
@@ -94,12 +95,15 @@ class AligmentComparator:
         if region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
             return "intron_shift"
+        elif region1[1] == region1[0] and region2[1] == region2[0] and \
+                total_intron_len_diff < BIG_DELTA:
+            return "big_intron_shift"
         elif region1[1] - region1[0] == region2[1] - region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
             return "mutual_exons"
-        elif region1[1] == region1[0] and region2[1] > region2[0] and total_intron_len_diff < DIFF_DELTA:
+        elif region1[1] == region1[0] and region2[1] > region2[0] and total_intron_len_diff < BIG_DELTA:
             return "first_misses_exon"
-        elif region1[1] > region1[0] and region2[1] == region2[0] and total_intron_len_diff < DIFF_DELTA:
+        elif region1[1] > region1[0] and region2[1] == region2[0] and total_intron_len_diff < BIG_DELTA:
             return "second_misses_exon"
         else:
             print("Unknown condtradiction")
@@ -110,16 +114,25 @@ class AligmentComparator:
             return "unknown_contradiction"
 
     def detect_contradiction_type(self, junctions1, junctions2, contradictory_region_pairs):
-        contradiction_events = set()
+        contradiction_events = []
         for pair in contradictory_region_pairs:
-            contradiction_events.add(self.compare_overlapping_contradictional_regions(junctions1, junctions2, pair[0], pair[1]))
-        if (len(contradiction_events) == 1):
-            return list(contradiction_events)[0]
+            contradiction_events.append(self.compare_overlapping_contradictional_regions(junctions1, junctions2, pair[0], pair[1]))
+        contradiction_events_set = set(contradiction_events)
+        if len(contradiction_events_set) == 1:
+            return contradiction_events[0]
         else:
+            contradiction_events_set.discard("intron_shift")
+            contradiction_events_set.discard("big_intron_shift")
+            contradiction_events_set.discard("unknown_contradiction")
+            if len(contradiction_events_set) == 1:
+                return list(contradiction_events_set)[0]
+            elif len(contradiction_events_set) == 0:
+                return "big_intron_shift"
             print("Multiple contradiction events")
             print(junctions1)
             print(junctions2)
             print(contradictory_region_pairs)
+            print(contradiction_events)
             return "multipe_contradiction_events"
 
     def compare_junctions(self, blocks1, blocks2):
@@ -262,8 +275,8 @@ class AligmentComparator:
 
         if len(alignments1) == 1 and len(alignments2) == 1:
             self.diff_locus_file.write(alignments1[0].query_name  + " " + alignments2[0].query_name + "\n")
-            self.diff_locus_file.write(alignments1[0].reference_name + ":" +  alignments1[0].reference_start + " "
-                                       + alignments2[0].reference_name + ":" +  alignments2[0].reference_start + "\n")
+            self.diff_locus_file.write(alignments1[0].reference_name + ":" +  str(alignments1[0].reference_start) + " "
+                                       + alignments2[0].reference_name + ":" +  str(alignments2[0].reference_start) + "\n")
             self.diff_locus_file.write(alignments1[0].query_sequence + "\n")
             self.diff_locus_file.write(alignments2[0].query_sequence + "\n")
 
