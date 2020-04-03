@@ -79,7 +79,7 @@ class AligmentComparator:
             return set()
         print("Getting known introns for " + chr_id + " " + str(region))
         transcripts_in_region = list(self.db.region(region=(chr_id, region[0], region[1]), completely_within=False,
-                                                    featuretype='transcript', order_by='start'))
+                                                    featuretype='transcript'))
         known_introns = set()
         for t in transcripts_in_region:
             transcript_exons = []
@@ -301,7 +301,7 @@ class AligmentComparator:
                     region2 = (blocks2[0][0], blocks2[-1][1])
 
                     if overlaps(region1, region2):
-                        chr_id = a1.get_reference_name()
+                        chr_id = a1.reference_name
                         res = self.compare_aligments(blocks1, blocks2, chr_id)
                         
                         if res in self.CONTRADICTION_TYPES:
