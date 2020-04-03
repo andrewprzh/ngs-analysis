@@ -13,6 +13,7 @@ import numpy
 import pysam
 from traceback import print_exc
 from functools import partial
+import gffutils
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../exon-structure/'))
 from common import *
@@ -61,49 +62,81 @@ class AligmentComparator:
         self.contradictory_alignemts = []
         self.delta = args.delta
 
+        if args.genedb is None:
+            self.db = None
+        if not os.path.isfile(args.genedb):
+            raise Exception("Gene database " + args.genedb + " does not exist")
+        self.db = gffutils.FeatureDB(args.genedb, keep_order = True)
+
     def __del__(self):
         self.contadictory_file.close()
         self.diff_locus_file.close()
 
         print("Closing output files")
 
-    def find_contradictional_regions(self, features_present):
-        contradiction_regions = []
-        current = 1
-        start = 0
-        for i in range(len(features_present)):
-            if features_present[i] == -1 and current == 1:
-                current = -1
-                start = i
-            elif features_present[i] == 1 and current == -1:
-                current = 1
-                contradiction_regions.append((start, i - 1))
-        if current == 1:
-            contradiction_regions.append((start, len(features_present) - 1))
-        return contradiction_regions
+    def get_known_introns(self, region, chr_id):
+        if self.db is None:
+            return set()
+        print("Getting known introns for " + chr_id + " " + str(region))
+        transcripts_in_region = list(self.db.region(region=(chr_id, region[0], region[1]), completely_within=False,
+                                                    featuretype='transcript', order_by='start'))
+        known_introns = set()
+        for t in transcripts_in_region:
+            transcript_exons = []
+            for e in self.db.children(t, order_by='start'):
+                if e.featuretype == 'exon':
+                    transcript_exons.append((e.start, e.end))
 
-    def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2):
+            known_introns.update(junctions_from_blocks(transcript_exons))
+        return known_introns
+
+    def are_known_introns(self, junctions, region, known_introns):
+        for i in range(region[0], region[1] + 1):
+            if junctions[i] not in known_introns:
+                return False
+        return True
+
+    def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2, known_introns):
         if region1 is None:
+            if self.are_known_introns(junctions2, region2, known_introns):
+                return "first_misses_known_intron"
             return "first_misses_intron"
         elif region2 is None:
+            if self.are_known_introns(junctions1, region1, known_introns):
+                return "second_misses_known_intron"
             return "second_misses_intron"
 
         intron1_total_len = sum([junctions1[i][1] - junctions1[i][0] for i in range(region1[0], region1[1] + 1)])
         intron2_total_len = sum([junctions2[i][1] - junctions2[i][0] for i in range(region2[0], region2[1] + 1)])
         total_intron_len_diff = abs(intron1_total_len - intron2_total_len)
 
+        first_introns_known = self.are_known_introns(junctions1, region1, known_introns)
+        second_introns_known = self.are_known_introns(junctions2, region2, known_introns)
+
         if region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
+            if first_introns_known and not second_introns_known:
+                return "second_intron_shift"
+            elif not first_introns_known and second_introns_known:
+                return "first_intron_shift"
             return "intron_shift"
         elif region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < BIG_DELTA:
+            if first_introns_known and not second_introns_known:
+                return "second_big_intron_shift"
+            elif not first_introns_known and second_introns_known:
+                return "first_big_intron_shift"
             return "big_intron_shift"
         elif region1[1] - region1[0] == region2[1] - region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
             return "mutual_exons"
         elif region1[1] == region1[0] and region2[1] > region2[0] and total_intron_len_diff < BIG_DELTA:
+            if not first_introns_known and second_introns_known:
+                return "first_misses_known_exon"
             return "first_misses_exon"
         elif region1[1] > region1[0] and region2[1] == region2[0] and total_intron_len_diff < BIG_DELTA:
+            if first_introns_known and not second_introns_known:
+                return "first_misses_known_exon"
             return "second_misses_exon"
         else:
             print("Unknown condtradiction")
@@ -113,10 +146,10 @@ class AligmentComparator:
             print(region2)
             return "unknown_contradiction"
 
-    def detect_contradiction_type(self, junctions1, junctions2, contradictory_region_pairs):
+    def detect_contradiction_type(self, junctions1, junctions2, contradictory_region_pairs, known_introns):
         contradiction_events = []
         for pair in contradictory_region_pairs:
-            contradiction_events.append(self.compare_overlapping_contradictional_regions(junctions1, junctions2, pair[0], pair[1]))
+            contradiction_events.append(self.compare_overlapping_contradictional_regions(junctions1, junctions2, pair[0], pair[1], known_introns))
         contradiction_events_set = set(contradiction_events)
         if len(contradiction_events_set) == 1:
             return contradiction_events[0]
@@ -135,7 +168,7 @@ class AligmentComparator:
             print(contradiction_events)
             return "multipe_contradiction_events"
 
-    def compare_junctions(self, blocks1, blocks2):
+    def compare_junctions(self, blocks1, blocks2, chr_id):
         junctions1 = junctions_from_blocks(blocks1)
         junctions2 = junctions_from_blocks(blocks2)
 
@@ -188,7 +221,9 @@ class AligmentComparator:
             contradictory_region_pairs.append(current_contradictory_region)
 
         if any(el == -1 for el in features_present1) or any(el == -1 for el in features_present2):
-            return self.detect_contradiction_type(junctions1, junctions2, contradictory_region_pairs)
+            region = (min(blocks1[0][0], blocks2[0][0]), max(blocks1[-1][1], blocks2[-1][1]))
+            known_introns = self.get_known_introns(region, chr_id)
+            return self.detect_contradiction_type(junctions1, junctions2, contradictory_region_pairs, known_introns)
         elif all(el == 0 for el in features_present1):
             if len(features_present1) > 1 or len(features_present1) > 1:
                 print("Empty")
@@ -230,7 +265,7 @@ class AligmentComparator:
             print(features_present2)
         return "unknown"
 
-    def compare_aligments(self, blocks1, blocks2):
+    def compare_aligments(self, blocks1, blocks2, chr_id):
         if len(blocks1) == 1:
             if len(blocks2) == 1:
                 return "both_non_spliced"
@@ -239,7 +274,7 @@ class AligmentComparator:
         elif len(blocks2) == 1:
             return "second_non_spliced"
 
-        comparison = self.compare_junctions(blocks1, blocks2)
+        comparison = self.compare_junctions(blocks1, blocks2, chr_id)
         return comparison
 
 
@@ -261,7 +296,9 @@ class AligmentComparator:
                     region2 = (blocks2[0][0], blocks2[-1][1])
 
                     if overlaps(region1, region2):
-                        res = self.compare_aligments(blocks1, blocks2)
+                        chr_id = a1.get_reference_name()
+                        res = self.compare_aligments(blocks1, blocks2, chr_id)
+                        # TODO change to multiple cases
                         if res == "contradictory":
                             self.contradictory_alignemts.append(a1)
                             self.contradictory_alignemts.append(a2)
@@ -315,7 +352,7 @@ class AligmentComparator:
             outf.write(k[0] + "\t" + k[1] + "\t" + self.stats[k] + "\n")
 
         outf.close()
-        for k in self.aggr_stats.keys():
+        for k in sorted(self.aggr_stats.keys()):
             print(k + "\t" + str(self.aggr_stats[k]))
 
         out_bam = pysam.AlignmentFile(self.args.output_prefix + ".contradictory.bam", "wb", template=pysam.AlignmentFile(self.args.bams[0], "rb"))
@@ -330,6 +367,7 @@ def parse_args():
     parser.add_argument("--read_info",  help="file read ids with the same UMI and barcode but mapped to different genes ", type=str)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str)
     parser.add_argument("--delta",  help="delta ", type=int, default=0)
+    parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str)
 
     args = parser.parse_args()
 
