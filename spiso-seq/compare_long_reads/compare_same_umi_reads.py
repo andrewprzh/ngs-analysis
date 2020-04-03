@@ -91,6 +91,8 @@ class AligmentComparator:
         return known_introns
 
     def are_known_introns(self, junctions, region, known_introns):
+        #print(junctions[region[0]:region[1] + 1])
+        #print(known_introns)
         for i in range(region[0], region[1] + 1):
             if junctions[i] not in known_introns:
                 return False
@@ -102,12 +104,14 @@ class AligmentComparator:
                                "second_misses_exon", "unknown_contradiction"])
 
     def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2, known_introns):
+        first_introns_known = self.are_known_introns(junctions1, region1, known_introns)
+        second_introns_known = self.are_known_introns(junctions2, region2, known_introns)
         if region1 is None:
-            if self.are_known_introns(junctions2, region2, known_introns):
+            if second_introns_known:
                 return "first_misses_known_intron"
             return "first_misses_intron"
         elif region2 is None:
-            if self.are_known_introns(junctions1, region1, known_introns):
+            if first_introns_known:
                 return "second_misses_known_intron"
             return "second_misses_intron"
 
@@ -115,8 +119,7 @@ class AligmentComparator:
         intron2_total_len = sum([junctions2[i][1] - junctions2[i][0] for i in range(region2[0], region2[1] + 1)])
         total_intron_len_diff = abs(intron1_total_len - intron2_total_len)
 
-        first_introns_known = self.are_known_introns(junctions1, region1, known_introns)
-        second_introns_known = self.are_known_introns(junctions2, region2, known_introns)
+
 
         if region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
@@ -295,15 +298,15 @@ class AligmentComparator:
         for a1 in alignments1:
             for a2 in alignments2:
                 if a1.reference_id == a2.reference_id:
-                    blocks1 = concat_gapless_blocks(sorted(a1.get_blocks()), a1.cigartuples)
-                    blocks2 = concat_gapless_blocks(sorted(a2.get_blocks()), a2.cigartuples)
+                    blocks1 = normalize_alignment_blocks(a1)
+                    blocks2 = normalize_alignment_blocks(a2)
                     region1 = (blocks1[0][0], blocks1[-1][1])
                     region2 = (blocks2[0][0], blocks2[-1][1])
 
                     if overlaps(region1, region2):
                         chr_id = a1.reference_name
                         res = self.compare_aligments(blocks1, blocks2, chr_id)
-                        
+
                         if res in self.CONTRADICTION_TYPES:
                             self.contradictory_alignemts.append(a1)
                             self.contradictory_alignemts.append(a2)

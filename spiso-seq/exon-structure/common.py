@@ -292,6 +292,11 @@ def concat_gapless_blocks(blocks, cigar_list):
     return resulting_blocks
 
 
+def normalize_alignment_blocks(alignment):
+    aligned_blocks = concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples)
+    return list(map(lambda x: (x[0] + 1, x[1]), aligned_blocks))
+
+
 def sign(i):
     return 0 if i == 0 else (-1 if i < 0 else 1)
 
