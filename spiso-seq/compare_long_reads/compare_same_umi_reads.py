@@ -20,6 +20,7 @@ from common import *
 
 POS_DIFF = 10000
 
+DIFF_DELTA = 20
 
 def read_info(info_file):
     barcode_map1 = {}
@@ -65,37 +66,116 @@ class AligmentComparator:
 
         print("Closing output files")
 
-    def compare_junctions(self, junctions1, junctions2):
+    def find_contradictional_regions(self, features_present):
+        contradiction_regions = []
+        current = 1
+        start = 0
+        for i in range(len(features_present)):
+            if features_present[i] == -1 and current == 1:
+                current = -1
+                start = i
+            elif features_present[i] == 1 and current == -1:
+                current = 1
+                contradiction_regions.append((start, i - 1))
+        if current == 1:
+            contradiction_regions.append((start, len(features_present) - 1))
+        return contradiction_regions
+
+    def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2):
+        if region1 is None:
+            return "first_misses_intron"
+        elif region2 is None:
+            return "second_misses_intron"
+
+        intron1_total_len = sum([junctions1[i][1] - junctions1[i][0] for i in range(region1[0], region1[1] + 1)])
+        intron2_total_len = sum([junctions2[i][1] - junctions2[i][0] for i in range(region2[0], region2[1] + 1)])
+        total_intron_len_diff = abs(intron1_total_len - intron2_total_len)
+
+        if region1[1] == region1[0] and region2[1] == region2[0] and \
+                total_intron_len_diff < DIFF_DELTA:
+            return "intron_shift"
+        elif region1[1] - region1[0] == region2[1] - region2[0] and \
+                total_intron_len_diff < DIFF_DELTA:
+            return "mutual_exons"
+        elif region1[1] == region1[0] and region2[1] > region2[0] and total_intron_len_diff < DIFF_DELTA:
+            return "first_misses_exon"
+        elif region1[1] > region1[0] and region2[1] == region2[0] and total_intron_len_diff < DIFF_DELTA:
+            return "second_misses_exon"
+        else:
+            print("Unknown condtradiction")
+            print(junctions1)
+            print(region1)
+            print(junctions2)
+            print(region2)
+            return "unknown_contradiction"
+
+    def detect_contradiction_type(self, junctions1, junctions2, contradictory_region_pairs):
+        contradiction_events = set()
+        for pair in contradictory_region_pairs:
+            contradiction_events.add(self.compare_overlapping_contradictional_regions(junctions1, junctions2, pair[0], pair[1]))
+        if (len(contradiction_events) == 1):
+            return list(contradiction_events)[0]
+        else:
+            print("Multiple contradiction events")
+            print(junctions1)
+            print(junctions2)
+            print(contradictory_region_pairs)
+            return "multipe_contradiction_events"
+
+    def compare_junctions(self, blocks1, blocks2):
+        junctions1 = junctions_from_blocks(blocks1)
+        junctions2 = junctions_from_blocks(blocks2)
+
         pos1 = 0
         pos2 = 0
-
         features_present1 = [0 for i in range(0, len(junctions1))]
         features_present2 = [0 for i in range(0, len(junctions2))]
+        contradictory_region_pairs = []
+        current_contradictory_region = (None, None)
 
         while pos1 < len(junctions1) and pos2 < len(junctions2):
             if equal_ranges(junctions2[pos2], junctions1[pos1], self.delta):
                 features_present1[pos1] = 1
                 features_present2[pos2] = 1
+                if (current_contradictory_region != (None, None)):
+                    contradictory_region_pairs.append(current_contradictory_region)
+                    current_contradictory_region = (None, None)
                 pos1 += 1
                 pos2 += 1
             elif overlaps(junctions2[pos2], junctions1[pos1]):
                 features_present1[pos1] = -1
                 features_present2[pos2] = -1
+                if current_contradictory_region == (None, None):
+                    current_contradictory_region = ((pos1, pos1), (pos2, pos2))
+                else:
+                    current_contradictory_region = ((current_contradictory_region[0][0], pos1), (current_contradictory_region[1][0], pos2))
                 if (junctions1[pos1][1] < junctions2[pos2][1]):
                     pos1 += 1
                 else:
                     pos2 += 1
             elif left_of(junctions2[pos2], junctions1[pos1]):
+                if (current_contradictory_region != (None, None)):
+                    contradictory_region_pairs.append(current_contradictory_region)
+                    current_contradictory_region = (None, None)
                 if pos1 > 0:
+                    if (features_present2[pos2] != -1):
+                        contradictory_region_pairs.append((None, (pos2, pos2)))
                     features_present2[pos2] = -1
                 pos2 += 1
             else:
+                if (current_contradictory_region != (None, None)):
+                    contradictory_region_pairs.append(current_contradictory_region)
+                    current_contradictory_region = (None, None)
                 if pos2 > 0:
+                    if (features_present1[pos1] != -1):
+                        contradictory_region_pairs.append(((pos1, pos1), None))
                     features_present1[pos1] = -1
                 pos1 += 1
+        if (current_contradictory_region != (None, None)):
+            contradictory_region_pairs.append(current_contradictory_region)
 
         if any(el == -1 for el in features_present1) or any(el == -1 for el in features_present2):
-            return "contradictory"
+            return self.detect_contradiction_type(junctions1, junctions2, contradictory_region_pairs)
         elif all(el == 0 for el in features_present1):
             if len(features_present1) > 1 or len(features_present1) > 1:
                 print("Empty")
@@ -137,7 +217,6 @@ class AligmentComparator:
             print(features_present2)
         return "unknown"
 
-
     def compare_aligments(self, blocks1, blocks2):
         if len(blocks1) == 1:
             if len(blocks2) == 1:
@@ -147,9 +226,8 @@ class AligmentComparator:
         elif len(blocks2) == 1:
             return "second_non_spliced"
 
-        introns1 = junctions_from_blocks(blocks1)
-        introns2 = junctions_from_blocks(blocks2)
-        return self.compare_junctions(introns1, introns2)
+        comparison = self.compare_junctions(blocks1, blocks2)
+        return comparison
 
 
     def compare_alignment_sets(self, alignments1, alignments2):
