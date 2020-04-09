@@ -61,6 +61,11 @@ class AligmentComparator:
         self.diff_locus_file = open(self.args.output_prefix + ".different_locations.tsv", "w")
         self.contradictory_alignemts = []
         self.delta = args.delta
+        self.missed_exons = {}
+        self.missed_exons["fisrt_misses"] = []
+        self.missed_exons["fisrt_misses_known"] = []
+        self.missed_exons["second_misses"] = []
+        self.missed_exons["second_misses_known"] = []
 
         if args.genedb is None:
             self.db = None
@@ -103,6 +108,13 @@ class AligmentComparator:
                                "big_intron_shift", "mutual_exons", "first_misses_known_exon", "first_misses_exon", "second_misses_known_exon",
                                "second_misses_exon", "unknown_contradiction"])
 
+    def add_missed_exons(self, key, region, introns):
+        if len(region) < 2:
+            return
+        for i in range(len(region) - 1):
+            exon_len = introns[i + 1][0] - introns[i][1]
+            self.missed_exons[key].append(exon_len)
+
     def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2, known_introns):
         if region1 is None:
             if self.are_known_introns(junctions2, region2, known_introns):
@@ -138,11 +150,15 @@ class AligmentComparator:
                 total_intron_len_diff < DIFF_DELTA:
             return "mutual_exons"
         elif region1[1] == region1[0] and region2[1] > region2[0] and total_intron_len_diff < BIG_DELTA:
+            self.add_missed_exons("fisrt_misses", region2, junctions2)
             if not first_introns_known and second_introns_known:
+                self.add_missed_exons("fisrt_misses_known", region2, junctions2)
                 return "first_misses_known_exon"
             return "first_misses_exon"
         elif region1[1] > region1[0] and region2[1] == region2[0] and total_intron_len_diff < BIG_DELTA:
+            self.add_missed_exons("second_misses", region1, junctions1)
             if first_introns_known and not second_introns_known:
+                self.add_missed_exons("second_misses_known", region1, junctions1)
                 return "second_misses_known_exon"
             return "second_misses_exon"
         else:
@@ -366,6 +382,12 @@ class AligmentComparator:
         for read in self.contradictory_alignemts:
             out_bam.write(read)
         out_bam.close()
+
+        for k in sorted(self.missed_exons.keys()):
+            print(k + " exon length histogram")
+            count, exon_len = numpy.histogram(self.missed_exons[key], bins=[10 * i for i in range(31)] + [10000])
+            for i in range(len(count)):
+                print(str(exon_len[i]) + '\t' + str(count[i]))
 
 
 def parse_args():
