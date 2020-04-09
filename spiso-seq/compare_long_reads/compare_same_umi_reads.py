@@ -64,7 +64,7 @@ class AligmentComparator:
 
         if args.genedb is None:
             self.db = None
-        if not os.path.isfile(args.genedb):
+        elif not os.path.isfile(args.genedb):
             raise Exception("Gene database " + args.genedb + " does not exist")
         self.db = gffutils.FeatureDB(args.genedb, keep_order = True)
 
@@ -77,7 +77,7 @@ class AligmentComparator:
     def get_known_introns(self, region, chr_id):
         if self.db is None:
             return set()
-        print("Getting known introns for " + chr_id + " " + str(region))
+#        print("Getting known introns for " + chr_id + " " + str(region))
         transcripts_in_region = list(self.db.region(region=(chr_id, region[0], region[1]), completely_within=False,
                                                     featuretype='transcript'))
         known_introns = set()
@@ -100,18 +100,16 @@ class AligmentComparator:
 
     CONTRADICTION_TYPES = set(["first_misses_known_intron", "first_misses_intron", "second_misses_known_intron", "second_misses_intron, ",
                                "second_intron_shift", "first_intron_shift", "intron_shift", "second_big_intron_shift", "first_big_intron_shift",
-                               "big_intron_shift", "mutual_exons", "first_misses_known_exon", "first_misses_exon", "first_misses_known_exon",
+                               "big_intron_shift", "mutual_exons", "first_misses_known_exon", "first_misses_exon", "second_misses_known_exon",
                                "second_misses_exon", "unknown_contradiction"])
 
     def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2, known_introns):
-        first_introns_known = self.are_known_introns(junctions1, region1, known_introns)
-        second_introns_known = self.are_known_introns(junctions2, region2, known_introns)
         if region1 is None:
-            if second_introns_known:
+            if self.are_known_introns(junctions2, region2, known_introns):
                 return "first_misses_known_intron"
             return "first_misses_intron"
         elif region2 is None:
-            if first_introns_known:
+            if self.are_known_introns(junctions1, region1, known_introns):
                 return "second_misses_known_intron"
             return "second_misses_intron"
 
@@ -119,7 +117,8 @@ class AligmentComparator:
         intron2_total_len = sum([junctions2[i][1] - junctions2[i][0] for i in range(region2[0], region2[1] + 1)])
         total_intron_len_diff = abs(intron1_total_len - intron2_total_len)
 
-
+        first_introns_known = self.are_known_introns(junctions1, region1, known_introns)
+        second_introns_known = self.are_known_introns(junctions2, region2, known_introns)
 
         if region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
@@ -144,7 +143,7 @@ class AligmentComparator:
             return "first_misses_exon"
         elif region1[1] > region1[0] and region2[1] == region2[0] and total_intron_len_diff < BIG_DELTA:
             if first_introns_known and not second_introns_known:
-                return "first_misses_known_exon"
+                return "second_misses_known_exon"
             return "second_misses_exon"
         else:
             print("Unknown condtradiction")

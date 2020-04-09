@@ -37,10 +37,13 @@ def parse_args():
     optional_group.add_argument("--delim2", help="delimeter between barcodes "
                                                       "(default:comma) ", type=str, default=',')
     optional_group.add_argument("--threads", "-t", help="threads for aligner (16)", type=int, default=16)
-    optional_group.add_argument("--max_len", help="skip contigs longer than (0), valid for 10x assembly only", type=int, default=16)
+    optional_group.add_argument("--max_len", help="skip contigs longer than (0), valid for 10x assembly only", type=int, default=-1)
 
 
     args = parser.parse_args()
+
+    if args.max_len == -1:
+        args.max_len = float('inf')
 
     if args.fasta_files is None or len(args.fasta_files) == 0 or args.index is None or args.output_prefix is None:
         print("ERROR: not enough parameters")
