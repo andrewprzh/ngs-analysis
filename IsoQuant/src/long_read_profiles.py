@@ -19,39 +19,44 @@ class MappedReadProfile:
         self.read_profile = read_profile
         self.read_features = read_features
 
-
-class IntronProfileConstructor:
-    def __init__(self, known_introns, comparator = partial(equal_ranges, delta=0)):
+#accepts sorted gapless alignment blocks
+class OverlappingFeaturesProfileConstructor:
+    def __init__(self, known_introns, gene_region, comparator = partial(equal_ranges, delta = 0)):
         self.known_introns = known_introns
+        self.gene_region = gene_region
         self.comparator = comparator
 
-    def construct_profile(self, alignment):
-        sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
-
+    def construct_profile(self, sorted_blocks):
         intron_profile = [0] * (len(self.known_introns))
-        read_profile = [0] * (len(sorted_blocks))
-        if len(blocks) >= 2:
-            return intron_profile, read_profile
+        #sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
+
+        if len(blocks) < 2:
+            return  MappedReadProfile(intron_profile, [], [])
 
         read_introns = junctions_from_blocks(sorted_blocks)
+        read_profile = [0] * (len(read_introns))
+
+        mapped_region = (sorted_blocks[0][0], sorted_blocks[-1][1])
+        for i in range(intron_profile):
+            if overlaps(intron_profile[i], mapped_region):
+                intron_profile[i] = -1
+        for i in range(read_profile):
+            if overlaps(read_profile[i], self.gene_region):
+                read_profile[i] = -1
+
         gene_pos = 0
         read_pos = 0
-
+        # TODO reduce excessive if statements
         while gene_pos < len(self.known_introns) and read_pos < len(read_introns):
             if self.comparator(read_introns[read_pos], self.known_introns[gene_pos]):
                 intron_profile[gene_pos] = 1
                 read_profile[read_pos] = 1
                 gene_pos += 1
-                read_pos += 1
             elif overlaps(read_introns[read_pos], self.known_introns[gene_pos]):
                 intron_profile[gene_pos] = -1
-                read_profile[read_pos] = -1
-                if (self.known_introns[gene_pos][1] < read_introns[read_pos][1]):
-                    gene_pos += 1
-                else:
-                    read_pos += 1
+                gene_pos += 1
             elif left_of(read_introns[read_pos], self.known_introns[gene_pos]):
-                if gene_pos > 0:
+                if read_profile[read_pos] == 0 and gene_pos > 0:
                     read_profile[read_pos] = -1
                 read_pos += 1
             else:
@@ -61,15 +66,14 @@ class IntronProfileConstructor:
 
         return MappedReadProfile(intron_profile, read_profile, read_introns)
 
-
-class ExonProfileConstructor:
+#accepts sorted gapless alignment blocks
+class NonOverlappingFeaturesProfileConstructor:
     def __init__(self, known_exons, comparator = overlaps):
         self.known_exons = known_exons
         self.comparator = comparator
 
-    def construct_profile(self, alignment):
-        sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
-
+    def construct_profile(self, sorted_blocks):
+        #sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
         exon_profile = [0] * (len(self.known_exons))
         read_profile = [0] * (len(sorted_blocks))
         read_exons = sorted_blocks

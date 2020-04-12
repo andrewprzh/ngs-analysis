@@ -8,6 +8,17 @@ import logging
 
 logger = logging.getLogger('Common')
 
+# key, value
+def get_first_best_from_sorted(sorted_list_of_pairs):
+    best_value = sorted_list_of_pairs[0][1]
+    result = []
+    for x in sorted_list_of_pairs:
+        if x[1] > best_value:
+            break
+        result.append(x[0])
+    return result
+
+
 # == range operations ==
 def overlaps(range1, range2):
     return not (range1[1] < range2[0] or range1[0] > range2[1])
@@ -109,3 +120,45 @@ def is_subprofile(short_isoform_profile, long_isoform_profile):
         if short_isoform_profile[i] != long_isoform_profile[i]:
             return False
     return True
+
+
+def difference_in_present_features(profile1, profile2):
+    if len(profile1) != len(profile2):
+        return -1
+    d = 0
+    for i in range(len(profile1)):
+        if profile1[i] == 0 or profile2[i] == 0:
+            continue
+        if profile1[i] != profile2[i]:
+            d += 1
+    return d
+
+
+def find_matching_positions(profile1, profile2):
+    if len(profile1) != len(profile2):
+        return -1
+    matches = [0 for i in range(len(profile1))]
+    for i in range(len(profile1)):
+        if profile1[i] == profile2[i]:
+            matches[i] = 1
+    return matches
+
+
+def mask_profile(read_profile, true_profile):
+    if len(read_profile) != len(true_profile):
+        return None
+    masked_profile = []
+    for i in range(len(true_profile)):
+        if true_profile[i] == 1:
+            masked_profile.append(read_profile[i])
+    return masked_profile
+
+
+def get_blocks_from_profile(features, profile):
+    if len(features) != len(profile):
+        return None
+    profile_features = []
+    for i in range(len(profile)):
+        if profile[i] == 1:
+            profile_features.append(features[i])
+    return profile_features

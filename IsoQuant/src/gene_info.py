@@ -49,7 +49,7 @@ class GeneInfo:
         self.intron_profiles = FeatureProfiles()
         self.exon_profiles = FeatureProfiles()
         self.split_exon_profiles = FeatureProfiles()
-        self.ambiguous = set()
+        self.ambiguous_isoforms = set()
 
         all_isoforms_introns, all_isoforms_exons = self.set_introns_and_exons()
         self.split_exon_profiles.set_features(self.split_exons(self.exons))
@@ -170,5 +170,5 @@ class GeneInfo:
                     continue
                 if is_subprofile(intron_profile, self.intron_profiles.profiles[t2]) and \
                         is_subprofile(exon_profile, self.exon_profiles.profiles[t2]):
-                    self.ambiguous.add(t)
+                    self.ambiguous_isoforms.add(t)
                     break
