@@ -14,130 +14,137 @@ import gffutils
 import pysam
 from Bio import SeqIO
 
+from src.input_data_storage import *
+from src.alignment_processor import *
+from src.assignment_io import *
+from src.gene_info import *
+
+logger = logging.getLogger('DatasetProcessor')
+
+class GeneClusterConstructor:
+    def __init__(self, gene_db):
+        self.gene_db = gene_db
+        self.gene_sets = None
+
+    def get_gene_sets(self):
+        if self.gene_sets is not None:
+            self.gene_sets = self.fill_gene_sets()
+        return self.gene_sets
+
+    def fill_gene_sets(self):
+        gene_sets = []
+        current_gene_db_list = []
+        for g in self.gene_db.features_of_type('gene', order_by=('seqid', 'start')):
+            gene_name = g.id
+            gene_db = self.gene_db[gene_name]
+            if len(current_gene_db_list) == 0 or any(genes_overlap(cg, gene_db) for cg in current_gene_db_list):
+                current_gene_db_list.append(gene_db)
+            else:
+                gene_sets.append(current_gene_db_list)
+                current_gene_db_list = [gene_db]
+
+        gene_sets.append(current_gene_db_list)
+        return gene_sets
+
+
+class OverlappingExonsGeneClusterConstructor(GeneClusterConstructor):
+    def get_gene_sets(self):
+        if self.gene_sets is not None:
+            self.gene_sets = self.cluster_on_shared_exons()
+        return self.gene_sets
+
+    def cluster_on_shared_exons(self):
+        gene_clusters = self.fill_gene_sets()
+        new_gene_sets = []
+
+        for cluster in gene_clusters:
+            new_gene_sets += self.split_cluster(cluster)
+        return new_gene_sets
+
+    def split_cluster(self, gene_cluster):
+        gene_sets = []
+        gene_exon_sets = []
+
+        for gene_db in gene_cluster:
+            gene_exons = set()
+            for e in self.db.children(gene_db):
+                if e.featuretype == 'exon':
+                    gene_exons.add((e.start, e.end))
+
+            overlapping_sets = []
+            for i in range(len(gene_exon_sets)):
+                if any(e in gene_exon_sets[i] for e in gene_exons):
+                    overlapping_sets.append(i)
+
+            if len(overlapping_sets) == 0:
+                #non-overlapping gene
+                gene_sets.append([gene_db])
+                gene_exon_sets.append(gene_exons)
+            elif len(overlapping_sets) == 1:
+                #overlaps with 1 gene
+                index = overlapping_sets[0]
+                gene_sets[index].append(gene_db)
+                gene_exon_sets[index].update(gene_exons)
+            else:
+                #merge all overlapping genes
+                new_gene_set = [gene_db]
+                new_exons_set = gene_exons
+                for index in overlapping_sets:
+                    new_gene_set += gene_sets[index]
+                    new_exons_set.update(gene_exon_sets[index])
+                for index in overlapping_sets[::-1]:
+                    del gene_sets[index]
+                    del gene_exon_sets[index]
+                gene_sets.append(new_gene_set)
+                gene_exon_sets.append(new_exons_set)
+
+        return gene_sets
 
 # Class for processing all samples against gene database
 class DatasetProcessor:
-    db = None
-    args = None
-    input_dataset = None
-    output_dir = ""
-    output_prefix = ""
-
     def __init__(self, args):
         self.args = args
-        self.bc_map = self.get_barcode_map(args.bam)
-        self.bamfile_name = args.bam
-        if not os.path.isfile(self.bamfile_name):
-            raise Exception("BAM file " + self.samfile_nam + " does not exist")
-        samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
-        if not samfile_in.has_index:
-            raise Exception("BAM file " + self.bamfile_name + " is not indexed, run samtools index")
-        if args.change_chr_prefix and samfile_in.references[0].startswith('chr'):
-            print("Changing chomosome prefix")
-            self.chr_bam_prefix = 'chr'
-        samfile_in.close()
+        self.gffutils_db = gffutils.FeatureDB(self.args.genedb, keep_order=True)
+        self.gene_cluster_constructor = GeneClusterConstructor(self.gffutils_db)
+        self.gene_clusters = self.gene_cluster_constructor.get_gene_sets()
 
-        if not os.path.isfile(args.genedb):
-            raise Exception("Gene database " + args.genedb + " does not exist")
-        self.db = gffutils.FeatureDB(args.genedb, keep_order=True)
+        self.correct_assignment_checker = PrintStartingWithSetFunctor(LongReadAssigner.UNIQUE_ASSIGNMENT_TYPES)
+        self.novel_assignment_checker = PrintStartingWithSetFunctor(LongReadAssigner.NOVEL_STRUCTURE_ASSIGNMENT_TYPES)
+        self.rest_assignment_checker = PrintStartingWithSetFunctor(LongReadAssigner.JUNK_ASSIGNMENT_TYPES, LongReadAssigner.AMBIGUOUS_ASSIGNMENT_TYPES)
 
-        self.output_prefix = args.output_prefix
-
-    def process_all_samples(self):
-        pass
-
-    # get barcode or sequence id depending on data type
-    def get_sequence_id(self, query_name):
-        if self.args.data_type == "10x":
-            tokens = query_name.strip().split("___")
-            if len(tokens) != 2:
-                return ""
-            return tokens[1]
-        elif self.args.data_type == "contigs":
-            return query_name.strip().split("_barcodeIDs_")[0]
+        if self.args.ingnore_extra_flanking :
+            self.correct_assignment_checker.update(LongReadAssigner.EXTRA_FLANKING_ASSIGNMEN_TYPES)
         else:
-            return query_name.strip()
+            self.rest_assignment_checker.update(LongReadAssigner.EXTRA_FLANKING_ASSIGNMEN_TYPES)
+        if self.args.correct_minor_errors:
+            self.correct_assignment_checker.update(LongReadAssigner.MINOR_CONTRADICTION_ASSIGNMENT_TYPES)
+        else:
+            self.rest_assignment_checker.update(LongReadAssigner.MINOR_CONTRADICTION_ASSIGNMENT_TYPES)
 
-    # assign all reads/barcodes mapped to gene region
-    def assign_all_reads(self, read_profiles):
-        samfile_in = pysam.AlignmentFile(self.bamfile_name, "rb")
-        gene_chr, gene_start, gene_end = read_profiles.gene_info.get_gene_region()
 
-        # process all alignments
-        # prefix is needed when bam file has chrXX chromosome names, but reference has XX names
-        for alignment in samfile_in.fetch(self.chr_bam_prefix + gene_chr, gene_start, gene_end):
-            if alignment.reference_id == -1 or alignment.is_secondary:
-                continue
-            seq_id = self.get_sequence_id(alignment.query_name)
-            read_profiles.add_read(alignment, seq_id)
-        samfile_in.close()
-
-        # read / barcode id -> (isoform, codon pair)
-        assigned_reads = {}
-        gene_stats = ReadAssignmentStats()
-
-        # iterate over all barcodes / sequences and assign them to known isoforms
-        for read_id in read_profiles.read_mapping_infos.keys():
-            isoform, codons = read_profiles.assign_isoform(read_id, gene_stats, self.args.reads_cutoff)
-
-            seq_id = read_id
-            if self.bc_map is not None:
-                seq_id = list(self.bc_map[read_id])[0]
-                for bc in self.bc_map[read_id]:
-                    assigned_reads[bc] = (isoform, codons)
-            else:
-                assigned_reads[read_id] = (isoform, codons)
-
-            if self.args.count_isoform_stats:
-                self.count_isoform_stats(isoform, seq_id, gene_stats, read_profiles.gene_info)
-
-        if self.args.count_isoform_stats:
-            self.count_unmapped_stats(read_profiles, gene_stats)
-
-        print("Done. Read stats " + gene_stats.to_str())
-        if self.args.count_isoform_stats:
-            print("Done. Isoform stats " + gene_stats.isoform_stats())
-        self.stats.merge(gene_stats)
-
-        return assigned_reads
-
-    # Process a set of genes given in gene_db_list
-    def process_gene_list(self, gene_db_list):
-        print("Processing " + str(len(gene_db_list)) + " gene(s): " + self.gene_list_id_str(gene_db_list, ", "))
-
-        read_profiles = ReadProfilesInfo(gene_db_list, self.db, self.args, self.chr_bam_prefix)
-        assigned_reads = self.assign_all_reads(read_profiles)
-
-        self.write_gene_stats(gene_db_list, assigned_reads)
-        self.write_codon_tables(gene_db_list, read_profiles.gene_info, assigned_reads)
+    def process_samples(self, input_data):
+        for sample in input_data:
+            self.process_sample(sample)
 
     # Run though all genes in db and count stats according to alignments given in bamfile_name
-    def process_all_genes(self):
-        self.out_tsv = self.output_prefix + ".assigned_reads.tsv"
-        outf = open(self.out_tsv, "w")
-        outf.close()
-        self.out_codon_stats = self.output_prefix + ".codon_stats.tsv"
-        outf = open(self.out_codon_stats, "w")
-        outf.close()
+    def process_sample(self, sample):
+        out_assigned_tsv = sample.out_dir + self.args.prefix + "assigned_reads.tsv"
+        correct_printer = BasicTSVAssignmentPrinter(out_assigned_tsv, self.args,
+                                                    assignment_checker=self.correct_assignment_checker)
+        out_unmatched_tsv = sample.out_dir + self.args.prefix + "unmatched_reads.tsv"
+        unmatched_printer = BasicTSVAssignmentPrinter(out_unmatched_tsv, self.args,
+                                                      assignment_checker=self.rest_assignment_checker)
+        out_alt_tsv = sample.out_dir + self.args.prefix + "altered_reads.tsv"
+        alt_printer = BasicTSVAssignmentPrinter(out_alt_tsv, self.args,
+                                                assignment_checker=self.rest_assignment_checker)
+        global_printer = ReadAssignmentCompositePrinter([correct_printer, unmatched_printer, alt_printer])
 
-        gene_db_list = []
-        current_chromosome = ""
+        logger.info("Processing sample " + sample.label)
+        for g in self.gene_clusters:
+            gene_info = GeneInfo(g, self.gffutils_db)
+            bam_files = list(map(lambda x: x[0], sample.file_list))
+            alignment_processor = LongReadAlginmentProcessor(gene_info, bam_files, args, global_printer)
+            alignment_processor.process()
 
-        for g in self.db.features_of_type('gene', order_by=('seqid', 'start')):
-            if current_chromosome != g.seqid:
-                current_chromosome = g.seqid
-                print("Processing chromosome " + current_chromosome)
-            gene_name = g.id
-            gene_db = self.db[gene_name]
+        logger.info("Finished processing sample " + sample.label)
 
-            if len(gene_db_list) == 0 or any(genes_overlap(g, gene_db) for g in gene_db_list):
-                gene_db_list.append(gene_db)
-            else:
-                self.process_gene_list(gene_db_list)
-                gene_db_list = [gene_db]
-
-        self.process_gene_list(gene_db_list)
-
-        print("\nFinished. Total stats " + self.stats.to_str())
-        if self.args.count_isoform_stats:
-            print("Finished. Isoform stats " + self.stats.isoform_stats() + "\n")

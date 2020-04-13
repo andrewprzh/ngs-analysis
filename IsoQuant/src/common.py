@@ -19,6 +19,17 @@ def get_first_best_from_sorted(sorted_list_of_pairs):
     return result
 
 
+def list_to_str(element_list, element_delim=','):
+    return element_delim.join(list(map(str, element_list)))
+
+
+#check whether genes overlap and should be processed together
+def genes_overlap(gene_db1, gene_db2):
+    if (gene_db1.seqid != gene_db2.seqid):
+        return False
+    return overlaps((gene_db1.start, gene_db1.end), (gene_db2.start, gene_db2.end))
+
+
 # == range operations ==
 def overlaps(range1, range2):
     return not (range1[1] < range2[0] or range1[0] > range2[1])
@@ -46,6 +57,10 @@ def contains(bigger_range, smaller_range):
 
 def contains_approx(bigger_range, smaller_range, delta = 1):
     return bigger_range[1] + delta >= smaller_range[1] and bigger_range[0] - delta <= smaller_range[0]
+
+
+def range_list_to_str(range_list, element_delim=',', coord_delim='-'):
+    return element_delim.join(list(map(lambda x: str(x[0]) + coord_delim + str(x[1]), range_list)))
 
 
 # == working with alignment blocks ==

@@ -7,7 +7,7 @@
 import logging
 from functools import partial
 
-from common import *
+from src.common import *
 
 logger = logging.getLogger('LRProfile')
 
@@ -19,6 +19,14 @@ class MappedReadProfile:
         self.read_profile = read_profile
         self.read_features = read_features
 
+
+class CombinedReadProfiles:
+    def __init__(self, read_intron_profile, read_split_profile, read_split_exon_profile):
+        self.read_intron_profile = read_intron_profile
+        self.read_exon_profile = read_split_profile
+        self.read_split_exon_profile = read_split_exon_profile
+
+
 #accepts sorted gapless alignment blocks
 class OverlappingFeaturesProfileConstructor:
     def __init__(self, known_introns, gene_region, comparator = partial(equal_ranges, delta = 0)):
@@ -28,8 +36,6 @@ class OverlappingFeaturesProfileConstructor:
 
     def construct_profile(self, sorted_blocks):
         intron_profile = [0] * (len(self.known_introns))
-        #sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
-
         if len(blocks) < 2:
             return  MappedReadProfile(intron_profile, [], [])
 
@@ -73,7 +79,6 @@ class NonOverlappingFeaturesProfileConstructor:
         self.comparator = comparator
 
     def construct_profile(self, sorted_blocks):
-        #sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
         exon_profile = [0] * (len(self.known_exons))
         read_profile = [0] * (len(sorted_blocks))
         read_exons = sorted_blocks

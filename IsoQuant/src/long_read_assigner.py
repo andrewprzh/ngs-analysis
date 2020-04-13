@@ -5,10 +5,10 @@
 ############################################################################
 
 import logging
-from enum import *
-from common import *
-from gene_info import *
-from long_read_profiles import *
+
+from src.common import *
+from src.gene_info import *
+from src.long_read_profiles import *
 
 
 logger = logging.getLogger('LRAssignment')
@@ -29,6 +29,14 @@ class ReadAssignment:
 
 
 class LongReadAssigner:
+    JUNK_ASSIGNMENT_TYPES = set(["empty", "undefined"])
+    UNIQUE_ASSIGNMENT_TYPES = set(["unique_full_splice_match", "unique_match"])
+    MINOR_CONTRADICTION_ASSIGNMENT_TYPES = set(["intron_retention", "undefined", "intron_shift", "small_exon_misalignment"])
+    AMBIGUOUS_ASSIGNMENT_TYPES = set(["ambiguous_", "assigned_to_ambiguous_isoform"])
+    EXTRA_FLANKING_ASSIGNMEN_TYPES = set(["unique_extra_"])
+    NOVEL_STRUCTURE_ASSIGNMENT_TYPES = set(["contradictory", "additional_", "intron_altered", "mutually_exclusive_",
+                                            "intron_migration", "exon_skipping_", "gains_", "alternative_"])
+
     def __init__(self, gene_info, params):
         self.gene_info = gene_info
         self.params = params
@@ -51,7 +59,9 @@ class LongReadAssigner:
         return set(filter(lambda x: x[1] == 0, isoforms))
 
     # === Isoforom matching function ===
-    def assign_to_isoform(self, read_id, read_intron_profile, read_split_exon_profile):
+    def assign_to_isoform(self, read_id, combined_read_profile):
+        read_intron_profile = combined_read_profile.read_intron_profile
+        read_split_exon_profile = combined_read_profile.read_split_exon_profile
         if all(el == 0 for el in read_split_exon_profile.read_profile):
             # none of the blocks matched
             return ReadAssignment(read_id, "empty")
@@ -65,6 +75,7 @@ class LongReadAssigner:
             assignment = self.match_non_contradictory(read_id, read_intron_profile, read_split_exon_profile)
             #check for extra flanking sequences
             if not self.params.ingnore_extra_flanking:
+                #TODO proper way of handling extra sequnces
                 isoform_exon_profile = self.gene_info.split_exon_profiles.profiles[assignment.assigned_features[0]]
                 start_exon = self.gene_info.split_exon_profiles.features[isoform_exon_profile.index[1]]
                 end_exon = self.gene_info.split_exon_profiles.features[isoform_exon_profile.rindex[1]]
@@ -87,7 +98,12 @@ class LongReadAssigner:
 
         read_assignment = None
         if len(both_mathched_isoforms) == 1:
-            read_assignment = ReadAssignment(read_id, "unique", list(both_mathched_isoforms))
+            isoform_id = list(both_mathched_isoforms)[0]
+            if read_intron_profile.gene_profile.index(1) == self.gene_info.intron_profiles.profiles[isoform_id].index(1) and \
+                    read_intron_profile.gene_profile.rindex(1) == self.gene_info.intron_profiles.profiles[isoform_id].rindex(1):
+                read_assignment = ReadAssignment(read_id, "unique_full_splice_match", list(both_mathched_isoforms))
+            else:
+                read_assignment = ReadAssignment(read_id, "unique_match", list(both_mathched_isoforms))
 
         elif len(both_mathched_isoforms) > 1:
             if not params.resolve_ambiguous or len(self.gene_info.ambiguous_isoforms.intersection(both_mathched_isoforms)) > 0:
@@ -102,7 +118,7 @@ class LongReadAssigner:
                 both_mathched_isoforms = intron_matched_isoforms.intersection(exon_matched_isoforms)
 
                 if len(both_mathched_isoforms) == 1:
-                    read_assignment = ReadAssignment(read_id, "ambiguous_isoform", list(both_mathched_isoforms))
+                    read_assignment = ReadAssignment(read_id, "assigned_to_ambiguous_isoform", list(both_mathched_isoforms))
                 else:
                     read_assignment = ReadAssignment(read_id, "ambiguous", list(both_mathched_isoforms))
 
@@ -350,9 +366,9 @@ class LongReadAssigner:
         elif read_cregion[1] - read_cregion[0] == isoform_cregion[1] - isoform_cregion[0] and \
                 total_intron_len_diff < self.params.delta:
             if read_introns_known:
-                return "mutual_known_exons"
+                return "mutually_exclusive_known_exons"
             else:
-                return "mutual_novel_exons"
+                return "mutualy_exclusive_novel_exons"
 
         elif read_cregion[1] == read_cregion[0] and isoform_cregion[1] > isoform_cregion[0]:
             if total_intron_len_diff < self.params.delta:
@@ -365,9 +381,9 @@ class LongReadAssigner:
 
         elif read_cregion[1] > read_cregion[0] and isoform_cregion[1] == isoform_cregion[0]:
             if read_introns_known:
-                return "known_exon_gain"
+                return "gains_known_exon"
             else:
-                return "novel_exon_gain"
+                return "gains_novel_exon"
 
         else:
             if read_introns_known:
@@ -387,5 +403,5 @@ class LongReadAssigner:
         return all(el == 1 for el in selected_junctions_profile)
 
     # === Exon matching ==
-    def assign_exons(self, read_exon_profile):
+    def assign_exons(self, combined_read_profile):
         pass

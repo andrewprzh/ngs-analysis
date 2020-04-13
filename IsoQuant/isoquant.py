@@ -44,39 +44,33 @@ def parse_args():
     parser.add_argument("--index", help="genome index for specified aligner,"
                                         "should be provided only when raw reads are used as an input", type=str)
 
-    parser.add_argument("--output", "-o", help="output folder, will be created automatically", type=str)
+    parser.add_argument("--output", "-o", help="output folder, will be created automatically [./]", type=str, default="./")
     parser.add_argument("--keep_tmp", help="do not remove temporary files in the end", action='store_true', default=False)
     parser.add_argument("--prefix", help="prefix for output files", type=str, default="")
-    parser.add_argument("--threads", "-t", help="number of threads to use", type=int, default="8")
+    parser.add_argument("--threads", "-t", help="number of threads to use", type=int, default="16")
     parser.add_argument("--read_info", help="text file with tab-separated information about input reads, according to"
                                             "which counts are groupped, e.g. cell type, barcode, etc.", type=str)
-    parser.add_argument("--aligner", help="force to use this alignment method, can be minimap2, star, gmap, hisat2", type=str)
+    parser.add_argument("--aligner", help="force to use this alignment method, can be minimap2, star, gmap, hisat2; "
+                                          "chosen based on data type if not set", type=str)
     parser.add_argument("--path_to_aligner", help="folder with the aligner, $PATH is used by default", type=str)
 
+    parser.add_argument("--delta", help="delta for inexact splice junction comparison, "
+                                        "chosen automatically based on data type", type=int, default="6")
 
     args = parser.parse_args()
-
-    if args.output is None:
-        print("Output folder was not specified")
-        exit(-1)
-
-    if os.path.exists(args.output):
-        print("Output folder already exists, some files may be overwritten")
-    else:
-        os.makedirs(args.output)
-
     return args
 
 
 # Check user's params
 def check_params(args):
-    input = map(lambda x: x is not None, [args.bam, args.fastq, args.bam_list, fastq_list])
+    input = list(map(lambda x: x is not None, [args.bam, args.fastq, args.bam_list, args.fastq_list]))
     if input.count(True) == 0:
         logger.critical("No input data was provided")
         exit(-1)
     elif input.count(True) > 1:
         logger.critical("Input data was provided using more than one option")
         exit(-1)
+
     args.input_data = InputDataStorage(args)
     if args.input_data.input_type == "fastq" and args.reference is None and args.index is None:
         logger.critical("Reference genome or index were not provided, raw reads cannot be processed")
@@ -89,7 +83,7 @@ def check_params(args):
         logger.critical("Gene database was provided twice")
         exit(-1)
 
-    if args.aligner is not None and args.aligne not in SUPPORTED_ALIGNERS:
+    if args.aligner is not None and args.aligner not in SUPPORTED_ALIGNERS:
         logger.critical("Unsupported aligner" + args.aligner + ", choose one of " + " ".join(SUPPORTED_ALIGNERS))
         exit(-1)
     if args.data_type is None:
@@ -99,11 +93,54 @@ def check_params(args):
         logger.critical("Unsupported data type " + args.data_type + ", choose one of " + " ".join(DATATYPE_TO_ALIGNER.keys()))
         exit(-1)
 
+    check_input_files(args)
+
+
+def check_input_files(args):
+    for sample in args.input_data.samples:
+        for lib in sample:
+            for in_file in lib:
+                if not os.path.isfile(in_file):
+                    raise Exception("Input file " + in_file + " does not exist")
+                if args.input_data.input_type == "bam":
+                    if not os.path.isfile(in_file):
+                        raise Exception("BAM file " + in_file + " does not exist")
+                    bamfile_in = pysam.AlignmentFile(in_file, "rb")
+                    if not bamfile_in.has_index:
+                        raise Exception("BAM file " + in_file + " is not indexed, run samtools index")
+                    bamfile_in.close()
+
+    if args.genedb is not None:
+        if not os.path.isfile(args.genedb):
+            logger.critical("Gene database " + args.genedb + " does not exist")
+            raise Exception("Gene database " + args.genedb + " does not exist")
+    if args.gtf is not None:
+        if not os.path.isfile(args.gtf):
+            logger.critical("Gene database " + args.gtf + " does not exist")
+            raise Exception("Gene database " + args.gtf + " does not exist")
+
 
 def create_output_dirs(args):
-    args.tmp_dir = ""
-    args.sample_dirs = []
-    pass
+    if args.output is None:
+        logger.critical("Output folder was not specified")
+        exit(-1)
+
+    if os.path.exists(args.output):
+        print("Output folder already exists, some files may be overwritten")
+    else:
+        os.makedirs(args.output)
+
+    args.tmp_dir = os.path.join(args.output, "tmp")
+    if os.path.exists(args.tmp_dir):
+        print("Tmp folder already exists, some files may be overwritten")
+    else:
+        os.makedirs(args.tmp_dir)
+
+    for sample_dir in args.input_data.output_folders:
+        if os.path.exists(sample_dir):
+            print(sample_dir + "folder already exists, some files may be overwritten")
+        else:
+            os.makedirs(sample_dir)
 
 
 def set_logger(args, logger_instnace):
@@ -118,6 +155,15 @@ def set_logger(args, logger_instnace):
     ch.setFormatter(formatter)
     logger_instnace.addHandler(fh)
     logger_instnace.addHandler(ch)
+
+
+def set_additional_params(args):
+    #TODO proper options
+    args.print_additional_info = True
+    args.skip_secondary = True
+    args.ingnore_extra_flanking = True
+    args.resolve_ambiguous = False
+    args.correct_minor_errors = True
 
 
 def run_pipeline(args):
@@ -145,6 +191,7 @@ def main():
     set_logger(args, logger)
     check_params(args)
     create_output_dirs(args)
+    set_additional_params(args)
     run_pipeline(args)
 
 

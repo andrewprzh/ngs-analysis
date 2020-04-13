@@ -8,7 +8,7 @@ import logging
 import gffutils
 from functools import partial
 
-from common import *
+from src.common import *
 
 logger = logging.getLogger('GeneInfo')
 
