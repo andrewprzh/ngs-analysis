@@ -148,9 +148,13 @@ def create_output_dirs(args):
 
 
 def set_logger(args, logger_instnace):
-    logger_instnace.setLevel(logging.INFO)
-    fh = logging.FileHandler(os.path.join(args.output, "isoquant.log"))
-    fh.setLevel(logging.INFO)
+    logger_instnace.setLevel(logging.DEBUG)
+    log_file = os.path.join(args.output, "isoquant.log")
+    f = open(log_file, "w")
+    f.close()
+    fh = logging.FileHandler(log_file)
+    #FIXME
+    fh.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
 
@@ -165,8 +169,10 @@ def set_additional_params(args):
     #TODO proper options
     args.print_additional_info = True
     args.skip_secondary = True
-    args.ingnore_extra_flanking = True
+
     args.resolve_ambiguous = False
+    args.allow_exon_extension = True
+    args.allow_extra_terminal_introns = False
     args.correct_minor_errors = True
 
 

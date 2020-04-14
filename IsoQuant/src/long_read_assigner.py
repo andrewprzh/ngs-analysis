@@ -5,6 +5,7 @@
 ############################################################################
 
 import logging
+import copy
 
 from src.common import *
 from src.gene_info import *
@@ -14,28 +15,82 @@ from src.long_read_profiles import *
 logger = logging.getLogger('IsoQuant')
 
 
-class ReadAssignment:
-    def __init__(self, read_id, assignment_type = [], assigned_features = []):
-        self.read_id = read_id
-        if isinstance(assignment_type, list):
-            self.assignment_type = assignment_type
-        else:
-            self.assignment_type = [assignment_type]
-        self.assigned_features = assigned_features
+class AssignmentType:
+    unique = "unique"
+    empty = "empty"
+    ambiguous = "ambiguous"
+    contradictory = "contradictory"
 
-    def add_feature(self, feature, type):
+
+class MatchingEvent:
+    none = "none"
+    undefined = "undefined"
+    fsm = "full_splice_match"
+    ambiguous_isoform = "assigned_to_ambiguous_isoform"
+
+    extra_intron = "additional_novel_intron"
+    extra_intron_known = "additional_known_intron"
+    extra_intron_out = "additional_terminal_intron"
+
+    intron_retention = "intron_retention"
+    intron_migration = "intron_migration"
+    intron_alternation_novel = "alternative_novel_intron"
+    intron_alternation_known = "alternative_known_intron"
+    mutually_exclusive_exons_novel = "mutualy_exclusive_novel_exons"
+    mutually_exclusive_exons_known = "mutualy_exclusive_known_exons"
+    exon_skipping_known_intron = "exon_skipping_known_intron"
+    exon_skipping_novel_intron = "exon_skipping_novel_intron"
+    exon_gain_known = "gains_known_exon"
+    exon_gain_novel = "gains_known_novel"
+    alternative_structure_novel = "alternative_novel_introns"
+    alternative_structure_known = "alternative_known_introns"
+
+    exon_elongation = "exon_elongation"
+    intron_shift = "intron_shift"
+    exon_misallignment = "small_exon_misallignment"
+
+    @staticmethod
+    def is_elongated_exon(event):
+        return event.find(MatchingEvent.exon_elongation) != 1
+
+    @staticmethod
+    def is_extra(event):
+        return any(event.find(e) != -1 for e in [MatchingEvent.extra_intron_out, MatchingEvent.extra_intron_known, MatchingEvent.extra_intron])
+
+    @staticmethod
+    def is_minor_error(event):
+        return event == MatchingEvent.intron_shift or event == MatchingEvent.exon_misallignment
+
+
+class ReadAssignment:
+    def __init__(self, read_id, assignment_type, assigned_features = [], match_events = []):
+        self.read_id = read_id
+        self.assignment_type = copy.deepcopy(assignment_type)
+        if len(match_events) == 0 and len(assigned_features) > 0:
+            self.match_events = copy.deepcopy([copy.deepcopy(MatchingEvent.none)] * len(assigned_features))
+        else:
+            self.match_events = copy.deepcopy(match_events)
+        self.assigned_features = copy.deepcopy(assigned_features)
+
+    def add_feature(self, feature, event = MatchingEvent.none):
         self.assigned_features.append(feature)
-        self.assignment_type.append(type)
+        self.match_events.append(copy.deepcopy(event))
+
+    def add_event(self, index, event):
+        if self.match_events[index] == MatchingEvent.none:
+            self.match_events[index] = copy.deepcopy(event)
+        else:
+            self.match_events[index] += "+" + copy.deepcopy(event)
+
+    def add_common_event(self, event):
+        for i in range(len(self.match_events)):
+            self.add_event(i, event)
+
+    def set_assignment_type(self, assignment_type):
+        self.assignment_type = copy.deepcopy(assignment_type)
 
 
 class LongReadAssigner:
-    JUNK_ASSIGNMENT_TYPES = set(["empty", "undefined"])
-    UNIQUE_ASSIGNMENT_TYPES = set(["unique_full_splice_match", "unique_match"])
-    MINOR_CONTRADICTION_ASSIGNMENT_TYPES = set(["intron_retention", "undefined", "intron_shift", "small_exon_misalignment"])
-    AMBIGUOUS_ASSIGNMENT_TYPES = set(["ambiguous_", "assigned_to_ambiguous_isoform"])
-    EXTRA_FLANKING_ASSIGNMEN_TYPES = set(["unique_extra_"])
-    NOVEL_STRUCTURE_ASSIGNMENT_TYPES = set(["contradictory", "additional_", "intron_altered", "mutually_exclusive_",
-                                            "intron_migration", "exon_skipping_", "gains_", "alternative_"])
 
     def __init__(self, gene_info, params):
         self.gene_info = gene_info
@@ -62,55 +117,85 @@ class LongReadAssigner:
     def assign_to_isoform(self, read_id, combined_read_profile):
         read_intron_profile = combined_read_profile.read_intron_profile
         read_split_exon_profile = combined_read_profile.read_split_exon_profile
+
+        logger.debug("> Read blocks" + str(read_split_exon_profile.read_features))
+        logger.debug("Gene split exons" + str(self.gene_info.split_exon_profiles.features))
+        logger.debug("Read exons profile" + str(read_split_exon_profile.read_profile))
+        logger.debug("Gene exons profile" + str(read_split_exon_profile.gene_profile))
+
+        logger.debug("< Read introns" + str(read_intron_profile.read_features))
+        logger.debug("Gene introns" + str(self.gene_info.intron_profiles.features))
+        logger.debug("Read intron profile" + str(read_intron_profile.read_profile))
+        logger.debug("Gene intron profile" + str(read_intron_profile.gene_profile))
+
         if all(el == 0 for el in read_split_exon_profile.read_profile):
             # none of the blocks matched
-            return ReadAssignment(read_id, "empty")
-        elif any(el == 0 for el in read_intron_profile.read_profile) or any(el == 0 for el in read_split_exon_profile.read_profile):
-            # Read has extra flanking exons / introns
-            return self.resolve_extra_flanking(read_id, read_intron_profile, read_split_exon_profile)
+            logger.debug("EMPTY")
+            return ReadAssignment(read_id, AssignmentType.empty)
         elif any(el == -1 for el in read_intron_profile.read_profile) or any(el == -1 for el in read_split_exon_profile.read_profile):
             # Read has missing exons / introns
+            logger.debug("+ Has contradictory features")
             return self.resolve_contradictory(read_id, read_intron_profile, read_split_exon_profile)
+        elif any(el == 0 for el in read_intron_profile.read_profile) or any(el == 0 for el in read_split_exon_profile.read_profile):
+            # Read has extra flanking exons / introns
+            logger.debug("+ Has extra flanking features")
+            return self.resolve_extra_flanking(read_id, read_intron_profile, read_split_exon_profile)
         else:
+            logger.debug("+ No contradictory features")
             assignment = self.match_non_contradictory(read_id, read_intron_profile, read_split_exon_profile)
+
             #check for extra flanking sequences
-            if not self.params.ingnore_extra_flanking:
-                #TODO proper way of handling extra sequnces
-                isoform_exon_profile = self.gene_info.split_exon_profiles.profiles[assignment.assigned_features[0]]
-                start_exon = self.gene_info.split_exon_profiles.features[isoform_exon_profile.index[1]]
-                end_exon = self.gene_info.split_exon_profiles.features[isoform_exon_profile.rindex[1]]
-                extra5 = read_split_exon_profile.read_features[0][0] + self.params.delta < start_exon[0]
-                extra3 = read_split_exon_profile.read_features[-1][1] - self.params.delta > end_exon[0]
-                if extra3 and extra5:
-                    assignment.assignment_type[0] += "_extra_seq53"
-                elif extra3:
-                    assignment.assignment_type[0] += "_extra_seq3"
-                elif extra5:
-                    assignment.assignment_type[0] += "_extra_seq5"
+            if assignment.assignment_type == AssignmentType.unique and not MatchingEvent.is_extra(assignment.match_events[0]) \
+                    and not MatchingEvent.is_elongated_exon(assignment.match_events[0]):
+
+                isoform_id = assignment.assigned_features[0]
+                isoform_exon_profile = self.gene_info.split_exon_profiles.profiles[isoform_id]
+                start_exon = self.gene_info.split_exon_profiles.features[isoform_exon_profile.index(1)]
+                end_exon = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)]
+                read_start = read_split_exon_profile.read_features[0][0]
+                read_end = read_split_exon_profile.read_features[-1][1]
+
+                extra5 = read_start + self.params.delta < start_exon[0]
+                extra3 = read_end - self.params.delta > end_exon[1]
+                if extra3 or extra5:
+                    logger.debug("+ + Exon elongation")
+                    logger.debug("Read: " + str(read_start) + "-" + str(read_end))
+                    logger.debug("Isoform: " + str(read_start) + "-" + str(read_end))
+                    assignment.add_event(0, MatchingEvent.exon_elongation)
+                    if not self.params.allow_exon_extension:
+                        assignment.set_assignment_type(AssignmentType.contradictory)
+
             return assignment
 
     # match profile when all read features are assigned
     def match_non_contradictory(self, read_id, read_intron_profile, read_split_exon_profile):
         intron_matched_isoforms = self.find_matching_isofoms(read_intron_profile.gene_profile,
-                                                                        self.gene_info.intron_profiles.profiles)
+                                                             self.gene_info.intron_profiles.profiles)
         exon_matched_isoforms = self.find_matching_isofoms(read_split_exon_profile.gene_profile,
-                                                                      self.gene_info.split_exon_profiles.profiles)
+                                                           self.gene_info.split_exon_profiles.profiles)
         both_mathched_isoforms = intron_matched_isoforms.intersection(exon_matched_isoforms)
 
         read_assignment = None
         if len(both_mathched_isoforms) == 1:
             isoform_id = list(both_mathched_isoforms)[0]
+            logger.debug("+ + UNIQUE match found " + isoform_id)
+            logger.debug(str(self.gene_info.split_exon_profiles.profiles[isoform_id]))
+            logger.debug(str(self.gene_info.intron_profiles.profiles[isoform_id]))
+
             if 1 in read_intron_profile.gene_profile and 1 in self.gene_info.intron_profiles.profiles[isoform_id] and \
                     read_intron_profile.gene_profile.index(1) == self.gene_info.intron_profiles.profiles[isoform_id].index(1) and \
                         rindex(read_intron_profile.gene_profile, 1) == rindex(self.gene_info.intron_profiles.profiles[isoform_id], 1):
-                read_assignment = ReadAssignment(read_id, "unique_full_splice_match", list(both_mathched_isoforms))
+                logger.debug("+ + Full splice match " + isoform_id)
+                read_assignment = ReadAssignment(read_id, AssignmentType.unique, list(both_mathched_isoforms), [MatchingEvent.fsm])
             else:
-                read_assignment = ReadAssignment(read_id, "unique_match", list(both_mathched_isoforms))
+                read_assignment = ReadAssignment(read_id, AssignmentType.unique, list(both_mathched_isoforms))
 
         elif len(both_mathched_isoforms) > 1:
+            logger.debug("+ + AMBIGUOUS matches found ")
             if not self.params.resolve_ambiguous or len(self.gene_info.ambiguous_isoforms.intersection(both_mathched_isoforms)) > 0:
-                read_assignment = ReadAssignment(read_id, "ambiguous", list(both_mathched_isoforms))
+                read_assignment = ReadAssignment(read_id, AssignmentType.ambiguous, list(both_mathched_isoforms))
             else:
+                logger.debug("+ + Resolving ambiguity ")
                 possible_isoforms = self.gene_info.ambiguous_isoforms.intersection(both_mathched_isoforms)
                 intron_matched_isoforms = \
                     self.resolve_ambiguous(read_intron_profile.gene_profile, self.gene_info.intron_profiles.profiles, possible_isoforms)
@@ -120,24 +205,25 @@ class LongReadAssigner:
                 both_mathched_isoforms = intron_matched_isoforms.intersection(exon_matched_isoforms)
 
                 if len(both_mathched_isoforms) == 1:
-                    read_assignment = ReadAssignment(read_id, "assigned_to_ambiguous_isoform", list(both_mathched_isoforms))
+                    read_assignment = ReadAssignment(read_id, AssignmentType.unique, list(both_mathched_isoforms), [MatchingEvent.ambiguous_isoform])
                 else:
-                    read_assignment = ReadAssignment(read_id, "ambiguous", list(both_mathched_isoforms))
+                    read_assignment = ReadAssignment(read_id, AssignmentType.ambiguous, list(both_mathched_isoforms))
 
         elif len(both_mathched_isoforms) == 0:
+            logger.debug("+ + Inersection is empty ")
             if len(intron_matched_isoforms) > 0:
+                #intron profile match, but extra exons
                 if len(intron_matched_isoforms) == 1:
-                    read_assignment = ReadAssignment(read_id, "unique_extra_exon", list(intron_matched_isoforms))
+                    logger.debug("+ + But there is unique intron profile match")
+                    read_assignment = ReadAssignment(read_id, AssignmentType.unique, list(intron_matched_isoforms), [MatchingEvent.exon_elongation])
                 else:
-                    read_assignment = ReadAssignment(read_id, "ambiguous_extra_exon", list(intron_matched_isoforms))
-            elif len(exon_matched_isoforms) > 0:
-                if len(exon_matched_isoforms) == 1:
-                    read_assignment = ReadAssignment(read_id, "unique_extra_intron_wtf", list(exon_matched_isoforms))
-                else:
-                    read_assignment = ReadAssignment(read_id, "ambiguous_extra_intron_wtf", list(exon_matched_isoforms))
+                    logger.debug("+ + But there is amb intron profile match")
+                    read_assignment = ReadAssignment(read_id, AssignmentType.ambiguous, list(intron_matched_isoforms),
+                                                     [MatchingEvent.exon_elongation] * len(intron_matched_isoforms))
             else:
                 # alternative isoforms made of known introns/exons or intron retention
-                read_assignment = self.resolve_unmatched(read_id, read_intron_profile, read_split_exon_profile)
+                logger.debug("+ + Resolving unmatched ")
+                read_assignment = self.resolve_contradictory(read_id, read_intron_profile, read_split_exon_profile)
         return read_assignment
 
     # resolve assignment ambiguities caused by identical profiles
@@ -158,61 +244,21 @@ class LongReadAssigner:
 
     #resolve when there are 0s  at the ends of read profile
     def resolve_extra_flanking(self, read_id, read_intron_profile, read_split_exon_profile):
-        if not self.params.ingnore_extra_flanking:
-            assignment = ReadAssignment(read_id, "contradictory")
-        else:
-            assignment = self.match_non_contradictory(read_id, read_intron_profile, read_split_exon_profile)
+        #logger.debug("+ + ")
+        if read_intron_profile.read_profile[0] == 1 or read_intron_profile.read_profile[-1] == 1:
+            logger.warn("+ + Both terminal introns present, odd case")
 
-        if read_intron_profile.read_profile[0] != 1 and read_intron_profile.read_profile[-1] != 1:
-            assignment_type_suffix = "_extra_intron35"
-        elif read_intron_profile.read_profile[0] != 1:
-            assignment_type_suffix = "_extra_intron5"
-        elif read_intron_profile.read_profile[-1] != 1:
-            assignment_type_suffix = "_extra_intron3"
-        elif read_intron_profile.read_profile[0] == 1 and read_intron_profile.read_profile[-1] == 1:
-            assignment_type_suffix = "_extra_exon_wtf"
-        else:
-            assignment_type_suffix = "_extra_intron_wtf"
-        assignment.assignment_type[0] += assignment_type_suffix
+        assignment = self.match_non_contradictory(read_id, read_intron_profile, read_split_exon_profile)
+        if not self.params.allow_extra_terminal_introns:
+            assignment.set_assignment_type(AssignmentType.contradictory)
+        assignment.add_common_event(MatchingEvent.extra_intron_out)
+
         return assignment
 
-    #resolve when there are no exactly matching isoforms, but no -1s in read profiles
-    def resolve_unmatched(self, read_id, read_intron_profile, read_split_exon_profile):
-        #FIXME do not exec match profile for the second time
-        intron_matching_isoforms = self.match_profile(read_intron_profile.gene_profile, self.gene_info.intron_profiles.profiles)
-        exon_matching_isoforms = self.match_profile(read_split_exon_profile.gene_profile, self.gene_info.split_exon_profiles.profiles)
-
-        assignment = ReadAssignment(read_id)
-        if intron_matching_isoforms[0][1] == 0:
-            # difference is only in exons
-            isoform_ids = get_first_best_from_sorted(exon_matching_isoforms)
-            assignment_type = "ambiguous" if len(isoform_ids) > 1 else "unique"
-
-            for matched_isoform in isoform_ids:
-                isoform_exon_comparative_profile = mask_profile(self.gene_info.split_exon_profiles.profiles[isoform_id],
-                                                                read_split_exon_profile.gene_profile)
-
-                if isoform_exon_comparative_profile[0] != 1 and isoform_exon_comparative_profile[-1] != 1:
-                    assignment_type_suffix = "_extra_known_exon35"
-                elif isoform_exon_comparative_profile[0] != 1:
-                    assignment_type_suffix = "_extra_known_exon5"
-                elif isoform_exon_comparative_profile[-1] != 1:
-                    assignment_type_suffix = "_extra_known_exon3"
-                else:
-                    assignment_type_suffix = "_extra_known_exon_wtf"
-                assignment.add_feature(matched_isoform, assignment_type + assignment_type_suffix)
-
-                return assignment
-
-        # difference in introns
-        return self.detect_differences(read_id, read_intron_profile, read_split_exon_profile, intron_matching_isoforms,
-                                       exon_matching_isoforms)
-
-    #resolve when there are -1s in read profile
+    #resolve when there are -1s in read profile or when there are no exactly matching isoforms, but no -1s in read profiles
     def resolve_contradictory(self, read_id, read_intron_profile, read_split_exon_profile):
         intron_matching_isoforms = self.match_profile(read_intron_profile.gene_profile, self.gene_info.intron_profiles.profiles)
-        exon_matching_isoforms = self.match_profile(read_split_exon_profile.gene_profile,
-                                           self.gene_info.split_exon_profiles.profiles)
+        exon_matching_isoforms = self.match_profile(read_split_exon_profile.gene_profile, self.gene_info.split_exon_profiles.profiles)
         return self.detect_differences(read_id, read_intron_profile, read_split_exon_profile, intron_matching_isoforms, exon_matching_isoforms)
 
     # compare read to closest matching isoforms
@@ -222,8 +268,9 @@ class LongReadAssigner:
         best_exon_isoforms = list(filter(lambda x: x[0] in best_intron_isoform_ids, exon_matching_isoforms))
         best_isoform_ids = get_first_best_from_sorted(best_exon_isoforms)
 
-        assignment = ReadAssignment(read_id)
-        print(read_intron_profile.read_profile)
+        assignment = ReadAssignment(read_id, AssignmentType.contradictory)
+        logger.debug("+ + Closest matching isoforms " + str(best_isoform_ids))
+
         for isoform_id in best_isoform_ids:
             # get intron coordinates
             isoform_introns = get_blocks_from_profile(self.gene_info.intron_profiles.features,
@@ -235,9 +282,18 @@ class LongReadAssigner:
             isoform_start = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][0]
             isoform_end = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][-1]
             isoform_region = (isoform_start, isoform_end)
-            assignment_type = self.compare_junctions(read_intron_profile.read_features, read_region,
-                                                     isoform_introns, isoform_region)
-            assignment.add_feature(isoform_id, assignment_type)
+            matching_event = self.compare_junctions(read_intron_profile.read_features, read_region,
+                                                    isoform_introns, isoform_region)
+            logger.debug("+ + Existing features " + str(assignment.assigned_features))
+            assignment.add_feature(isoform_id, matching_event)
+            logger.debug("+ + Found contradiction for " + isoform_id + ": " + matching_event)
+
+        if self.params.correct_minor_errors:
+            #correct assignment type if contradiction is minor
+            if all(MatchingEvent.is_minor_error(e) for e in assignment.match_events):
+                new_assignment_type = AssignmentType.unique if len(best_isoform_ids) == 1 else AssignmentType.ambiguous
+                assignment.set_assignment_type(new_assignment_type)
+
         return assignment
 
     # compare read splice junctions against similar isoform
@@ -318,14 +374,20 @@ class LongReadAssigner:
                 break
             isoform_pos += 1
 
-        print(read_features_present)
-        print(isoform_features_present)
+        logger.debug("+ + Inspected contradictory read")
+        logger.debug("+ + Read profile " + str(read_features_present))
+        logger.debug("+ + Isoform profile " + str(isoform_features_present))
+
         if any(el == -1 for el in read_features_present) or any(el == -1 for el in isoform_features_present):
             # classify contradictions
+            logger.debug("+ + Classifying contradictions")
             return self.detect_contradiction_type(read_junctions, isoform_junctions, contradictory_region_pairs)
+        elif read_features_present[0] == 0 or read_features_present[-1] == 0:
+            logger.debug("+ + Found only extra terminal introns")
+            return MatchingEvent.extra_intron_out
         else:
-            logger.warn("No contradition detected")
-            return "undefined"
+            logger.warn("No contradition detected, odd case")
+            return MatchingEvent.undefined
 
     def detect_contradiction_type(self, read_junctions, isoform_junctions, contradictory_region_pairs):
         contradiction_events = []
@@ -338,15 +400,15 @@ class LongReadAssigner:
         if len(contradiction_events_set) == 1:
             return contradiction_events[0]
         else:
-            return ",".join(list(contradiction_events_set))
+            return "+".join(list(contradiction_events_set))
 
     def compare_overlapping_contradictional_regions(self, read_junctions, isoform_junctions, read_cregion, isoform_cregion):
         if read_cregion is None:
-            return "intron_retention"
+            return MatchingEvent.intron_retention
         elif isoform_cregion is None:
             if self.are_known_introns(read_junctions, read_cregion):
-                return "additional_known_intron"
-            return "additional_unknown_intron"
+                return MatchingEvent.extra_intron_known
+            return MatchingEvent.extra_intron
 
         read_intron_total_len = sum(
             [read_junctions[i][1] - read_junctions[i][0] for i in range(read_cregion[0], read_cregion[1] + 1)])
@@ -359,42 +421,43 @@ class LongReadAssigner:
         if read_cregion[1] == read_cregion[0] and isoform_cregion[1] == isoform_cregion[0]:
             if total_intron_len_diff < self.params.delta:
                 if read_introns_known:
-                    return "intron_migration"
+                    return MatchingEvent.intron_migration
                 else:
-                    return "intron_shift"
+                    return MatchingEvent.intron_shift
             else:
+                # TODO more cases - alternative donor-acceptor sites
                 if read_introns_known:
-                    return "intron_altered"
+                    return MatchingEvent.intron_alternation_known
                 else:
-                    return "intron_altered_novel"
+                    return MatchingEvent.intron_alternation_novel
 
         elif read_cregion[1] - read_cregion[0] == isoform_cregion[1] - isoform_cregion[0] and \
                 total_intron_len_diff < self.params.delta:
             if read_introns_known:
-                return "mutually_exclusive_known_exons"
+                return MatchingEvent.mutually_exclusive_exons_known
             else:
-                return "mutualy_exclusive_novel_exons"
+                return MatchingEvent.mutually_exclusive_exons_novel
 
         elif read_cregion[1] == read_cregion[0] and isoform_cregion[1] > isoform_cregion[0]:
             if total_intron_len_diff < self.params.delta:
-                return "small_exon_misalignment"
+                return MatchingEvent.exon_misallignment
             else:
                 if read_introns_known:
-                    return "exon_skipping_known_intron"
+                    return MatchingEvent.exon_skipping_known_intron
                 else:
-                    return "exon_skipping_novel_intron"
+                    return MatchingEvent.exon_skipping_novel_intron
 
         elif read_cregion[1] > read_cregion[0] and isoform_cregion[1] == isoform_cregion[0]:
             if read_introns_known:
-                return "gains_known_exon"
+                return MatchingEvent.exon_gain_known
             else:
-                return "gains_novel_exon"
+                return MatchingEvent.exon_gain_novel
 
         else:
             if read_introns_known:
-                return "alternative_known_exons"
+                return MatchingEvent.alternative_structure_known
             else:
-                return "alternative_novel_exons"
+                return MatchingEvent.alternative_structure_novel
 
     def are_known_introns(self, junctions, region):
         selected_junctions = []

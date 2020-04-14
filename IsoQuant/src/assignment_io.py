@@ -6,6 +6,7 @@
 
 import logging
 from src.common import *
+from src.long_read_assigner import *
 
 logger = logging.getLogger('IsoQuant')
 
@@ -14,17 +15,17 @@ class PrintAllFunctor:
         return True
 
 
-class PrintStartingWithSetFunctor:
-    def __init__(self, *prefix_sets):
-        self.prefix_set = set()
-        self.update(*prefix_sets)
-
-    def update(self, *prefix_sets):
-        for s in prefix_sets:
-            self.prefix_set.update(s)
+class PrintOnlyFunctor:
+    def __init__(self, allowed_types):
+        if isinstance(allowed_types, list):
+            self.allowed_types = set(allowed_types)
+        elif isinstance(allowed_types, set):
+            self.allowed_types = allowed_types
+        else:
+            self.allowed_types = set([allowed_types])
 
     def check(self, assignment):
-        return any(assignment.assignment_type[0].startswith(prefix) for prefix in self.prefix_set)
+        return assignment.assignment_type in self.allowed_types
 
 
 class AbstractAssignmentPrinter:
@@ -60,7 +61,7 @@ class ReadAssignmentCompositePrinter:
 class BasicTSVAssignmentPrinter(AbstractAssignmentPrinter):
     def __init__(self, output_file_name, params, format = "TSV", assignment_checker=PrintAllFunctor()):
         AbstractAssignmentPrinter.__init__(self, output_file_name, params, format, assignment_checker)
-        self.header = "#read_id\tisoform_id\tassignment_type"
+        self.header = "#read_id\tisoform_id\tassignment_type\tassignment_events"
         if self.params.print_additional_info:
             self.header += "\taligned_blocks\tintron_profile\tsplit_exon_profile"
         self.header += "\n"
@@ -70,7 +71,8 @@ class BasicTSVAssignmentPrinter(AbstractAssignmentPrinter):
         if not self.assignment_checker.check(read_assignment):
             return
 
-        line = read_assignment.read_id + "\t" + ",".join(read_assignment.assigned_features) + "\t" + ",".join(read_assignment.assignment_type)
+        line = read_assignment.read_id  + "\t" + ",".join(read_assignment.assigned_features) + "\t" \
+                + read_assignment.assignment_type + "\t" + ",".join(read_assignment.match_events)
         if self.params.print_additional_info:
             if combined_read_profile is None:
                 line += "\t.\t.\t."

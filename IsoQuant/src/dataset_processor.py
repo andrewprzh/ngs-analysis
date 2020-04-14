@@ -108,19 +108,9 @@ class DatasetProcessor:
         self.gene_cluster_constructor = GeneClusterConstructor(self.gffutils_db)
         self.gene_clusters = self.gene_cluster_constructor.get_gene_sets()
 
-        self.correct_assignment_checker = PrintStartingWithSetFunctor(LongReadAssigner.UNIQUE_ASSIGNMENT_TYPES)
-        self.novel_assignment_checker = PrintStartingWithSetFunctor(LongReadAssigner.NOVEL_STRUCTURE_ASSIGNMENT_TYPES)
-        self.rest_assignment_checker = PrintStartingWithSetFunctor(LongReadAssigner.JUNK_ASSIGNMENT_TYPES, LongReadAssigner.AMBIGUOUS_ASSIGNMENT_TYPES)
-
-        if self.args.ingnore_extra_flanking :
-            self.correct_assignment_checker.update(LongReadAssigner.EXTRA_FLANKING_ASSIGNMEN_TYPES)
-        else:
-            self.rest_assignment_checker.update(LongReadAssigner.EXTRA_FLANKING_ASSIGNMEN_TYPES)
-        if self.args.correct_minor_errors:
-            self.correct_assignment_checker.update(LongReadAssigner.MINOR_CONTRADICTION_ASSIGNMENT_TYPES)
-        else:
-            self.rest_assignment_checker.update(LongReadAssigner.MINOR_CONTRADICTION_ASSIGNMENT_TYPES)
-
+        self.correct_assignment_checker = PrintOnlyFunctor(AssignmentType.unique)
+        self.novel_assignment_checker = PrintOnlyFunctor(AssignmentType.contradictory)
+        self.rest_assignment_checker = PrintOnlyFunctor([AssignmentType.empty, AssignmentType.ambiguous])
 
     def process_all_samples(self, input_data):
         for sample in input_data.samples:
