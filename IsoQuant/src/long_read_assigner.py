@@ -276,11 +276,11 @@ class LongReadAssigner:
             isoform_introns = get_blocks_from_profile(self.gene_info.intron_profiles.features,
                                                       self.gene_info.intron_profiles.profiles[isoform_id])
             # read start-end coordinates
-            read_region = (read_split_exon_profile.read_features[0][0], read_split_exon_profile.read_features[0][0])
+            read_region = (read_split_exon_profile.read_features[0][0], read_split_exon_profile.read_features[-1][1])
             # isoform start-end
             isoform_exon_profile = self.gene_info.split_exon_profiles.profiles[isoform_id]
-            isoform_start = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][0]
-            isoform_end = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][-1]
+            isoform_start = self.gene_info.split_exon_profiles.features[isoform_exon_profile.index(1)][0]
+            isoform_end = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][1]
             isoform_region = (isoform_start, isoform_end)
             matching_event = self.compare_junctions(read_intron_profile.read_features, read_region,
                                                     isoform_introns, isoform_region)
@@ -376,7 +376,12 @@ class LongReadAssigner:
 
         logger.debug("+ + Inspected contradictory read")
         logger.debug("+ + Read profile " + str(read_features_present))
+        logger.debug("+ + Read introns " + str(read_junctions))
+        logger.debug("+ + Read region " + str(read_region))
+
         logger.debug("+ + Isoform profile " + str(isoform_features_present))
+        logger.debug("+ + Isoform introns " + str(isoform_junctions))
+        logger.debug("+ + Isoform region " + str(isoform_region))
 
         if any(el == -1 for el in read_features_present) or any(el == -1 for el in isoform_features_present):
             # classify contradictions

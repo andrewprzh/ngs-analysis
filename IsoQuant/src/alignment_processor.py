@@ -45,7 +45,7 @@ class LongReadAlginmentProcessor:
                 continue
 
             read_id = alignment.query_name
-            sorted_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
+            sorted_blocks = correct_bam_coords(concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples))
             intron_profile = self.intron_profile_construnctor.construct_profile(sorted_blocks)
             split_exon_profile = self.split_exon_profile_construnctor.construct_profile(sorted_blocks)
             # FIXME

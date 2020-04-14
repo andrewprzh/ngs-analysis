@@ -131,7 +131,6 @@ class DatasetProcessor:
                                                 assignment_checker=self.novel_assignment_checker)
         global_printer = ReadAssignmentCompositePrinter([correct_printer, unmatched_printer, alt_printer])
 
-
         for g in self.gene_clusters:
             gene_info = GeneInfo(g, self.gffutils_db)
             bam_files = list(map(lambda x: x[0], sample.file_list))

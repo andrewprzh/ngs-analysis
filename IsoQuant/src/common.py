@@ -122,6 +122,10 @@ def concat_gapless_blocks(blocks, cigar_tuples):
     return resulting_blocks
 
 
+def correct_bam_coords(blocks):
+    return list(map(lambda x: (x[0] + 1, x[1]), blocks))
+
+
 # == profile functions ==
 def is_subprofile(short_isoform_profile, long_isoform_profile):
     if len(short_isoform_profile) != len(long_isoform_profile):
