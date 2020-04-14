@@ -6,7 +6,7 @@
 
 import logging
 
-logger = logging.getLogger('Common')
+logger = logging.getLogger('IsoQuant')
 
 # key, value
 def get_first_best_from_sorted(sorted_list_of_pairs):
@@ -21,6 +21,13 @@ def get_first_best_from_sorted(sorted_list_of_pairs):
 
 def list_to_str(element_list, element_delim=','):
     return element_delim.join(list(map(str, element_list)))
+
+
+def rindex(l, el):
+    for i in range(len(l) - 1, -1, -1):
+        if l[i] == el:
+            return i
+    raise ValueError(str(el) + " is not in list")
 
 
 #check whether genes overlap and should be processed together
@@ -64,12 +71,12 @@ def range_list_to_str(range_list, element_delim=',', coord_delim='-'):
 
 
 # == working with alignment blocks ==
-def junctions_from_blocks(blocks):
+def junctions_from_blocks(sorted_blocks):
     junctions = []
-    if len(blocks) >= 2:
-        for i in range(0, len(blocks) - 1):
-            if blocks[i][1] + 1 < blocks[i + 1][0]:
-                junctions.append((blocks[i][1] + 1, blocks[i + 1][0] - 1))
+    if len(sorted_blocks) >= 2:
+        for i in range(0, len(sorted_blocks) - 1):
+            if sorted_blocks[i][1] + 1 < sorted_blocks[i + 1][0]:
+                junctions.append((sorted_blocks[i][1] + 1, sorted_blocks[i + 1][0] - 1))
     return junctions
 
 

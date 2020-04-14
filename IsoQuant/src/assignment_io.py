@@ -5,8 +5,9 @@
 ############################################################################
 
 import logging
+from src.common import *
 
-logger = logging.getLogger('IO')
+logger = logging.getLogger('IsoQuant')
 
 class PrintAllFunctor:
     def check(sefl, assignment):
@@ -16,14 +17,14 @@ class PrintAllFunctor:
 class PrintStartingWithSetFunctor:
     def __init__(self, *prefix_sets):
         self.prefix_set = set()
-        self.update(prefix_sets)
+        self.update(*prefix_sets)
 
     def update(self, *prefix_sets):
         for s in prefix_sets:
             self.prefix_set.update(s)
 
     def check(self, assignment):
-        return any(assignment.assignment_type[0].starts_with(prefix) for prefix in self.prefix_set)
+        return any(assignment.assignment_type[0].startswith(prefix) for prefix in self.prefix_set)
 
 
 class AbstractAssignmentPrinter:
@@ -36,7 +37,7 @@ class AbstractAssignmentPrinter:
     def __del__(self):
         self.output_file.close()
 
-    def add_read_info(self, read_assignemnt, combined_read_profile = None):
+    def add_read_info(self, read_assignment, combined_read_profile = None):
         raise NotImplementedError()
 
     def flush(self):
@@ -47,9 +48,9 @@ class ReadAssignmentCompositePrinter:
     def __init__(self, printers = []):
         self.pinters = printers
 
-    def add_read_info(self, read_assignemnt, mapping_read_profile=None):
+    def add_read_info(self, read_assignment, mapping_read_profile=None):
         for p in self.pinters:
-            p.add_read_info(read_assignemnt, mapping_read_profile)
+            p.add_read_info(read_assignment, mapping_read_profile)
 
     def flush(self):
         for p in self.pinters:
@@ -66,7 +67,7 @@ class BasicTSVAssignmentPrinter(AbstractAssignmentPrinter):
         self.output_file.write(self.header)
 
     def add_read_info(self, read_assignment, combined_read_profile = None):
-        if not self.assignment_checker.check(read_assignemnt):
+        if not self.assignment_checker.check(read_assignment):
             return
 
         line = read_assignment.read_id + "\t" + ",".join(read_assignment.assigned_features) + "\t" + ",".join(read_assignment.assignment_type)
@@ -74,7 +75,7 @@ class BasicTSVAssignmentPrinter(AbstractAssignmentPrinter):
             if combined_read_profile is None:
                 line += "\t.\t.\t."
             else:
-                line += range_list_to_str(combined_read_profile.read_split_exon_profile.read_features) + "\t" + \
+                line += "\t" + range_list_to_str(combined_read_profile.read_split_exon_profile.read_features) + "\t" + \
                     list_to_str(combined_read_profile.read_intron_profile.gene_profile) + "\t" + \
                         list_to_str(combined_read_profile.read_split_exon_profile.gene_profile)
         line += "\n"

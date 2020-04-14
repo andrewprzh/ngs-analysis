@@ -5,11 +5,12 @@
 ############################################################################
 
 import logging
+import pysam
 
 from src.long_read_assigner import *
 from src.long_read_profiles import *
 
-logger = logging.getLogger('LRAlignmentProcessor')
+logger = logging.getLogger('IsoQuant')
 
 # class for aggregating all assignment information
 class LongReadAlginmentProcessor:

@@ -11,7 +11,7 @@ from src.gene_info import *
 from src.long_read_profiles import *
 
 
-logger = logging.getLogger('LRAssignment')
+logger = logging.getLogger('IsoQuant')
 
 
 class ReadAssignment:
@@ -56,7 +56,7 @@ class LongReadAssigner:
     # match read profiles to a known isoform junction profile, hint - potential candidates
     def find_matching_isofoms(self, read_gene_profile, isoform_profiles, hint = set()):
         isoforms = self.match_profile(read_gene_profile, isoform_profiles, hint)
-        return set(filter(lambda x: x[1] == 0, isoforms))
+        return set(map(lambda x: x[0], filter(lambda x: x[1] == 0, isoforms)))
 
     # === Isoforom matching function ===
     def assign_to_isoform(self, read_id, combined_read_profile):
@@ -87,6 +87,7 @@ class LongReadAssigner:
                     assignment.assignment_type[0] += "_extra_seq3"
                 elif extra5:
                     assignment.assignment_type[0] += "_extra_seq5"
+            return assignment
 
     # match profile when all read features are assigned
     def match_non_contradictory(self, read_id, read_intron_profile, read_split_exon_profile):
@@ -99,14 +100,15 @@ class LongReadAssigner:
         read_assignment = None
         if len(both_mathched_isoforms) == 1:
             isoform_id = list(both_mathched_isoforms)[0]
-            if read_intron_profile.gene_profile.index(1) == self.gene_info.intron_profiles.profiles[isoform_id].index(1) and \
-                    read_intron_profile.gene_profile.rindex(1) == self.gene_info.intron_profiles.profiles[isoform_id].rindex(1):
+            if 1 in read_intron_profile.gene_profile and 1 in self.gene_info.intron_profiles.profiles[isoform_id] and \
+                    read_intron_profile.gene_profile.index(1) == self.gene_info.intron_profiles.profiles[isoform_id].index(1) and \
+                        rindex(read_intron_profile.gene_profile, 1) == rindex(self.gene_info.intron_profiles.profiles[isoform_id], 1):
                 read_assignment = ReadAssignment(read_id, "unique_full_splice_match", list(both_mathched_isoforms))
             else:
                 read_assignment = ReadAssignment(read_id, "unique_match", list(both_mathched_isoforms))
 
         elif len(both_mathched_isoforms) > 1:
-            if not params.resolve_ambiguous or len(self.gene_info.ambiguous_isoforms.intersection(both_mathched_isoforms)) > 0:
+            if not self.params.resolve_ambiguous or len(self.gene_info.ambiguous_isoforms.intersection(both_mathched_isoforms)) > 0:
                 read_assignment = ReadAssignment(read_id, "ambiguous", list(both_mathched_isoforms))
             else:
                 possible_isoforms = self.gene_info.ambiguous_isoforms.intersection(both_mathched_isoforms)
@@ -135,7 +137,7 @@ class LongReadAssigner:
                     read_assignment = ReadAssignment(read_id, "ambiguous_extra_intron_wtf", list(exon_matched_isoforms))
             else:
                 # alternative isoforms made of known introns/exons or intron retention
-                return self.resolve_unmatched(read_id, read_intron_profile, read_split_exon_profile)
+                read_assignment = self.resolve_unmatched(read_id, read_intron_profile, read_split_exon_profile)
         return read_assignment
 
     # resolve assignment ambiguities caused by identical profiles
@@ -221,6 +223,7 @@ class LongReadAssigner:
         best_isoform_ids = get_first_best_from_sorted(best_exon_isoforms)
 
         assignment = ReadAssignment(read_id)
+        print(read_intron_profile.read_profile)
         for isoform_id in best_isoform_ids:
             # get intron coordinates
             isoform_introns = get_blocks_from_profile(self.gene_info.intron_profiles.features,
@@ -229,8 +232,8 @@ class LongReadAssigner:
             read_region = (read_split_exon_profile.read_features[0][0], read_split_exon_profile.read_features[0][0])
             # isoform start-end
             isoform_exon_profile = self.gene_info.split_exon_profiles.profiles[isoform_id]
-            isoform_start = self.gene_info.split_exon_profiles.features[isoform_exon_profile.index(1)]
-            isoform_end = self.gene_info.split_exon_profiles.features[isoform_exon_profile.rindex(1)]
+            isoform_start = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][0]
+            isoform_end = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)][-1]
             isoform_region = (isoform_start, isoform_end)
             assignment_type = self.compare_junctions(read_intron_profile.read_features, read_region,
                                                      isoform_introns, isoform_region)
@@ -238,7 +241,7 @@ class LongReadAssigner:
         return assignment
 
     # compare read splice junctions against similar isoform
-    def compare_junctions(self, read_junctions, read_region, isoform_junctions, isoform_region,):
+    def compare_junctions(self, read_junctions, read_region, isoform_junctions, isoform_region):
         read_pos = 0
         isoform_pos = 0
         read_features_present = [0 for i in range(0, len(read_junctions))]
@@ -315,6 +318,8 @@ class LongReadAssigner:
                 break
             isoform_pos += 1
 
+        print(read_features_present)
+        print(isoform_features_present)
         if any(el == -1 for el in read_features_present) or any(el == -1 for el in isoform_features_present):
             # classify contradictions
             return self.detect_contradiction_type(read_junctions, isoform_junctions, contradictory_region_pairs)
@@ -400,7 +405,7 @@ class LongReadAssigner:
                                                   (self.gene_info.start, self.gene_info.end),
                                                   comparator = partial(equal_ranges, delta = self.params.delta))
         selected_junctions_profile = intron_profile_constructor.construct_profile(selected_junctions)
-        return all(el == 1 for el in selected_junctions_profile)
+        return all(el == 1 for el in selected_junctions_profile.read_profile)
 
     # === Exon matching ==
     def assign_exons(self, combined_read_profile):

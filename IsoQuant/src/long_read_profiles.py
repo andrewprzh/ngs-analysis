@@ -9,7 +9,7 @@ from functools import partial
 
 from src.common import *
 
-logger = logging.getLogger('LRProfile')
+logger = logging.getLogger('IsoQuant')
 
 # The following 2 classes are very similar, but lets keep them separately for now
 
@@ -36,18 +36,18 @@ class OverlappingFeaturesProfileConstructor:
 
     def construct_profile(self, sorted_blocks):
         intron_profile = [0] * (len(self.known_introns))
-        if len(blocks) < 2:
+        if len(sorted_blocks) < 2:
             return  MappedReadProfile(intron_profile, [], [])
 
         read_introns = junctions_from_blocks(sorted_blocks)
         read_profile = [0] * (len(read_introns))
 
         mapped_region = (sorted_blocks[0][0], sorted_blocks[-1][1])
-        for i in range(intron_profile):
-            if overlaps(intron_profile[i], mapped_region):
+        for i in range(len(intron_profile)):
+            if overlaps(self.known_introns[i], mapped_region):
                 intron_profile[i] = -1
-        for i in range(read_profile):
-            if overlaps(read_profile[i], self.gene_region):
+        for i in range(len(read_profile)):
+            if overlaps(read_introns[i], self.gene_region):
                 read_profile[i] = -1
 
         gene_pos = 0

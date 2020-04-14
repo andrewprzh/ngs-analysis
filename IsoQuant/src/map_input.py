@@ -12,7 +12,7 @@ from traceback import print_exc
 
 from src.input_data_storage import *
 
-logger = logging.getLogger('ReadMapping')
+logger = logging.getLogger('IsoQuant')
 
 
 DATATYPE_TO_ALIGNER = {'assmebly' : 'starlong', 'raw_long_reads' : 'minimap', 'hq_long_reads' : 'starlong',

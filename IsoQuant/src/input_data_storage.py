@@ -8,8 +8,7 @@ import os
 import sys
 import logging
 
-logger = logging.getLogger('InputData')
-
+logger = logging.getLogger('IsoQuant')
 
 class SampleData:
     def __init__(self, file_list, label, out_dir):
@@ -50,10 +49,10 @@ class InputDataStorage:
             else:
                 labels = args.labels
         else:
-            labels = get_labels(sample_files)
+            labels = self.get_labels(sample_files)
 
         for i in range(len(sample_files)):
-            self.samples.append(SampleData(sample_files[i], labels[i], os.path.join(args.output, sample_name)))
+            self.samples.append(SampleData(sample_files[i], labels[i], os.path.join(args.output, labels[i])))
 
     def get_samples_from_file(self, file_name):
         sample_files = []
@@ -73,6 +72,6 @@ class InputDataStorage:
 
     def get_labels(self, sample_files):
         labels = []
-        for i in range(sample_files):
-            labels = '{:02d}'.format(i) + "_" + os.path.splitext(os.path.basename(sample_files[i][0][0]))[0]
+        for i in range(len(sample_files)):
+            labels.append('{:02d}'.format(i) + "_" + os.path.splitext(os.path.basename(sample_files[i][0][0]))[0])
         return labels

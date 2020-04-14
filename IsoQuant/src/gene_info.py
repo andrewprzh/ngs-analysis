@@ -10,7 +10,7 @@ from functools import partial
 
 from src.common import *
 
-logger = logging.getLogger('GeneInfo')
+logger = logging.getLogger('IsoQuant')
 
 
 # storage for feature profiles of all known isoforms of a gene or a set of overlapping genes
@@ -28,10 +28,11 @@ class FeatureProfiles:
     def set_profiles(self, transcript_id, transcript_features, comaprator):
         self.profiles[transcript_id] = [-1] * len(self.features)
         pos = 0
+
         for feature in transcript_features:
-            while not comaprator(self.features[pos], feature):
+            while not comaprator(feature, self.features[pos]):
                 pos += 1
-                self.profiles[transcript_id][pos] = 1
+            self.profiles[transcript_id][pos] = 1
 
 
 # All gene(s) information
@@ -52,7 +53,7 @@ class GeneInfo:
         self.ambiguous_isoforms = set()
 
         all_isoforms_introns, all_isoforms_exons = self.set_introns_and_exons()
-        self.split_exon_profiles.set_features(self.split_exons(self.exons))
+        self.split_exon_profiles.set_features(self.split_exons(self.exon_profiles.features))
 
         self.set_junction_profiles(all_isoforms_introns, all_isoforms_exons)
         self.detect_ambiguous()
@@ -91,12 +92,12 @@ class GeneInfo:
         introns = set()
         exons = set()
         for i in all_isoforms_introns.keys():
-            self.introns.update(all_isoforms_introns[i])
+            introns.update(all_isoforms_introns[i])
         for i in all_isoforms_exons.keys():
-            self.exons.update(all_isoforms_exons[i])
+            exons.update(all_isoforms_exons[i])
 
-        self.intron_profiles.set_features(sorted(list(self.introns)))
-        self.exon_profiles.set_features(sorted(list(self.exons)))
+        self.intron_profiles.set_features(sorted(list(introns)))
+        self.exon_profiles.set_features(sorted(list(exons)))
 
         return all_isoforms_introns, all_isoforms_exons
 
@@ -141,24 +142,23 @@ class GeneInfo:
             ends_pos += 1
 
         if current_state != 0:
-            print("Unequal number of starts and ends")
+            logger.ciritcal("Unequal number of starts and ends")
 
         if exon_blocks != sorted(exon_blocks):
-            print("Somehow block are unsorted")
+            logger.ciritcal("Somehow block are unsorted")
 
         return exon_blocks
 
-
     # calculate junction profiles for known isoforms
-    def set_junction_profiles(self, profile_storage, all_isoforms_introns, all_isoforms_exons):
+    def set_junction_profiles(self, all_isoforms_introns, all_isoforms_exons):
         for gene_db in self.gene_db_list:
             for t in self.db.children(gene_db, featuretype='transcript', order_by='start'):
                 # setting up intron profiles for current isoform
-                self.intron_profiles.set_profiles(t.id, all_isoforms_introns, partial(equal_ranges, delta=0))
+                self.intron_profiles.set_profiles(t.id, all_isoforms_introns[t.id], partial(equal_ranges, delta=0))
                 # setting up exon profiles for current isoform
-                self.exon_profiles.set_profiles(t.id, all_isoforms_exons, partial(equal_ranges, delta=0))
+                self.exon_profiles.set_profiles(t.id, all_isoforms_exons[t.id], partial(equal_ranges, delta=0))
                 # setting up split exon profiles for current isoform
-                self.split_exon_profiles.set_profiles(t.id, all_isoforms_exons, contains)
+                self.split_exon_profiles.set_profiles(t.id, all_isoforms_exons[t.id], contains)
 
     # detect isoforms which are exact sub-isoforms of others
     def detect_ambiguous(self):

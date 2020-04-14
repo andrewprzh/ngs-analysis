@@ -19,7 +19,7 @@ from src.alignment_processor import *
 from src.assignment_io import *
 from src.gene_info import *
 
-logger = logging.getLogger('DatasetProcessor')
+logger = logging.getLogger('IsoQuant')
 
 class GeneClusterConstructor:
     def __init__(self, gene_db):
@@ -27,7 +27,7 @@ class GeneClusterConstructor:
         self.gene_sets = None
 
     def get_gene_sets(self):
-        if self.gene_sets is not None:
+        if self.gene_sets is None:
             self.gene_sets = self.fill_gene_sets()
         return self.gene_sets
 
@@ -49,7 +49,7 @@ class GeneClusterConstructor:
 
 class OverlappingExonsGeneClusterConstructor(GeneClusterConstructor):
     def get_gene_sets(self):
-        if self.gene_sets is not None:
+        if self.gene_sets is None:
             self.gene_sets = self.cluster_on_shared_exons()
         return self.gene_sets
 
@@ -122,29 +122,33 @@ class DatasetProcessor:
             self.rest_assignment_checker.update(LongReadAssigner.MINOR_CONTRADICTION_ASSIGNMENT_TYPES)
 
 
-    def process_samples(self, input_data):
-        for sample in input_data:
+    def process_all_samples(self, input_data):
+        for sample in input_data.samples:
             self.process_sample(sample)
 
     # Run though all genes in db and count stats according to alignments given in bamfile_name
     def process_sample(self, sample):
-        out_assigned_tsv = sample.out_dir + self.args.prefix + "assigned_reads.tsv"
+        logger.info("Processing sample " + sample.label)
+
+        out_assigned_tsv = os.path.join(sample.out_dir, self.args.prefix + sample.label + ".assigned_reads.tsv")
         correct_printer = BasicTSVAssignmentPrinter(out_assigned_tsv, self.args,
                                                     assignment_checker=self.correct_assignment_checker)
-        out_unmatched_tsv = sample.out_dir + self.args.prefix + "unmatched_reads.tsv"
+        out_unmatched_tsv = os.path.join(sample.out_dir, self.args.prefix + sample.label + ".unmatched_reads.tsv")
         unmatched_printer = BasicTSVAssignmentPrinter(out_unmatched_tsv, self.args,
                                                       assignment_checker=self.rest_assignment_checker)
-        out_alt_tsv = sample.out_dir + self.args.prefix + "altered_reads.tsv"
+        out_alt_tsv = os.path.join(sample.out_dir, self.args.prefix + sample.label + ".altered_reads.tsv")
         alt_printer = BasicTSVAssignmentPrinter(out_alt_tsv, self.args,
-                                                assignment_checker=self.rest_assignment_checker)
+                                                assignment_checker=self.novel_assignment_checker)
         global_printer = ReadAssignmentCompositePrinter([correct_printer, unmatched_printer, alt_printer])
 
-        logger.info("Processing sample " + sample.label)
+
         for g in self.gene_clusters:
             gene_info = GeneInfo(g, self.gffutils_db)
             bam_files = list(map(lambda x: x[0], sample.file_list))
-            alignment_processor = LongReadAlginmentProcessor(gene_info, bam_files, args, global_printer)
+            alignment_processor = LongReadAlginmentProcessor(gene_info, bam_files, self.args, global_printer)
             alignment_processor.process()
 
         logger.info("Finished processing sample " + sample.label)
-
+        logger.info("Assigned reads are stored in " + out_assigned_tsv)
+        logger.info("Unmatched reads are stored in " + out_unmatched_tsv)
+        logger.info("Reads with alternative structure are stored in " + out_alt_tsv)

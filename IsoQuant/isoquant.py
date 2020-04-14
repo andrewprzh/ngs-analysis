@@ -1,4 +1,6 @@
-############################################################################
+#!/usr/bin/env python
+#
+# ############################################################################
 # Copyright (c) 2019 Saint Petersburg State University
 # # All Rights Reserved
 # See file LICENSE for details.
@@ -58,6 +60,16 @@ def parse_args():
                                         "chosen automatically based on data type", type=int, default="6")
 
     args = parser.parse_args()
+
+    if args.output is None:
+        logger.critical("Output folder was not specified")
+        exit(-1)
+
+    if os.path.exists(args.output):
+        logger.warn("Output folder already exists, some files may be overwritten")
+    else:
+        os.makedirs(args.output)
+
     return args
 
 
@@ -98,7 +110,7 @@ def check_params(args):
 
 def check_input_files(args):
     for sample in args.input_data.samples:
-        for lib in sample:
+        for lib in sample.file_list:
             for in_file in lib:
                 if not os.path.isfile(in_file):
                     raise Exception("Input file " + in_file + " does not exist")
@@ -121,24 +133,16 @@ def check_input_files(args):
 
 
 def create_output_dirs(args):
-    if args.output is None:
-        logger.critical("Output folder was not specified")
-        exit(-1)
-
-    if os.path.exists(args.output):
-        print("Output folder already exists, some files may be overwritten")
-    else:
-        os.makedirs(args.output)
-
     args.tmp_dir = os.path.join(args.output, "tmp")
     if os.path.exists(args.tmp_dir):
-        print("Tmp folder already exists, some files may be overwritten")
+        logger.warn("Tmp folder already exists, some files may be overwritten")
     else:
         os.makedirs(args.tmp_dir)
 
-    for sample_dir in args.input_data.output_folders:
+    for sample in args.input_data.samples:
+        sample_dir = sample.out_dir
         if os.path.exists(sample_dir):
-            print(sample_dir + "folder already exists, some files may be overwritten")
+            logger.warn(sample_dir + "folder already exists, some files may be overwritten")
         else:
             os.makedirs(sample_dir)
 
@@ -150,7 +154,7 @@ def set_logger(args, logger_instnace):
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
 
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
     logger_instnace.addHandler(fh)
@@ -183,7 +187,12 @@ def run_pipeline(args):
 
     # run isoform assignment
     dataset_processor = DatasetProcessor(args)
-    dataset_processor.process_all_samples()
+    dataset_processor.process_all_samples(args.input_data)
+
+
+def clean_up(args):
+    #TODO
+    pass
 
 
 def main():
@@ -193,6 +202,7 @@ def main():
     create_output_dirs(args)
     set_additional_params(args)
     run_pipeline(args)
+    clean_up(args)
 
 
 if __name__ == "__main__":
