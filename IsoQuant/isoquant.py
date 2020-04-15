@@ -174,7 +174,7 @@ def set_additional_params(args):
     args.max_exon_extension = 300
     args.allow_extra_terminal_introns = False
     args.max_intron_shift = 100
-    args.max_missed_exon_len = 100
+    args.max_missed_exon_len = 200
     args.correct_minor_errors = True
 
 
