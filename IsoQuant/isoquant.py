@@ -142,7 +142,7 @@ def create_output_dirs(args):
     for sample in args.input_data.samples:
         sample_dir = sample.out_dir
         if os.path.exists(sample_dir):
-            logger.warn(sample_dir + "folder already exists, some files may be overwritten")
+            logger.warn(sample_dir + " folder already exists, some files may be overwritten")
         else:
             os.makedirs(sample_dir)
 

@@ -59,7 +59,7 @@ class InputDataStorage:
         inf = open(file_name, "r")
         current_sample = []
 
-        for l in inf.readline():
+        for l in inf:
             if len(l.strip()) == 0 and len(current_sample) > 0:
                 sample_files.append(current_sample)
                 current_sample = []

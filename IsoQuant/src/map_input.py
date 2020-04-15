@@ -15,7 +15,7 @@ from src.input_data_storage import *
 logger = logging.getLogger('IsoQuant')
 
 
-DATATYPE_TO_ALIGNER = {'assmebly' : 'starlong', 'raw_long_reads' : 'minimap', 'hq_long_reads' : 'starlong',
+DATATYPE_TO_ALIGNER = {'assembly' : 'starlong', 'raw_long_reads' : 'minimap', 'hq_long_reads' : 'starlong',
                        'barcoded_se_reads' : 'star', 'barcoded_pe_reads' : 'star'}
 
 SUPPORTED_ALIGNERS = ['star', 'starlong', 'minimap2', 'gmap', 'hisat2']
@@ -31,7 +31,7 @@ class DataSetMapper:
         if self.args.aligner is not None:
             return self.args.aligner
         else:
-            return DATATYPE_TO_ALIGNER[args.data_type]
+            return DATATYPE_TO_ALIGNER[self.args.data_type]
 
     def create_index(self):
         return ""
