@@ -36,19 +36,18 @@ class MatchingEvent:
 
     intron_retention = "intron_retention"
     intron_migration = "intron_migration"
-    intron_alternation_novel = "alternative_novel_intron"
-    intron_alternation_known = "alternative_known_intron"
+    intron_alternation_novel = "intron_change_to_novel"
+    intron_alternation_known = "intron_change_to_known"
+    donor_site = "donor_site"
+    acceptor_site = "acceptor_site"
     mutually_exclusive_exons_novel = "mutualy_exclusive_novel_exons"
     mutually_exclusive_exons_known = "mutualy_exclusive_known_exons"
     exon_skipping_known_intron = "exon_skipping_known_intron"
     exon_skipping_novel_intron = "exon_skipping_novel_intron"
     exon_gain_known = "gains_known_exon"
-    exon_gain_novel = "gains_known_novel"
-    alternative_structure_novel = "alternative_novel_introns"
-    alternative_structure_known = "alternative_known_introns"
-
-    intron_big_shift = "intron_big_shift"
-    long_exon_misallignment = "long_exon_misallignment"
+    exon_gain_novel = "gains_novel_exon"
+    alternative_structure_novel = "alternative_structure_novel_introns"
+    alternative_structure_known = "alternative_structure_known_introns"
 
     exon_elongation = "exon_elongation"
     intron_shift = "intron_shift"
@@ -65,6 +64,15 @@ class MatchingEvent:
     @staticmethod
     def is_minor_error(event):
         return event == MatchingEvent.intron_shift or event == MatchingEvent.exon_misallignment
+
+    @staticmethod
+    def concat_events(event1, event2):
+        if event1 == MatchingEvent.none:
+            return event2
+        elif event2 == MatchingEvent.none:
+            return event1
+        else:
+            return event1 + '_' + event2
 
 
 class ReadAssignment:
@@ -487,17 +495,8 @@ class LongReadAssigner:
         read_introns_known = self.are_known_introns(read_junctions, read_cregion)
 
         if read_cregion[1] == read_cregion[0] and isoform_cregion[1] == isoform_cregion[0]:
-            if total_intron_len_diff < self.params.delta:
-                if read_introns_known:
-                    return MatchingEvent.intron_migration
-                else:
-                    return MatchingEvent.intron_shift
-            else:
-                # TODO more cases - alternative donor-acceptor sites
-                if read_introns_known:
-                    return MatchingEvent.intron_alternation_known
-                else:
-                    return MatchingEvent.intron_alternation_novel
+            return self.classify_single_intron_alteration(read_junctions, isoform_junctions, read_cregion[0],
+                                                          isoform_cregion[0], total_intron_len_diff, read_introns_known)
 
         elif read_cregion[1] - read_cregion[0] == isoform_cregion[1] - isoform_cregion[0] and \
                 total_intron_len_diff < self.params.delta:
@@ -507,13 +506,7 @@ class LongReadAssigner:
                 return MatchingEvent.mutually_exclusive_exons_novel
 
         elif read_cregion[1] == read_cregion[0] and isoform_cregion[1] > isoform_cregion[0]:
-            if total_intron_len_diff < self.params.delta:
-                return MatchingEvent.exon_misallignment
-            else:
-                if read_introns_known:
-                    return MatchingEvent.exon_skipping_known_intron
-                else:
-                    return MatchingEvent.exon_skipping_novel_intron
+            return self.classify_skipped_exons(isoform_junctions, isoform_cregion, total_intron_len_diff, read_introns_known)
 
         elif read_cregion[1] > read_cregion[0] and isoform_cregion[1] == isoform_cregion[0]:
             if read_introns_known:
@@ -526,6 +519,42 @@ class LongReadAssigner:
                 return MatchingEvent.alternative_structure_known
             else:
                 return MatchingEvent.alternative_structure_novel
+
+    def classify_skipped_exons(self, isoform_junctions, isoform_cregion,
+                               total_intron_len_diff, read_introns_known):
+        total_exon_len = sum([isoform_junctions[i + 1][0] - isoform_junctions[i][1] + 1
+                              for i in range(isoform_cregion[0], isoform_cregion[1])])
+
+        if total_intron_len_diff < 2 * self.params.delta and total_exon_len <= self.params.max_missed_exon_len:
+            return MatchingEvent.exon_misallignment
+        else:
+            if read_introns_known:
+                return MatchingEvent.exon_skipping_known_intron
+            else:
+                return MatchingEvent.exon_skipping_novel_intron
+
+    def classify_single_intron_alteration(self, read_junctions, isoform_junctions, read_cpos, isoform_cpos,
+                                          total_intron_len_diff, read_introns_known):
+        if total_intron_len_diff <= 2 * self.params.delta:
+            if read_introns_known:
+                return MatchingEvent.intron_migration
+            else:
+                if abs(isoform_junctions[isoform_cpos][0] - read_junctions[read_cpos][0]) <= self.params.max_intron_shift:
+                    return MatchingEvent.intron_shift
+                else:
+                    return MatchingEvent.intron_alternation_novel
+        else:
+            site = MatchingEvent.none
+            if abs(isoform_junctions[isoform_cpos][0] - read_junctions[read_cpos][0]) < self.params.delta:
+                site = MatchingEvent.acceptor_site
+            elif abs(isoform_junctions[isoform_cpos][1] - read_junctions[read_cpos][1]) < self.params.delta:
+                site = MatchingEvent.donor_site
+
+            if read_introns_known:
+                return MatchingEvent.concat_events(MatchingEvent.intron_alternation_known, site)
+            else:
+                return MatchingEvent.concat_events(MatchingEvent.intron_alternation_novel, site)
+
 
     def are_known_introns(self, junctions, region):
         selected_junctions = []
