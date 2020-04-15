@@ -26,6 +26,7 @@ class MatchingEvent:
     none = "none"
     undefined = "undefined"
     unspliced = "unspliced"
+    no_contradiction = "no_contradiction"
 
     fsm = "full_splice_match"
     ambiguous_isoform = "assigned_to_ambiguous_isoform"
@@ -357,6 +358,11 @@ class LongReadAssigner:
             assignment.add_feature(isoform_id, matching_event)
             logger.debug("+ + Found contradiction for " + isoform_id + ": " + matching_event)
 
+        if all(e == MatchingEvent.no_contradiction for e in assignment.match_events):
+            # No contradiction
+            new_assignment_type = AssignmentType.unique if len(best_isoform_ids) == 1 else AssignmentType.ambiguous
+            return ReadAssignment(read_id, new_assignment_type, assignment.assigned_features, assignment.match_events)
+
         if self.params.correct_minor_errors:
             #correct assignment type if contradiction is minor
             if all(MatchingEvent.is_minor_error(e) for e in assignment.match_events):
@@ -462,8 +468,8 @@ class LongReadAssigner:
             logger.debug("+ + Found only extra terminal introns")
             return MatchingEvent.extra_intron_out
         else:
-            logger.warn("No contradition detected, odd case")
-            return MatchingEvent.undefined
+            logger.debug("No contradition detected, odd case")
+            return MatchingEvent.no_contradiction
 
     def detect_contradiction_type(self, read_junctions, isoform_junctions, contradictory_region_pairs):
         contradiction_events = []

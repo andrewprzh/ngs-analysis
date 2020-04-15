@@ -179,6 +179,7 @@ def set_additional_params(args):
 
 
 def run_pipeline(args):
+    logger.info(" === IsoQuant pipeline started === ")
     # convert GTF/GFF in needed
     if args.genedb is None:
         args.genedb = os.path.join(args.output, os.path.splitext(os.path.basename(args.gtf))[0] + ".db")
@@ -197,7 +198,7 @@ def run_pipeline(args):
     # run isoform assignment
     dataset_processor = DatasetProcessor(args)
     dataset_processor.process_all_samples(args.input_data)
-
+    logger.info(" === IsoQuant pipeline finished === ")
 
 def clean_up(args):
     #TODO

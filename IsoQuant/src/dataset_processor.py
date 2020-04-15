@@ -104,6 +104,7 @@ class OverlappingExonsGeneClusterConstructor(GeneClusterConstructor):
 class DatasetProcessor:
     def __init__(self, args):
         self.args = args
+        logger.info("Loading gene database from " + self.args.genedb)
         self.gffutils_db = gffutils.FeatureDB(self.args.genedb, keep_order=True)
         self.gene_cluster_constructor = GeneClusterConstructor(self.gffutils_db)
         self.gene_clusters = self.gene_cluster_constructor.get_gene_sets()
@@ -113,8 +114,10 @@ class DatasetProcessor:
         self.rest_assignment_checker = PrintOnlyFunctor([AssignmentType.empty, AssignmentType.ambiguous])
 
     def process_all_samples(self, input_data):
+        logger.info("Processing " + str(len(input_data.samples)) + " samples")
         for sample in input_data.samples:
             self.process_sample(sample)
+        logger.info("Processed " + str(len(input_data.samples)) + " samples")
 
     # Run though all genes in db and count stats according to alignments given in bamfile_name
     def process_sample(self, sample):
@@ -137,7 +140,7 @@ class DatasetProcessor:
             if chr_id != current_chromosome:
                 logger.info("Processing chromosome " + chr_id)
                 current_chromosome = chr_id
-                
+
             gene_info = GeneInfo(g, self.gffutils_db)
             bam_files = list(map(lambda x: x[0], sample.file_list))
             alignment_processor = LongReadAlginmentProcessor(gene_info, bam_files, self.args, global_printer)

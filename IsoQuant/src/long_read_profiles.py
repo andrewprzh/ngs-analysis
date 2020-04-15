@@ -42,9 +42,13 @@ class OverlappingFeaturesProfileConstructor:
         mapped_region = (sorted_blocks[0][0], sorted_blocks[-1][1])
         return self.construct_profile_for_introns(read_introns, mapped_region)
 
+    def match_delta(self, feature1, feature2):
+        return abs(feature1[0] - feature2[0]) + abs(feature1[1] - feature2[1])
+
     def construct_profile_for_introns(self, read_introns, mapped_region = (0, 0)):
         read_profile = [0] * (len(read_introns))
         intron_profile = [0] * (len(self.known_introns))
+        matched_features = {}
 
         for i in range(len(intron_profile)):
             if contains(mapped_region, self.known_introns[i]):
@@ -60,6 +64,9 @@ class OverlappingFeaturesProfileConstructor:
             if self.comparator(read_introns[read_pos], self.known_introns[gene_pos]):
                 intron_profile[gene_pos] = 1
                 read_profile[read_pos] = 1
+                if read_pos not in matched_features:
+                    matched_features[read_pos] = []
+                matched_features[read_pos].append(gene_pos)
                 gene_pos += 1
             elif overlaps(read_introns[read_pos], self.known_introns[gene_pos]):
                 intron_profile[gene_pos] = -1
@@ -72,6 +79,16 @@ class OverlappingFeaturesProfileConstructor:
                 if read_pos > 0:
                     intron_profile[gene_pos] = -1
                 gene_pos += 1
+
+        #eliminating non unique features
+        for read_pos in matched_features.keys():
+            if len(matched_features[read_pos]) > 1:
+                deltas = [self.match_delta(read_introns[read_pos], self.known_introns[gene_pos])
+                          for gene_pos in matched_features[read_pos]]
+                best_match = min(deltas)
+                for i in range(len(matched_features[read_pos])):
+                    if deltas[i] > best_match:
+                        intron_profile[matched_features[read_pos][i]] = -1
 
         return MappedReadProfile(intron_profile, read_profile, read_introns)
 
