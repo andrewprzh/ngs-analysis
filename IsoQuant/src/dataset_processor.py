@@ -131,7 +131,13 @@ class DatasetProcessor:
                                                 assignment_checker=self.novel_assignment_checker)
         global_printer = ReadAssignmentCompositePrinter([correct_printer, unmatched_printer, alt_printer])
 
+        current_chromosome = ""
         for g in self.gene_clusters:
+            chr_id = g[0].seqid
+            if chr_id != current_chromosome:
+                logger.info("Processing chromosome " + chr_id)
+                current_chromosome = chr_id
+                
             gene_info = GeneInfo(g, self.gffutils_db)
             bam_files = list(map(lambda x: x[0], sample.file_list))
             alignment_processor = LongReadAlginmentProcessor(gene_info, bam_files, self.args, global_printer)
