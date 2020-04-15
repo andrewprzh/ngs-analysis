@@ -35,19 +35,22 @@ class OverlappingFeaturesProfileConstructor:
         self.comparator = comparator
 
     def construct_profile(self, sorted_blocks):
-        intron_profile = [0] * (len(self.known_introns))
         if len(sorted_blocks) < 2:
-            return  MappedReadProfile(intron_profile, [], [])
+            return  MappedReadProfile([0] * (len(self.known_introns)), [], [])
 
         read_introns = junctions_from_blocks(sorted_blocks)
-        read_profile = [0] * (len(read_introns))
-
         mapped_region = (sorted_blocks[0][0], sorted_blocks[-1][1])
+        return self.construct_profile_for_introns(read_introns, mapped_region)
+
+    def construct_profile_for_introns(self, read_introns, mapped_region = (0, 0)):
+        read_profile = [0] * (len(read_introns))
+        intron_profile = [0] * (len(self.known_introns))
+
         for i in range(len(intron_profile)):
-            if overlaps(self.known_introns[i], mapped_region):
+            if contains(mapped_region, self.known_introns[i]):
                 intron_profile[i] = -1
         for i in range(len(read_profile)):
-            if overlaps(read_introns[i], self.gene_region):
+            if contains(self.gene_region, read_introns[i]):
                 read_profile[i] = -1
 
         gene_pos = 0
@@ -89,14 +92,16 @@ class NonOverlappingFeaturesProfileConstructor:
             if self.comparator(read_exons[read_pos], self.known_exons[gene_pos]):
                 exon_profile[gene_pos] = 1
                 read_profile[read_pos] = 1
-                gene_pos += 1
-                read_pos += 1
+                if read_exons[read_pos][1] < self.known_exons[gene_pos][1]:
+                    read_pos += 1
+                else:
+                    gene_pos += 1
             elif left_of(read_exons[read_pos], self.known_exons[gene_pos]):
-                if gene_pos > 0:
+                if gene_pos > 0 and read_profile[read_pos] == 0:
                     read_profile[read_pos] = -1
                 read_pos += 1
             else:
-                if read_pos > 0:
+                if read_pos > 0 and exon_profile[gene_pos] == 0:
                     exon_profile[gene_pos] = -1
                 gene_pos += 1
 

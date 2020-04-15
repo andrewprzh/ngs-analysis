@@ -25,11 +25,14 @@ class LongReadAlginmentProcessor:
         self.intron_profile_construnctor = \
             OverlappingFeaturesProfileConstructor(self.gene_info.intron_profiles.features, gene_region,
                                                   comparator = partial(equal_ranges, delta = self.params.delta))
+        # TODO check for non split exons which do overlap
         self.exon_profile_construnctor = \
-            NonOverlappingFeaturesProfileConstructor(self.gene_info.exon_profiles.features,
+            OverlappingFeaturesProfileConstructor(self.gene_info.exon_profiles.features, gene_region,
                                                   comparator = partial(equal_ranges, delta = self.params.delta))
+        # TODO think whether overlaps should be changed to contains to avoid terminal partially covered exons
         self.split_exon_profile_construnctor = \
-            NonOverlappingFeaturesProfileConstructor(self.gene_info.split_exon_profiles.features, overlaps)
+            NonOverlappingFeaturesProfileConstructor(self.gene_info.split_exon_profiles.features,
+                                                     comparator=partial(overlaps_at_least, delta=self.params.delta))
 
     def process(self):
         for b in self.bams:
@@ -45,12 +48,15 @@ class LongReadAlginmentProcessor:
                 continue
 
             read_id = alignment.query_name
-            sorted_blocks = correct_bam_coords(concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples))
+            logger.debug("=== Processing read " + read_id + " ===")
+            concat_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
+            logger.debug(concat_blocks)
+            sorted_blocks = correct_bam_coords(concat_blocks)
+            logger.debug(sorted_blocks)
             intron_profile = self.intron_profile_construnctor.construct_profile(sorted_blocks)
             split_exon_profile = self.split_exon_profile_construnctor.construct_profile(sorted_blocks)
             # FIXME
             combined_profile = CombinedReadProfiles(intron_profile, None, split_exon_profile)
-            logger.debug("=== Processing read " + read_id + " ===")
             read_assignment = self.assigner.assign_to_isoform(read_id, combined_profile)
             logger.debug("=== Finished read " + read_id + " ===")
             self.printer.add_read_info(read_assignment, combined_profile)

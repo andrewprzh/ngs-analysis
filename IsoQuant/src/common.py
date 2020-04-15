@@ -42,6 +42,12 @@ def overlaps(range1, range2):
     return not (range1[1] < range2[0] or range1[0] > range2[1])
 
 
+def overlaps_at_least(range1, range2, delta = 0):
+    cutoff = min([delta, range1[1] - range1[0], range2[1] - range2[0]])
+    overlap = min(range1[1], range2[1]) + 1 - max(range1[0], range2[0])
+    return overlap > cutoff
+
+
 def left_of(range1, range2):
     return range1[1] < range2[0]
 

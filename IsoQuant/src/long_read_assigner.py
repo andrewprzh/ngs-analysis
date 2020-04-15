@@ -148,15 +148,13 @@ class LongReadAssigner:
             if assignment.assignment_type == AssignmentType.unique and not MatchingEvent.is_extra(assignment.match_events[0]) \
                     and not MatchingEvent.is_elongated_exon(assignment.match_events[0]):
 
-                isoform_id = assignment.assigned_features[0]
-                isoform_exon_profile = self.gene_info.split_exon_profiles.profiles[isoform_id]
-                start_exon = self.gene_info.split_exon_profiles.features[isoform_exon_profile.index(1)]
-                end_exon = self.gene_info.split_exon_profiles.features[rindex(isoform_exon_profile, 1)]
+                read_start_exon = self.gene_info.split_exon_profiles.features[read_split_exon_profile.gene_profile.index(1)]
+                read_end_exon = self.gene_info.split_exon_profiles.features[rindex(read_split_exon_profile.gene_profile, 1)]
                 read_start = read_split_exon_profile.read_features[0][0]
                 read_end = read_split_exon_profile.read_features[-1][1]
 
-                extra5 = read_start + self.params.delta < start_exon[0]
-                extra3 = read_end - self.params.delta > end_exon[1]
+                extra5 = read_start + self.params.delta < read_start_exon[0]
+                extra3 = read_end - self.params.delta > read_end_exon[1]
                 if extra3 or extra5:
                     logger.debug("+ + Exon elongation")
                     logger.debug("Read: " + str(read_start) + "-" + str(read_end))
@@ -174,6 +172,9 @@ class LongReadAssigner:
         exon_matched_isoforms = self.find_matching_isofoms(read_split_exon_profile.gene_profile,
                                                            self.gene_info.split_exon_profiles.profiles)
         both_mathched_isoforms = intron_matched_isoforms.intersection(exon_matched_isoforms)
+        logger.debug("Intron matched " + str(intron_matched_isoforms))
+        logger.debug("Exon matched " + str(exon_matched_isoforms))
+        logger.debug("Both matched " + str(both_mathched_isoforms))
 
         read_assignment = None
         if len(both_mathched_isoforms) == 1:
@@ -215,6 +216,10 @@ class LongReadAssigner:
                 #intron profile match, but extra exons
                 if len(intron_matched_isoforms) == 1:
                     logger.debug("+ + But there is unique intron profile match")
+                    isoform_id = list(intron_matched_isoforms)[0]
+                    logger.debug(str(self.gene_info.split_exon_profiles.profiles[isoform_id]))
+                    logger.debug(str(self.gene_info.intron_profiles.profiles[isoform_id]))
+
                     read_assignment = ReadAssignment(read_id, AssignmentType.unique, list(intron_matched_isoforms), [MatchingEvent.exon_elongation])
                 else:
                     logger.debug("+ + But there is amb intron profile match")
@@ -270,6 +275,9 @@ class LongReadAssigner:
 
         assignment = ReadAssignment(read_id, AssignmentType.contradictory)
         logger.debug("+ + Closest matching isoforms " + str(best_isoform_ids))
+        isoform_id = list(best_isoform_ids)[0]
+        logger.debug(str(self.gene_info.split_exon_profiles.profiles[isoform_id]))
+        logger.debug(str(self.gene_info.intron_profiles.profiles[isoform_id]))
 
         for isoform_id in best_isoform_ids:
             # get intron coordinates
@@ -331,22 +339,22 @@ class LongReadAssigner:
                     isoform_pos += 1
 
             elif left_of(isoform_junctions[isoform_pos], read_junctions[read_pos]):
-                # isoform junction is behing, move on
+                # isoform junction is behind, move on
                 if (current_contradictory_region != (None, None)):
                     contradictory_region_pairs.append(current_contradictory_region)
                     current_contradictory_region = (None, None)
-                if read_pos > 0 or overlaps(read_region, isoform_junctions[isoform_pos]):
+                if read_pos > 0 or contains(read_region, isoform_junctions[isoform_pos]):
                     if (isoform_features_present[isoform_pos] != -1):
                         contradictory_region_pairs.append((None, (isoform_pos, isoform_pos)))
                     isoform_features_present[isoform_pos] = -1
                 isoform_pos += 1
 
             else:
-                # read junction is behing, move on
+                # read junction is behind, move on
                 if (current_contradictory_region != (None, None)):
                     contradictory_region_pairs.append(current_contradictory_region)
                     current_contradictory_region = (None, None)
-                if isoform_pos > 0 or overlaps(isoform_region, read_junctions[read_pos]):
+                if isoform_pos > 0 or contains(isoform_region, read_junctions[read_pos]):
                     if (read_features_present[read_pos] != -1):
                         contradictory_region_pairs.append(((read_pos, read_pos), None))
                     read_features_present[read_pos] = -1
@@ -357,7 +365,7 @@ class LongReadAssigner:
 
         # check terminating regions
         while read_pos < len(read_junctions):
-            if overlaps(isoform_region, read_junctions[read_pos]):
+            if contains(isoform_region, read_junctions[read_pos]):
                 if (read_features_present[read_pos] != -1):
                     contradictory_region_pairs.append(((read_pos, read_pos), None))
                     read_features_present[read_pos] = -1
@@ -366,7 +374,7 @@ class LongReadAssigner:
             read_pos += 1
 
         while isoform_pos < len(isoform_junctions):
-            if overlaps(read_region, isoform_junctions[isoform_pos]):
+            if contains(read_region, isoform_junctions[isoform_pos]):
                 if (isoform_features_present[isoform_pos] != -1):
                     contradictory_region_pairs.append((None, (isoform_pos, isoform_pos)))
                     isoform_features_present[isoform_pos] = -1
@@ -409,6 +417,7 @@ class LongReadAssigner:
 
     def compare_overlapping_contradictional_regions(self, read_junctions, isoform_junctions, read_cregion, isoform_cregion):
         if read_cregion is None:
+            #FIXME partial itron overlap at read ends -> exon_elongation
             return MatchingEvent.intron_retention
         elif isoform_cregion is None:
             if self.are_known_introns(read_junctions, read_cregion):
@@ -466,13 +475,17 @@ class LongReadAssigner:
 
     def are_known_introns(self, junctions, region):
         selected_junctions = []
+        logger.debug("Checking for known introns " + str(region))
         for i in range(region[0], region[1] + 1):
             selected_junctions.append(junctions[i])
+
+        logger.debug(str(selected_junctions))
         intron_profile_constructor = \
             OverlappingFeaturesProfileConstructor(self.gene_info.intron_profiles.features,
                                                   (self.gene_info.start, self.gene_info.end),
                                                   comparator = partial(equal_ranges, delta = self.params.delta))
-        selected_junctions_profile = intron_profile_constructor.construct_profile(selected_junctions)
+        selected_junctions_profile = intron_profile_constructor.construct_profile_for_introns(selected_junctions)
+        logger.debug(str(selected_junctions_profile.read_profile))
         return all(el == 1 for el in selected_junctions_profile.read_profile)
 
     # === Exon matching ==

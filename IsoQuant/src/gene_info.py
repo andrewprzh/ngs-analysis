@@ -30,9 +30,11 @@ class FeatureProfiles:
         pos = 0
 
         for feature in transcript_features:
-            while not comaprator(feature, self.features[pos]):
+            while pos < len(self.features) and not comaprator(feature, self.features[pos]):
                 pos += 1
-            self.profiles[transcript_id][pos] = 1
+            while pos < len(self.features) and comaprator(feature, self.features[pos]):
+                self.profiles[transcript_id][pos] = 1
+                pos += 1
 
 
 # All gene(s) information
