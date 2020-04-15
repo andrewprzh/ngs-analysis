@@ -22,8 +22,8 @@ READS_CUTOFF = 10
 MIN_CODON_COUNT = 2
 ASSIGN_CODONS_WHEN_AMBIGUOUS = False
 CONSIDER_FLANKING_JUNCTIONS = False
-JUNCTION_DELTA = 2
-LR_JUNCTION_DELTA = 3
+JUNCTION_DELTA = 6
+LR_JUNCTION_DELTA = 6
 COUNT_ISOFORM_STATS = True
 # merge --- merge overlaping genes and treat as one
 # separate --- count start/stop codons independently for each gene
@@ -152,7 +152,7 @@ class FeatureVector:
     fill_gaps = True
     block_comparator = None
     
-    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = True):
+    def __init__(self, num, check_flanking, fill_gaps, block_comparator, ignore_flanking_blocks = False):
         self.profile = [0 for i in range(0, num)]  
         self.reads = 0
         self.check_flanking = check_flanking
@@ -165,8 +165,8 @@ class FeatureVector:
         read_pos = 0
         ref_pos = 0
         
-        #print read_features
-        #print known_features
+        print_debug(read_features)
+        print_debug(known_features)
 
         features_present = [0 for i in range(0, len(known_features) + 2)]
         starting_matched = False
@@ -211,8 +211,10 @@ class FeatureVector:
                 read_pos +=1
 
         # filling gaps between included / excluded features
+        print_debug(features_present)
         if self.fill_gaps:
             self.fill_gaps_in_profile(features_present)
+        print_debug(features_present)
 
         # if ignoring inexact 1st and last blocks, mark overlapping blocks with 0 (as unknown) in case not exact match is found
         if self.ignore_flanking_blocks and not starting_matched:
@@ -223,6 +225,7 @@ class FeatureVector:
             for ref_pos in range(len(known_features)):
                 if overlaps(known_features[ref_pos], read_features[-1]):
                     features_present[ref_pos + 1] = 0
+        print_debug(features_present)
 
         self.reads += 1
         for i in range(0, len(self.profile)):
@@ -256,10 +259,11 @@ class ReadMappingInfo:
         self.total_reads = 0
         self.junctions_counts = \
             FeatureVector(introns_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = equal_ranges)
+        print_debug("Exon counting mode " + str(self.exon_counting_mode))
         self.exons_counts = FeatureVector(exons_count, check_flanking = False, fill_gaps = True,
                                           block_comparator = partial(equal_ranges, delta=delta), ignore_flanking_blocks = True) \
             if self.exon_counting_mode else \
-            FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps)
+            FeatureVector(exons_count, check_flanking = check_flanking, fill_gaps = True, block_comparator = overlaps, ignore_flanking_blocks = False)
 
     def concat_gapless_blocks(self, blocks, cigar_list):
         cigar_index = 0
@@ -309,7 +313,7 @@ class ReadMappingInfo:
         blocks = map(lambda x: (x[0] + 1, x[1]), self.concat_gapless_blocks(alignment.get_blocks(), alignment.cigartuples))
 
 #        if alignment.query_name == 'e44d07f3-1abc-41f8-918a-8547c40d511a' or alignment.query_name == 'b6922288-7e4c-4aec-a6dd-a440fc19837f':
-#            print(blocks)
+        print_debug(blocks)
 
         if len(blocks) >= 2 and not self.exon_counting_mode:
             read_junctions = junctions_from_blocks(blocks)
@@ -620,7 +624,7 @@ class ReadProfilesInfo:
 #        if read_id == 'e44d07f3-1abc-41f8-918a-8547c40d511a':
 #            print(len(alignment.cigartuples))
 #            print(alignment.cigartuples)
-#            print(len(alignment.get_blocks()))
+#            print(alignment.get_blocks())
 #            print(sorted(alignment.get_blocks()) == blocks)
 #            print(alignment.get_blocks())
 
@@ -659,8 +663,8 @@ class ReadProfilesInfo:
         read_intron_profile = map(sign, read_mapping_info.junctions_counts.profile)
         read_exon_profile = map(sign, read_mapping_info.exons_counts.profile)
 #        print_debug(read_mapping_info.read_id)
-#        print_debug(read_intron_profile)
-#        print_debug(read_exon_profile)
+        print_debug(read_intron_profile)
+        print_debug(read_exon_profile[1:-1])
 
         if all(el != 1 for el in read_intron_profile) and all(el != 1 for el in read_exon_profile[1:-1]):
             return True
@@ -730,8 +734,8 @@ class ReadProfilesInfo:
                 add_to_global_stats(read_id, intron_matched_isoforms)
             elif len(exon_matched_isoforms) == 1:
                 print_debug("Extra intron, but unique exon profile " + read_id)
-                transcript_id = list(exon_matched_isoforms)[0]
-                codon_pair = self.codon_pairs[transcript_id]
+                #transcript_id = list(exon_matched_isoforms)[0]
+                #codon_pair = self.codon_pairs[transcript_id]
                 stat.unique_extra_intros += 1
                 add_to_global_stats(read_id, exon_matched_isoforms)
             else:
@@ -1215,7 +1219,7 @@ def set_params(args):
     args.delta = LR_JUNCTION_DELTA  if args.data_type == "long_reads" else JUNCTION_DELTA
     args.count_isoform_stats = COUNT_ISOFORM_STATS and args.data_type == "isoforms"
     args.exon_count_mode = False
-
+    args.read_info_map = None
 
 def main():
     args = parse_args()
