@@ -171,8 +171,11 @@ def set_additional_params(args):
     args.skip_secondary = True
 
     args.resolve_ambiguous = False
+    args.max_exon_extension = 200
     args.allow_exon_extension = True
     args.allow_extra_terminal_introns = False
+    args.max_intron_shift = 100
+    args.max_missed_exon_len = 100
     args.correct_minor_errors = True
 
 

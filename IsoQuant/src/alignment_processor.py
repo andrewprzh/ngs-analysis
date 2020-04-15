@@ -50,9 +50,7 @@ class LongReadAlginmentProcessor:
             read_id = alignment.query_name
             logger.debug("=== Processing read " + read_id + " ===")
             concat_blocks = concat_gapless_blocks(sorted(alignment.get_blocks()), alignment.cigartuples)
-            logger.debug(concat_blocks)
             sorted_blocks = correct_bam_coords(concat_blocks)
-            logger.debug(sorted_blocks)
             intron_profile = self.intron_profile_construnctor.construct_profile(sorted_blocks)
             split_exon_profile = self.split_exon_profile_construnctor.construct_profile(sorted_blocks)
             # FIXME
