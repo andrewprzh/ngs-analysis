@@ -45,6 +45,30 @@ def get_aligner(aligner):
     return path
 
 
+def index_reference(aligner, args):
+    logger.debug('Indexing reference')
+    ref_name, _ = os.path.splitext(args.reference.split('/')[-1])
+    index_name = os.path.join(args.output, ref_name + ".idx")
+    if os.path.exists(index_name):
+        return index_name
+
+    #TODO: fix
+    if aligner == "starlong":
+        pass
+    elif aligner == "minimap2":
+        minimap2_path = get_aligner('minimap2')
+        command = '{exec_path} -t {threads} -k15 -w5 -d {ref_index_name} {ref_name}'.format(exec_path=minimap2_path,
+                                                                                            threads=args.threads,
+                                                                                            ref_index_name=index_name,
+                                                                                            ref_name=args.reference)
+    elif aligner == "gmap":
+        pass
+
+    if os.system(command) != 0:
+        logger.critical("Failed indexing reference")
+        exit(-1)
+    return index_name
+
 def align_fasta(aligner, fastq_paths, args):
     #TODO: fix paired end reads
     fastq_path = fastq_paths[0]
@@ -87,16 +111,6 @@ def align_fasta(aligner, fastq_paths, args):
 
     elif aligner == "minimap2":
         minimap2_path = get_aligner('minimap2')
-        if not args.index:
-            logger.debug('Indexing reference')
-            ref_name, _ = os.path.splitext(args.reference.split('/')[-1])
-            args.index = os.path.join(args.output, ref_name + ".idx")
-            if not os.path.exists(args.index):
-                command = '{exec_path} -k15 -w5 -d {ref_index_name} {ref_name}'.format(exec_path=minimap2_path, ref_index_name=args.index,
-                                                                                       ref_name=args.reference)
-                if os.system(command) != 0:
-                    logger.critical("Minimap2 finished with errors")
-                    exit(-1)
         command = '{exec_path} {ref_index_name} {transcripts} -a -x splice --secondary=no -C5 -t {threads} ' \
                   '> {alignment_out} '.format(exec_path=minimap2_path,
                                               ref_index_name=args.index,

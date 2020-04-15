@@ -11,7 +11,7 @@ import argparse
 from traceback import print_exc
 
 from src.input_data_storage import *
-from src.read_mapper import align_fasta
+from src.read_mapper import align_fasta, index_reference
 
 logger = logging.getLogger('IsoQuant')
 
@@ -26,7 +26,7 @@ class DataSetMapper:
     def __init__(self, args):
         self.args = args
         self.aligner = self.choose_aligner()
-        self.index_path = self.create_index()
+        self.index_path = self.create_index(args)
 
     def choose_aligner(self,):
         if self.args.aligner is not None:
@@ -34,8 +34,10 @@ class DataSetMapper:
         else:
             return DATATYPE_TO_ALIGNER[self.args.data_type]
 
-    def create_index(self):
-        return ""
+    def create_index(self, args):
+        if args.index and os.path.exists(args.index):
+            return args.index
+        return index_reference(self.aligner, args)
 
     def map_input(self, input_data):
         # returns new InputDataStorage

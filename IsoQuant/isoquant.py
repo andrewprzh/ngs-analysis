@@ -191,6 +191,7 @@ def run_pipeline(args):
     if args.input_data.input_type == "fastq":
         # substitute input reads with bams
         dataset_mapper = DataSetMapper(args)
+        args.index = dataset_mapper.index_path
         args.input_data = dataset_mapper.map_reads(args)
 
     # run isoform assignment
