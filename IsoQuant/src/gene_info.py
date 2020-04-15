@@ -144,10 +144,10 @@ class GeneInfo:
             ends_pos += 1
 
         if current_state != 0:
-            logger.ciritcal("Unequal number of starts and ends")
+            logger.critical("Unequal number of starts and ends")
 
         if exon_blocks != sorted(exon_blocks):
-            logger.ciritcal("Somehow block are unsorted")
+            logger.critical("Somehow block are unsorted")
 
         return exon_blocks
 

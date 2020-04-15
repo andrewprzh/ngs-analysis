@@ -11,11 +11,12 @@ import argparse
 from traceback import print_exc
 
 from src.input_data_storage import *
+from src.read_mapper import align_fasta
 
 logger = logging.getLogger('IsoQuant')
 
 
-DATATYPE_TO_ALIGNER = {'assembly' : 'starlong', 'raw_long_reads' : 'minimap', 'hq_long_reads' : 'starlong',
+DATATYPE_TO_ALIGNER = {'assembly' : 'starlong', 'raw_long_reads' : 'minimap2', 'hq_long_reads' : 'starlong',
                        'barcoded_se_reads' : 'star', 'barcoded_pe_reads' : 'star'}
 
 SUPPORTED_ALIGNERS = ['star', 'starlong', 'minimap2', 'gmap', 'hisat2']
@@ -43,12 +44,23 @@ class DataSetMapper:
     def map_sample(self, sample, output_folder):
         pass
 
+    def map_reads(self, args):
+        samples = []
+        for sample in args.input_data.samples:
+            bam_files = []
+            for fastq_files in sample.file_list:
+                bam_files.append([align_fasta(self.aligner, fastq_files, args)])
+            samples.append(SampleData(bam_files, sample.label, sample.out_dir))
+        args.input_data.samples = samples
+        args.input_data.input_type = "bam"
+        return args.input_data
+
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--fastq', nargs='+', type=str, help='input FASTQ file(s), '
-                                                             'each file will be treated as a separate sample'
-                                                             'reference genome should be provided when using raw reads')
+                                                             'each file will be treated as a separate sample.'
+                                                             ' Reference genome should be provided when using raw reads')
     parser.add_argument('--fastq_list', type=str, help='text file with list of FASTQ files, one file per line '
                                                        '(two in case of paired end reads), leave empty line between samples')
     parser.add_argument("--data_type", "-d", help="type of data to process, supported types are: "

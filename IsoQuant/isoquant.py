@@ -36,8 +36,8 @@ def parse_args():
     parser.add_argument('--fastq_list', type=str, help='text file with list of FASTQ files, one file per line '
                                                        '(two in case of paired end reads), leave empty line between samples')
     parser.add_argument('--labels', nargs='+', type=str, help='sample names to be used')
-    parser.add_argument("--data_type", "-d", help="type of data to process, supported types are: "
-                                                  "assembly, raw_long_reads, hq_long_reads, barcoded_se_reads, barcoded_pe_reads", type=str)
+    parser.add_argument("--data_type", "-d", type=str, required=True, help="type of data to process, supported types are: "
+                                                  "assembly, raw_long_reads, hq_long_reads, barcoded_se_reads, barcoded_pe_reads")
 
     parser.add_argument("--genedb", "-g", help="gene database in gffutils .db format", type=str)
     parser.add_argument("--gtf", help="gene database in GTF/GFF format", type=str)
@@ -66,7 +66,7 @@ def parse_args():
         exit(-1)
 
     if os.path.exists(args.output):
-        logger.warn("Output folder already exists, some files may be overwritten")
+        logger.warning("Output folder already exists, some files may be overwritten")
     else:
         os.makedirs(args.output)
 
@@ -135,14 +135,14 @@ def check_input_files(args):
 def create_output_dirs(args):
     args.tmp_dir = os.path.join(args.output, "tmp")
     if os.path.exists(args.tmp_dir):
-        logger.warn("Tmp folder already exists, some files may be overwritten")
+        logger.warning("Tmp folder already exists, some files may be overwritten")
     else:
         os.makedirs(args.tmp_dir)
 
     for sample in args.input_data.samples:
         sample_dir = sample.out_dir
         if os.path.exists(sample_dir):
-            logger.warn(sample_dir + " folder already exists, some files may be overwritten")
+            logger.warning(sample_dir + " folder already exists, some files may be overwritten")
         else:
             os.makedirs(sample_dir)
 
