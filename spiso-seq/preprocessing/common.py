@@ -47,8 +47,10 @@ def align_fasta(contigs_infile, args, out_name = ""):
     contigs_name, ext = os.path.splitext(contigs_infile.split('/')[-1])
     if out_name == "":
         out_name = contigs_name
-
-    alignment_name = args.output_prefix + out_name
+    if os.path.isdir(args.output_prefix):
+        alignment_name = args.output_prefix + out_name
+    else:
+        alignment_name = args.output_prefix
     alignment_sam_path = alignment_name + '.sam'
     alignment_bam_path = alignment_name + '.bam'
 
@@ -94,7 +96,7 @@ def align_fasta(contigs_infile, args, out_name = ""):
 
     elif method.lower() == "minimap":
         minimap_path = '/Bmo/prjbel/tools/minimap2-2.8_x64-linux/minimap2'
-        command =  minimap_path+ ' {ref_index_name} {transcripts} -a -x splice -t {threads} ' \
+        command =  minimap_path+ ' {ref_index_name} {transcripts} -a -x splice  --secondary=no -C5 -t {threads} ' \
                               '> {alignment_out} '.format(ref_index_name=args.index,
                                                           transcripts=contigs_infile,
                                                           threads=str(args.threads),
