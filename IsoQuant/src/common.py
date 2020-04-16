@@ -23,6 +23,8 @@ def get_first_best_from_sorted(sorted_list_of_pairs):
 
 
 def list_to_str(element_list, element_delim=','):
+    if len(element_list) == 0:
+        return "."
     return element_delim.join(list(map(str, element_list)))
 
 
