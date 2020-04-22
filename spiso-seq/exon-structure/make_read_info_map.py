@@ -35,12 +35,16 @@ def process_reads(args, barcode_map):
     for l in open(args.read_to_barcode):
         tokens = l.strip().split()
         read_id = tokens[args.readid_column]
-        barcode = "none"
+        barcodes = []
         for i in args.read_barcode_columns:
-            barcode = tokens[i]
-            if barcode != "none":
-                break
-        if barcode == "none":
+            if tokens[i] != "none":
+                barcodes.append((tokens[i], int(tokens[i + 1])))
+
+        if len(barcodes) != 1:
+            continue
+        barcode = barcodes[0][0]
+        kmers = barcodes[0][1]
+        if barcode.find(',') != -1 or kmers < 3:
             continue
 
         if barcode not in barcode_map:
