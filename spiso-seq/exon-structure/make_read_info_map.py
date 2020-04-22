@@ -12,8 +12,6 @@ import argparse
 from traceback import print_exc
 from functools import partial
 
-MISSED_BARCODES = 0
-CONTRADICTORY_CLUSTERS = 0
 
 def read_barcode_clusters(args):
     CONTRADICTORY_CLUSTERS = 0
@@ -26,6 +24,8 @@ def read_barcode_clusters(args):
             CONTRADICTORY_CLUSTERS += 1
 
         barcode_map[barcode] = property
+    print("Total barcodes read " + str(len(barcode_map)))
+    print("Contradictory barcode assignments " + str(CONTRADICTORY_CLUSTERS))
     return barcode_map
 
 
@@ -40,12 +40,15 @@ def process_reads(args, barcode_map):
             barcode = tokens[i]
             if barcode != "none":
                 break
+        if barcode == "none":
+            continue
 
         if barcode not in barcode_map:
             MISSED_BARCODES += 1
         else:
             outf.write(read_id + "\t" + barcode + "\t" + barcode_map[barcode] + "\n")
     outf.close()
+    print("Reads with non-informative barcodes " + str(MISSED_BARCODES))
 
 
 def parse_args():
@@ -72,16 +75,6 @@ def main():
     print("Reading reads from " + args.read_to_barcode)
     process_reads(args, barcode_map)
     print("Read info map is written to " + args.output)
-    print("Contradictory barcode assignments " + str(CONTRADICTORY_CLUSTERS))
-    print("Reads with non-informative barcodes " + str(MISSED_BARCODES))
 
 
-if __name__ == "__main__":
-   # stuff only to run when not called via 'import' here
-    try:
-        main()
-    except SystemExit:
-        raise
-    except:
-        print_exc()
-        sys.exit(-1)
+main()

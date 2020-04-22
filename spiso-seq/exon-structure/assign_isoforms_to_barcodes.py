@@ -479,7 +479,7 @@ class GeneInfo:
         self.similar_exons = set()
         for e1 in self.exons:
             for e2 in self.exons:
-                if e1 != e2 and equal_ranges(e1, e2, self.args.delta):
+                if e1 != e2 and equal_ranges(e1, e2, LR_JUNCTION_DELTA):
                     self.similar_exons.add(e1)
                     self.similar_exons.add(e2)
 
@@ -1064,7 +1064,7 @@ class GeneDBProcessor:
             out_exons = open(self.out_exon_counts, "a+")
 
             exon_type = "."
-            if exon in self.similar_exons:
+            if exon in read_profiles.gene_info.similar_exons:
                 exon_type += "S"
             if len(exon_to_genes[exon]) > 1:
                 exon_type += "M"
