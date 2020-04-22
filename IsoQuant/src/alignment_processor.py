@@ -14,10 +14,11 @@ logger = logging.getLogger('IsoQuant')
 
 # class for aggregating all assignment information
 class LongReadAlginmentProcessor:
-    def __init__(self, gene_info, bams, params, printer):
+    def __init__(self, gene_info, bams, params, printer, counter):
         self.gene_info = gene_info
         self.bams = bams
         self.printer = printer
+        self.counter = counter
         self.params = params
 
         gene_region = (gene_info.start, gene_info.end)
@@ -58,6 +59,7 @@ class LongReadAlginmentProcessor:
             read_assignment = self.assigner.assign_to_isoform(read_id, combined_profile)
             logger.debug("=== Finished read " + read_id + " ===")
             self.printer.add_read_info(read_assignment, combined_profile)
+            self.counter.add_read_info(read_assignment)
 
         bamfile_in.close()
 
