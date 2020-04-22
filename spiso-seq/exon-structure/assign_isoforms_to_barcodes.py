@@ -476,6 +476,13 @@ class GeneInfo:
             self.terminal_exons.add(all_isoforms_exons[i][0])
             self.terminal_exons.add(all_isoforms_exons[i][-1])
 
+        self.similar_exons = set()
+        for e1 in self.exons:
+            for e2 in self.exons:
+                if e1 != e2 and equal_ranges(e1, e2, self.args.delta):
+                    self.similar_exons.add(e1)
+                    self.similar_exons.add(e2)
+
         self.terminal_only_exons = copy.deepcopy(self.terminal_exons)
         for i in all_isoforms_exons.keys():
             non_terminal = set(all_isoforms_exons[i][1:-1])
@@ -1057,6 +1064,8 @@ class GeneDBProcessor:
             out_exons = open(self.out_exon_counts, "a+")
 
             exon_type = "."
+            if exon in self.similar_exons:
+                exon_type += "S"
             if len(exon_to_genes[exon]) > 1:
                 exon_type += "M"
             if exon in read_profiles.gene_info.terminal_only_exons:
