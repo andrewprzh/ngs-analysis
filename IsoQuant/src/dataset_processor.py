@@ -18,7 +18,6 @@ from src.input_data_storage import *
 from src.alignment_processor import *
 from src.assignment_io import *
 from src.gene_info import *
-
 from src.long_read_counter import FeatureCounter
 
 logger = logging.getLogger('IsoQuant')
@@ -148,7 +147,7 @@ class DatasetProcessor:
 
             gene_info = GeneInfo(g, self.gffutils_db)
             bam_files = list(map(lambda x: x[0], sample.file_list))
-            alignment_processor = LongReadAlginmentProcessor(gene_info, bam_files, self.args, global_printer, feature_counter)
+            alignment_processor = LongReadAlignmentProcessor(gene_info, bam_files, self.args, global_printer, feature_counter)
             alignment_processor.process()
 
         feature_counter.dump()

@@ -13,7 +13,7 @@ from src.long_read_profiles import *
 logger = logging.getLogger('IsoQuant')
 
 # class for aggregating all assignment information
-class LongReadAlginmentProcessor:
+class LongReadAlignmentProcessor:
     def __init__(self, gene_info, bams, params, printer, counter):
         self.gene_info = gene_info
         self.bams = bams

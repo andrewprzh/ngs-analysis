@@ -49,16 +49,16 @@ def parse_args():
 
     parser.add_argument("--genedb", "-g", help="gene database in gffutils .db format", type=str)
     parser.add_argument("--gtf", help="gene database in GTF/GFF format", type=str)
-    parser.add_argument("--reference", help="reference genome in FASTA format,"
+    parser.add_argument("--reference", help="reference genome in FASTA format, "
                                             "should be provided only when raw reads are used as an input", type=str)
-    parser.add_argument("--index", help="genome index for specified aligner,"
+    parser.add_argument("--index", help="genome index for specified aligner, "
                                         "should be provided only when raw reads are used as an input", type=str)
 
     parser.add_argument("--output", "-o", help="output folder, will be created automatically [./]", type=str, default="./")
     parser.add_argument("--keep_tmp", help="do not remove temporary files in the end", action='store_true', default=False)
     parser.add_argument("--prefix", help="prefix for output files", type=str, default="")
     parser.add_argument("--threads", "-t", help="number of threads to use", type=int, default="16")
-    parser.add_argument("--read_info", help="text file with tab-separated information about input reads, according to"
+    parser.add_argument("--read_info", help="text file with tab-separated information about input reads, according to "
                                             "which counts are groupped, e.g. cell type, barcode, etc.", type=str)
 
     ## ADDITIONAL OPTIONS
