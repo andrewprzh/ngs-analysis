@@ -1096,10 +1096,12 @@ class GeneDBProcessor:
                                     + "\t" + str(total_counts) + "\t" + str(total_inclusion) + "\t" + exon_type + "\t" +
                                     ",".join(list(exon_to_genes[exon])) + "\t" + "{0:.4f}".format(gene_coverage) + "\n")
                 elif self.args.format == "df":
-                    exon_inclusion_rate = float(include_counts) / float(include_counts + exclude_counts)
+                    sum_group_counts = include_counts + exclude_counts
                     exon_report = "contained" if include_counts == 0 else "inclusion"
-                    out_exons.write(group_id + "\t" +  exon_id + "\t" + ",".join(list(exon_to_genes[exon]))
-                                    + "\t" + exon_report + "\t" + "{0:.4f}".format(exon_inclusion_rate)  + "\t" + exon_type + "\n")
+                    out_exons.write(group_id + "\t" +  exon_id + "\t" + ",".join(list(exon_to_genes[exon])) + "\t" +
+                                    exon_report + "\t" + exon_type + "\t"+
+                                    str(include_counts) + "\t" + str(sum_group_counts) + "\t" +
+                                    str(total_inclusion) + "\t" + str(total_counts) + "\t" + "\n")
             out_exons.close()
 
             #out_exon_info = open(self.out_exon_genes, "a+")
@@ -1135,7 +1137,7 @@ class GeneDBProcessor:
                     '#exon_id\tcell_type\tinclusion\texclusion\ttotal_count\ttotal_inclusion\texon_type\tgene_id\tgene_coverage\n')
             elif self.args.format == "df":
                 outf.write(
-                    '#barcode\texon_id\tgene_id\treported\tinclusion_rate\texon_type\n')
+                    '#barcode\texon_id\tgene_id\treported\texon_type\tincluded_in_bc\tcounts_in_bc\ttotal_included\ttotal_count\n')
             outf.close()
             #self.out_exon_genes = self.output_prefix + ".exon_to_geneid.tsv"
             #outf = open(self.out_exon_genes, "w")
