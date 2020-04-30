@@ -94,7 +94,7 @@ def align_fasta(contigs_infile, args, out_name = ""):
 
     elif method.lower() == "minimap":
         minimap_path = '/Bmo/prjbel/tools/minimap2-2.8_x64-linux/minimap2'
-        command =  minimap_path+ ' {ref_index_name} {transcripts} -a -x splice -t {threads} ' \
+        command =  minimap_path+ ' {ref_index_name} {transcripts} -a -x splice --secondary=no -C5  -t {threads} ' \
                               '> {alignment_out} '.format(ref_index_name=args.index,
                                                           transcripts=contigs_infile,
                                                           threads=str(args.threads),
