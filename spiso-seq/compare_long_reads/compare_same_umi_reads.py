@@ -104,7 +104,8 @@ class AligmentComparator:
         return True
 
     CONTRADICTION_TYPES = set(["first_misses_known_intron", "first_misses_intron", "second_misses_known_intron", "second_misses_intron, ",
-                               "second_intron_shift", "first_intron_shift", "intron_shift", "second_big_intron_shift", "first_big_intron_shift",
+                               "second_intron_shift", "first_intron_shift", "intron_shift", "intron_shift_both_known",
+                               "second_big_intron_shift", "first_big_intron_shift", "big_intron_shift_both_known",
                                "big_intron_shift", "mutual_exons", "first_misses_known_exon", "first_misses_exon", "second_misses_known_exon",
                                "second_misses_exon", "unknown_contradiction"])
 
@@ -134,14 +135,18 @@ class AligmentComparator:
 
         if region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
-            if first_introns_known and not second_introns_known:
+            if first_introns_known and second_introns_known:
+                return "intron_shift_both_known"
+            elif first_introns_known and not second_introns_known:
                 return "second_intron_shift"
             elif not first_introns_known and second_introns_known:
                 return "first_intron_shift"
             return "intron_shift"
         elif region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < BIG_DELTA:
-            if first_introns_known and not second_introns_known:
+            if first_introns_known and second_introns_known:
+                return "big_intron_shift_both_known"
+            elif first_introns_known and not second_introns_known:
                 return "second_big_intron_shift"
             elif not first_introns_known and second_introns_known:
                 return "first_big_intron_shift"
