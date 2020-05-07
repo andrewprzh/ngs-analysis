@@ -67,6 +67,12 @@ class AligmentComparator:
         self.missed_exons["second_misses"] = []
         self.missed_exons["second_misses_known"] = []
 
+        self.shifted_introns = {}
+        self.shifted_introns["intron_shift_both_known"] = []
+        self.shifted_introns["intron_shift_both_novel"] = []
+        self.shifted_introns["first_intron_shift"] = []
+        self.shifted_introns["second_intron_shift"] = []
+
         if args.genedb is None:
             self.db = None
         elif not os.path.isfile(args.genedb):
@@ -120,6 +126,15 @@ class AligmentComparator:
             exon_len = introns[i + 1][0] - introns[i][1]
             self.missed_exons[key].append(exon_len)
 
+    def add_shifted_inton(self, key, intron1, intron2):
+        diff1 = intron1[0] - intron2[0]
+        diff2 = intron1[1] - intron2[1]
+        if diff1 * diff2 < 0:
+            # intron shrink
+            self.shifted_introns[key].append(- abs(diff1) - abs(diff2))
+        else:
+            self.shifted_introns[key].append(abs(diff1) + abs(diff2))
+
     def compare_overlapping_contradictional_regions(self, junctions1, junctions2, region1, region2, known_introns):
         if region1 is None:
             if self.are_known_introns(junctions2, region2, known_introns):
@@ -140,20 +155,28 @@ class AligmentComparator:
         if region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
             if first_introns_known and second_introns_known:
+                self.add_shifted_inton("intron_shift_both_known", junctions1[region1[0]], junctions2[region2[0]])
                 return "intron_shift_both_known"
             elif first_introns_known and not second_introns_known:
+                self.add_shifted_inton("second_intron_shift", junctions1[region1[0]], junctions2[region2[0]])
                 return "second_intron_shift"
             elif not first_introns_known and second_introns_known:
+                self.add_shifted_inton("first_intron_shift", junctions1[region1[0]], junctions2[region2[0]])
                 return "first_intron_shift"
+            self.add_shifted_inton("intron_shift_both_novel", junctions1[region1[0]], junctions2[region2[0]])
             return "intron_shift"
         elif region1[1] == region1[0] and region2[1] == region2[0] and \
                 total_intron_len_diff < BIG_DELTA:
             if first_introns_known and second_introns_known:
+                self.add_shifted_inton("intron_shift_both_known", junctions1[region1[0]], junctions2[region2[0]])
                 return "big_intron_shift_both_known"
             elif first_introns_known and not second_introns_known:
+                self.add_shifted_inton("second_intron_shift", junctions1[region1[0]], junctions2[region2[0]])
                 return "second_big_intron_shift"
             elif not first_introns_known and second_introns_known:
+                self.add_shifted_inton("first_intron_shift", junctions1[region1[0]], junctions2[region2[0]])
                 return "first_big_intron_shift"
+            self.add_shifted_inton("intron_shift_both_novel", junctions1[region1[0]], junctions2[region2[0]])
             return "big_intron_shift"
         elif region1[1] - region1[0] == region2[1] - region2[0] and \
                 total_intron_len_diff < DIFF_DELTA:
@@ -401,6 +424,12 @@ class AligmentComparator:
             count, exon_len = numpy.histogram(self.missed_exons[k], bins=[10 * i for i in range(61)] + [10000])
             for i in range(len(count)):
                 print(str(exon_len[i]) + '\t' + str(count[i]))
+
+        for k in sorted(self.shifted_introns.keys()):
+            print(k + " intron shift histogram")
+            count, intron_len = numpy.histogram(self.missed_exons[k], bins=[-10000] + [10 * i for i in range(-20, 21)] + [10000])
+            for i in range(len(count)):
+                print(str(intron_len[i]) + '\t' + str(count[i]))
 
 
 def parse_args():
