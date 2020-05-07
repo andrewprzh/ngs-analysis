@@ -390,7 +390,7 @@ class AligmentComparator:
 
         for k in sorted(self.missed_exons.keys()):
             print(k + " exon length histogram")
-            count, exon_len = numpy.histogram(self.missed_exons[k], bins=[10 * i for i in range(31)] + [10000])
+            count, exon_len = numpy.histogram(self.missed_exons[k], bins=[10 * i for i in range(61)] + [10000])
             for i in range(len(count)):
                 print(str(exon_len[i]) + '\t' + str(count[i]))
 
