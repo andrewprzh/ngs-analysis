@@ -79,7 +79,7 @@ class AligmentComparator:
 
         print("Closing output files")
 
-    def get_known_introns(self, region, chr_id):
+    def get_known_introns(self, region, chr_id, isoform_id = None):
         if self.db is None:
             return set()
 #        print("Getting known introns for " + chr_id + " " + str(region))
@@ -91,8 +91,12 @@ class AligmentComparator:
             for e in self.db.children(t, order_by='start'):
                 if e.featuretype == 'exon':
                     transcript_exons.append((e.start, e.end))
-
-            known_introns.update(junctions_from_blocks(transcript_exons))
+            transcript_introns = junctions_from_blocks(transcript_exons)
+            if isoform_id is not None and t.id == isoform_id:
+                known_introns = set(transcript_introns)
+                break
+            else:
+                known_introns.update(transcript_introns)
         return known_introns
 
     def are_known_introns(self, junctions, region, known_introns):
@@ -196,7 +200,7 @@ class AligmentComparator:
             print(contradiction_events)
             return "multipe_contradiction_events"
 
-    def compare_junctions(self, blocks1, blocks2, chr_id):
+    def compare_junctions(self, blocks1, blocks2, chr_id, isoform_id = None):
         junctions1 = junctions_from_blocks(blocks1)
         junctions2 = junctions_from_blocks(blocks2)
 
@@ -250,7 +254,7 @@ class AligmentComparator:
 
         if any(el == -1 for el in features_present1) or any(el == -1 for el in features_present2):
             region = (min(blocks1[0][0], blocks2[0][0]), max(blocks1[-1][1], blocks2[-1][1]))
-            known_introns = self.get_known_introns(region, chr_id)
+            known_introns = self.get_known_introns(region, chr_id, isoform_id)
             return self.detect_contradiction_type(junctions1, junctions2, contradictory_region_pairs, known_introns)
         elif all(el == 0 for el in features_present1):
             if len(features_present1) > 1 or len(features_present1) > 1:
@@ -293,7 +297,7 @@ class AligmentComparator:
             print(features_present2)
         return "unknown"
 
-    def compare_aligments(self, blocks1, blocks2, chr_id):
+    def compare_aligments(self, blocks1, blocks2, chr_id, isoform_id = None):
         if len(blocks1) == 1:
             if len(blocks2) == 1:
                 return "both_non_spliced"
@@ -302,7 +306,7 @@ class AligmentComparator:
         elif len(blocks2) == 1:
             return "second_non_spliced"
 
-        comparison = self.compare_junctions(blocks1, blocks2, chr_id)
+        comparison = self.compare_junctions(blocks1, blocks2, chr_id, isoform_id)
         return comparison
 
 
@@ -325,7 +329,11 @@ class AligmentComparator:
 
                     if overlaps(region1, region2):
                         chr_id = a1.reference_name
-                        res = self.compare_aligments(blocks1, blocks2, chr_id)
+                        isoform_id1 = a1.query_name.split("_")[-1]
+                        isoform_id2 = a1.query_name.split("_")[-1]
+                        if isoform_id2 != isoform_id1:
+                            print("Unequal isoforms")
+                        res = self.compare_aligments(blocks1, blocks2, chr_id, isoform_id1)
 
                         if res in self.CONTRADICTION_TYPES:
                             self.contradictory_alignemts.append(a1)
