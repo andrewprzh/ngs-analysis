@@ -99,6 +99,7 @@ class AligmentComparator:
                     transcript_exons.append((e.start, e.end))
             transcript_introns = junctions_from_blocks(transcript_exons)
             if isoform_id is not None and t.id == isoform_id:
+                print("Setting introns for known isoform " + isoform_id)
                 known_introns = set(transcript_introns)
                 break
             else:
@@ -414,10 +415,10 @@ class AligmentComparator:
         for k in sorted(self.aggr_stats.keys()):
             print(k + "\t" + str(self.aggr_stats[k]))
 
-        out_bam = pysam.AlignmentFile(self.args.output_prefix + ".contradictory.bam", "wb", template=pysam.AlignmentFile(self.args.bams[0], "rb"))
-        for read in self.contradictory_alignemts:
-            out_bam.write(read)
-        out_bam.close()
+#        out_bam = pysam.AlignmentFile(self.args.output_prefix + ".contradictory.bam", "wb", template=pysam.AlignmentFile(self.args.bams[0], "rb"))
+#        for read in self.contradictory_alignemts:
+#            out_bam.write(read)
+#        out_bam.close()
 
         for k in sorted(self.missed_exons.keys()):
             print(k + " exon length histogram")
@@ -427,7 +428,7 @@ class AligmentComparator:
 
         for k in sorted(self.shifted_introns.keys()):
             print(k + " intron shift histogram")
-            count, intron_len = numpy.histogram(self.missed_exons[k], bins=[-10000] + [10 * i for i in range(-20, 21)] + [10000])
+            count, intron_len = numpy.histogram(self.shifted_introns[k], bins=[-10000] + [10 * i for i in range(-20, 21)] + [10000])
             for i in range(len(count)):
                 print(str(intron_len[i]) + '\t' + str(count[i]))
 
