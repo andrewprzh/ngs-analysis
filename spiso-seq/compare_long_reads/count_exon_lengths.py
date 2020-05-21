@@ -14,10 +14,10 @@ def process_db(db):
     processed_exons = set()
     lengths = []
     for e in db.features_of_type('exon'):
-        etuple = (e.seqid, e.start, e.end)
-        if etuple not in processed_exons:
-            processed_exons.add(etuple)
-            lengths.append(e.end + 1 - e.start)
+#        etuple = (e.seqid, e.start, e.end)
+#        if etuple not in processed_exons:
+#            processed_exons.add(etuple)
+        lengths.append(e.end + 1 - e.start)
     return lengths
 
 
