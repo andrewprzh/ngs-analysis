@@ -35,6 +35,7 @@ def process_single_read_sample(sample_id, barcode_file, read_file, barcode_map, 
     else:
         read_handle = SeqIO.parse(open(read_file, "rt"), "fastq")
 
+    counter = 0
     for bc_record in bc_handle:
         read_rec = next(read_handle)
         if read_rec.id.split()[0] != bc_record.id.split()[0]:
@@ -48,7 +49,9 @@ def process_single_read_sample(sample_id, barcode_file, read_file, barcode_map, 
                 read_rec.description += " sample=" + sample_id + " barcode=" + barcode + " cluster=" + cluster_id
                 outf = outf_map[cluster_id]
                 SeqIO.write(read_rec, outf, "fastq")
+                counter += 1
                 break
+    print("Total reads written: " + str(counter))
 
 
 def process_paired_read_sample(sample_id, barcode_file, read_file1, read_file2, barcode_map, outf_map1, outf_map2):
@@ -65,6 +68,7 @@ def process_paired_read_sample(sample_id, barcode_file, read_file1, read_file2, 
     else:
         read_handle2 = SeqIO.parse(open(read_file2, "rt"), "fastq")
 
+    counter = 0
     for bc_record in bc_handle:
         read_rec1 = next(read_handle1)
         read_rec2 = next(read_handle2)
@@ -82,7 +86,9 @@ def process_paired_read_sample(sample_id, barcode_file, read_file1, read_file2, 
                 outf2 = outf_map2[cluster_id]
                 SeqIO.write(read_rec1, outf1, "fastq")
                 SeqIO.write(read_rec2, outf2, "fastq")
+                counter += 1
                 break
+    print("Total reads written: " + str(counter))
 
 
 def get_sample_name(fname):
