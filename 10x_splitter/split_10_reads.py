@@ -36,12 +36,16 @@ def process_single_read_sample(sample_id, barcode_file, read_file, barcode_map, 
         read_handle = SeqIO.parse(open(read_file, "rt"), "fastq")
 
     counter = 0
+    processed = 0
     for bc_record in bc_handle:
         read_rec = next(read_handle)
         if read_rec.id.split()[0] != bc_record.id.split()[0]:
             sys.stderr.write("Unequal read ids " + read_rec.id.split()[0] + ",  " + bc_record.id.split()[0] + "\n")
             continue
 
+        processed += 1
+        if processed % 1000000 == 0:
+            print("Processed " + str(processed) + " reads")
         for l in BARCODE_LENGTHS:
             barcode = str(bc_record.seq[:l])
             if barcode in barcode_map:
@@ -69,6 +73,7 @@ def process_paired_read_sample(sample_id, barcode_file, read_file1, read_file2, 
         read_handle2 = SeqIO.parse(open(read_file2, "rt"), "fastq")
 
     counter = 0
+    processed = 0
     for bc_record in bc_handle:
         read_rec1 = next(read_handle1)
         read_rec2 = next(read_handle2)
@@ -76,6 +81,9 @@ def process_paired_read_sample(sample_id, barcode_file, read_file1, read_file2, 
             sys.stderr.write("Unequal read ids " + read_rec1.id.split()[0] + ",  " + read_rec1.id.split()[0] + ",  " + bc_record.id.split()[0] + "\n")
             continue
 
+        processed += 1
+        if processed % 1000000 == 0:
+            print("Processed " + str(processed) + " reads")
         for l in BARCODE_LENGTHS:
             barcode = str(bc_record.seq[:l])
             if barcode in barcode_map:
