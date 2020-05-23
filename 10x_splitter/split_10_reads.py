@@ -88,7 +88,7 @@ def process_paired_read_sample(sample_id, barcode_file, read_file1, read_file2, 
 def get_sample_name(fname):
     for r in ['R1', 'R2', 'R3']:
         if fname.find(r) != -1:
-            return fname.split(r)[0][:-1]
+            return fname.split("/")[-1].split(r)[0][:-1]
 
     return fname.split('.')[0]
 
@@ -115,7 +115,7 @@ def create_output_file_map(barcode_map, output_prefix):
     for cluster_id in cluster_ids:
         name_map[cluster_id] = output_prefix + ".cluster_" + cluster_id
 
-    read_type_suffix = { "single" : "S.fastq", "left" : ".R1.fastq", "right" : ".R2.fastq"}
+    read_type_suffix = { "single" : ".S.fastq", "left" : ".R1.fastq", "right" : ".R2.fastq"}
     outf_maps = {}
     for read_type in read_type_suffix.keys():
         outf_maps[read_type] = {}
@@ -143,10 +143,12 @@ def parse_args():
 def main():
     args = parse_args()
     barcode_map = read_barcode_map(args.barcode_map)
+    print("Loaded " + str(len(barcode_map.keys())) + " barcodes with " + str(len(set(barcode_map.values()))) + " clusters")
     samples = read_samples(args.samples)
     outf_maps = create_output_file_map(barcode_map, args.output_prefix)
 
     for sample in samples:
+        print("Processing sample " + sample[0])
         if len(sample) == 3:
             process_single_read_sample(sample[0], sample[1], sample[2], barcode_map, outf_maps["single"])
         elif len(sample) == 4:
