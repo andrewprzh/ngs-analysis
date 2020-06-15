@@ -129,7 +129,7 @@ def create_output_file_map(barcode_map, output_prefix):
     for cluster_id in cluster_ids:
         name_map[cluster_id] = output_prefix + ".cluster_" + cluster_id
 
-    read_type_suffix = { "single" : ".S.fastq", "left" : ".R1.fastq", "right" : ".R2.fastq"}
+    read_type_suffix = { "single" : ".S.fastq" } #, "left" : ".R1.fastq", "right" : ".R2.fastq"}
     outf_maps = {}
     for read_type in read_type_suffix.keys():
         outf_maps[read_type] = {}
