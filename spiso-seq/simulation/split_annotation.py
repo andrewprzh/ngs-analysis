@@ -33,17 +33,17 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, probability = 0.05):
                 if r < probability:
                     ignored_transcripts.add(t_id)
 
-        gene_str = '%s\t.\tgene\t%d\t%d\t.\t%s\t.\tgene_id "%s";\n' % (g.seqid, g.start, g.end, g.strand, g.id)
+        gene_str = '%s\n' % g # '%s\t.\tgene\t%d\t%d\t.\t%s\t.\tgene_id "%s";\n' % (g.seqid, g.start, g.end, g.strand, g.id)
         main_gtf.write(gene_str)
         if len(ignored_transcripts):
             excl_gtf.write(gene_str)
 
         for t in db.children(g, featuretype='transcript', order_by='start'):
-            transcript_str = '%s\t.\ttranscript\t%d\t%d\t.\t%s\t.\tgene_id "%s"; transcript_id "%s";\n' % \
-                             (t.seqid, t.start, t.end, t.strand, g.id, t.id)
-            prefix_columns = "%s\t.\texon\t" % t.seqid
-            suffix_columns = '.\t%s\t.\tgene_id "%s"; transcript_id "%s"; \n' % \
-                             (t.strand, g.id, t.id)
+            transcript_str = '%s\n' % t #'%s\t.\ttranscript\t%d\t%d\t.\t%s\t.\tgene_id "%s"; transcript_id "%s";\n' % \
+                             #(t.seqid, t.start, t.end, t.strand, g.id, t.id)
+            # prefix_columns = "%s\t.\texon\t" % t.seqid
+            # suffix_columns = '.\t%s\t.\tgene_id "%s"; transcript_id "%s"; \n' % \
+            #                 (t.strand, g.id, t.id)
 
             if t.id in ignored_transcripts:
                 current_file = excl_gtf
@@ -52,7 +52,7 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, probability = 0.05):
 
             current_file.write(transcript_str)
             for e in db.children(t, featuretype='exon', order_by='start'):
-                current_file.write(prefix_columns + "%d\t%d\t" % (e.start, e.end) + suffix_columns)
+                current_file.write('%s\n' % e)
 
     main_gtf.close()
     excl_gtf.close()
