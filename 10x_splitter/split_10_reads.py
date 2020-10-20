@@ -17,7 +17,7 @@ BARCODE_LENGTHS = [16, 14]
 def read_barcode_map(inf):
     barcode_map = {}
     for l in open(inf):
-        tokens = l.strip().split()
+        tokens = l.strip().split('\t')
         if len(tokens) != 5:
             continue
         barcode_map[tokens[0].split('_')[0]] = tokens[4]
