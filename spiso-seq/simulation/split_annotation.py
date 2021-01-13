@@ -84,7 +84,7 @@ def read_expressed_isoforms(fname, min_expr=1):
             if len(tokens) < 2:
                 print("Invalid fasta entry, isoform id was not found: " + record.name)
                 continue
-            t_id = tokens[1].split('.')
+            t_id = tokens[1].split('.')[0]
             assert  t_id.startswith("E")
             isoform_dict[t_id] += 1
         for k in isoform_dict.keys():
