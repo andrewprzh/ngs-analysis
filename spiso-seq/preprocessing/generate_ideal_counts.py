@@ -17,10 +17,10 @@ from traceback import print_exc
 def generate_counts(db, count):
     rpm_map = {}
     for t in db.features_of_type('transcript'):
-        transcript_len = 0
-        for e in db.children(t, featuretype='exon', order_by='start'):
-            transcript_len += e.end + 1 - e.start
-        rpm_map[t.id] = float(count * 1000.0) / float(transcript_len)
+        # transcript_len = 0
+        # for e in db.children(t, featuretype='exon', order_by='start'):
+        #    transcript_len += e.end + 1 - e.start
+        rpm_map[t.id] = float(count)
     return rpm_map
 
 
