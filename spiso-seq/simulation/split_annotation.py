@@ -9,6 +9,7 @@ import os
 import gffutils
 import random
 import argparse
+from collections import defaultdict
 from Bio import SeqIO
 
 from traceback import print_exc
@@ -26,11 +27,12 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
     for g in db.features_of_type('gene', order_by=('seqid', 'start')):
         exon_count = {}
         for t in db.children(g, featuretype='transcript', order_by='start'):
-            if len(expressed_transcripts) > 0 and t.id not in expressed_transcripts:
+            t_id = t.id.split('.')[0]
+            if len(expressed_transcripts) > 0 and t_id not in expressed_transcripts:
                 continue
-            exon_count[t.id] = 0
+            exon_count[t_id] = 0
             for e in db.children(t, featuretype='exon', order_by='start'):
-                exon_count[t.id] += 1
+                exon_count[t_id] += 1
 
         to_remove = set()
         for t_id in exon_count.keys():
@@ -55,7 +57,7 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
 
         for t in db.children(g, featuretype='transcript', order_by='start'):
             transcript_str = '%s\n' % t
-            if t.id in ignored_transcripts:
+            if t_id in ignored_transcripts:
                 current_file = excl_gtf
                 transcripts_dropped += 1
             else:
@@ -72,19 +74,29 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
     print("Reduced genes: %d, dropped transcripts: %d" % (genes_reduced, transcripts_dropped))
 
 
-def read_expressed_isoforms(fname):
+def read_expressed_isoforms(fname, min_expr=1):
     expressed_transcripts = set()
     base, ext = os.path.splitext(fname)
     if ext in {'.fa', '.fasta', '.fna'}:
+        isoform_dict = defaultdict(int)
         for record in SeqIO.parse(fname, "fasta"):
             tokens = record.name.split('_')
             if len(tokens) < 2:
                 print("Invalid fasta entry, isoform id was not found: " + record.name)
                 continue
-            expressed_transcripts.add(tokens[1])
+            t_id = tokens[1].split('.')
+            assert  t_id.startswith("E")
+            isoform_dict[t_id] += 1
+        for k in isoform_dict.keys():
+            if isoform_dict[k] >= min_expr:
+                expressed_transcripts.add(k)
     else:
         for l in open(fname):
-            expressed_transcripts.add(l.strip())
+            t = l.strip().split()
+            t_id = t[0].split('.')[0]
+            assert t_id.startswith("E")
+            if int(t[1]) >= min_expr:
+                expressed_transcripts.add(t_id)
 
     return expressed_transcripts
 
@@ -94,12 +106,14 @@ def parse_args():
     parser.add_argument("--genedb", "-g", help="gene database in gffutils db format", type=str, required=True)
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--seed", help="randomization seed [11]", type=int, default=11)
+    parser.add_argument("--min_expression", help="minimal number reads in transcript to be considered as expressed",
+                        type=int, default=1)
     parser.add_argument("--min_transcripts_expressed", help="minimal number of transcripts expressed in a gene to "
                                                             "consider them for dropping", type=int, default=3)
 
     parser.add_argument("--fraction", help="fraction of non-monoexonic transcripts to be removed",
                         type=float, default=0.05)
-    parser.add_argument("--expressed", help="simulated reads or list of expressed isoforms, "
+    parser.add_argument("--expressed", help="simulated reads or count table, "
                                             "will consider the entire annotation if not set", type=str)
     args = parser.parse_args()
 
