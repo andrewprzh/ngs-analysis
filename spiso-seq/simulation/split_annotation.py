@@ -15,7 +15,9 @@ from Bio import SeqIO
 from traceback import print_exc
 
 def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcripts,
-                    probability=0.05, min_expressed_transcripts=3):
+                    probability=0.05, min_expressed_transcripts=2,
+                    min_expression=1,
+                    min_excluded_expression=2):
     main_gtf = open(main_gtf_fname, "w")
     excl_gtf = open(excluded_gtf_fname, "w")
 
@@ -28,7 +30,7 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
         exon_count = {}
         for t in db.children(g, featuretype='transcript', order_by='start'):
             t_id = t.id.split('.')[0]
-            if len(expressed_transcripts) > 0 and t_id not in expressed_transcripts:
+            if len(expressed_transcripts) > 0 and expressed_transcripts[t_id] < min_expression:
                 continue
             exon_count[t_id] = 0
             for e in db.children(t, featuretype='exon', order_by='start'):
@@ -44,6 +46,8 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
         ignored_transcripts = set()
         if len(exon_count) > min_expressed_transcripts:
             for t_id in exon_count.keys():
+                if expressed_transcripts[t_id] < min_excluded_expression:
+                    continue
                 r = random.random()
                 if r < probability:
                     ignored_transcripts.add(t_id)
@@ -74,11 +78,10 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
     print("Reduced genes: %d, dropped transcripts: %d" % (genes_reduced, transcripts_dropped))
 
 
-def read_expressed_isoforms(fname, min_expr=1):
-    expressed_transcripts = set()
+def read_expressed_isoforms(fname):
+    expressed_transcripts = defaultdict(int)
     base, ext = os.path.splitext(fname)
     if ext in {'.fa', '.fasta', '.fna'}:
-        isoform_dict = defaultdict(int)
         for record in SeqIO.parse(fname, "fasta"):
             tokens = record.name.split('_')
             if len(tokens) < 2:
@@ -86,17 +89,13 @@ def read_expressed_isoforms(fname, min_expr=1):
                 continue
             t_id = tokens[1].split('.')[0]
             assert  t_id.startswith("E")
-            isoform_dict[t_id] += 1
-        for k in isoform_dict.keys():
-            if isoform_dict[k] >= min_expr:
-                expressed_transcripts.add(k)
+            expressed_transcripts[t_id] += 1
     else:
         for l in open(fname):
             t = l.strip().split()
             t_id = t[0].split('.')[0]
             assert t_id.startswith("E")
-            if int(t[1]) >= min_expr:
-                expressed_transcripts.add(t_id)
+            expressed_transcripts[t_id] = int(t[1])
 
     return expressed_transcripts
 
@@ -107,9 +106,11 @@ def parse_args():
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--seed", help="randomization seed [11]", type=int, default=11)
     parser.add_argument("--min_expression", help="minimal number reads in transcript to be considered as expressed",
-                        type=int, default=1)
+                        type=int, default=2)
+    parser.add_argument("--min_excluded_expression", help="minimal number reads in transcript to be possibly excluded",
+                        type=int, default=4)
     parser.add_argument("--min_transcripts_expressed", help="minimal number of transcripts expressed in a gene to "
-                                                            "consider them for dropping", type=int, default=3)
+                                                            "consider them for dropping", type=int, default=2)
 
     parser.add_argument("--fraction", help="fraction of non-monoexonic transcripts to be removed",
                         type=float, default=0.05)
@@ -136,7 +137,9 @@ def main():
                     excluded_gtf_fname=args.output_prefix + ".excluded.gtf",
                     expressed_transcripts=expressed_transcripts,
                     probability=args.fraction,
-                    min_expressed_transcripts=args.min_transcripts_expressed)
+                    min_expressed_transcripts=args.min_transcripts_expressed,
+                    min_expression=args.min_expression,
+                    min_excluded_expression=args.min_excluded_expression)
 
 
 if __name__ == "__main__":
