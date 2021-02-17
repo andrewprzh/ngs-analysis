@@ -14,24 +14,29 @@ from Bio import SeqIO
 
 from traceback import print_exc
 
-def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcripts,
+def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname, expressed_transcripts,
                     probability=0.05, min_expressed_transcripts=2,
                     min_expression=1,
                     min_excluded_expression=2):
     main_gtf = open(main_gtf_fname, "w")
     excl_gtf = open(excluded_gtf_fname, "w")
+    expr_gtf = open(expressed_gtf_fname, "w")
 
     genes_kept = 0
     transcripts_kept = 0
     genes_reduced = 0
     transcripts_dropped = 0
+    genes_expressed = 0
+    transcripts_expressed = 0
 
     for g in db.features_of_type('gene', order_by=('seqid', 'start')):
         exon_count = {}
+        expressed = set()
         for t in db.children(g, featuretype='transcript', order_by='start'):
             t_id = t.id.split('.')[0]
             if len(expressed_transcripts) > 0 and expressed_transcripts[t_id] < min_expression:
                 continue
+            expressed.add(t_id)
             exon_count[t_id] = 0
             for e in db.children(t, featuretype='exon', order_by='start'):
                 exon_count[t_id] += 1
@@ -55,25 +60,37 @@ def process_gene_db(db, main_gtf_fname, excluded_gtf_fname, expressed_transcript
         gene_str = '%s\n' % g
         main_gtf.write(gene_str)
         genes_kept += 1
+        if len(expressed) > len(ignored_transcripts):
+            expr_gtf.write(gene_str)
+            genes_expressed += 1
         if len(ignored_transcripts):
             excl_gtf.write(gene_str)
             genes_reduced += 1
 
         for t in db.children(g, featuretype='transcript', order_by='start'):
             transcript_str = '%s\n' % t
+            t_id = t.id.split('.')[0]
             if t_id in ignored_transcripts:
                 current_file = excl_gtf
                 transcripts_dropped += 1
             else:
                 current_file = main_gtf
                 transcripts_kept += 1
-
             current_file.write(transcript_str)
             for e in db.children(t, featuretype='exon', order_by='start'):
                 current_file.write('%s\n' % e)
 
+            if t_id in expressed:
+                transcripts_expressed += 1
+                expr_gtf.write(transcript_str)
+                for e in db.children(t, featuretype='exon', order_by='start'):
+                    expr_gtf.write('%s\n' % e)
+
+
     main_gtf.close()
     excl_gtf.close()
+    expr_gtf.close()   
+    print("Expressed genes: %d, transcripts: %d" % (genes_expressed, transcripts_expressed))
     print("Kept genes: %d, transcripts: %d" % (genes_kept, transcripts_kept))
     print("Reduced genes: %d, dropped transcripts: %d" % (genes_reduced, transcripts_dropped))
 
@@ -128,12 +145,19 @@ def main():
     args = parse_args()
     random.seed(args.seed)
 
-    expressed_transcripts = set()
+    expressed_transcripts = {}
     if args.expressed:
         expressed_transcripts = read_expressed_isoforms(args.expressed)
+        expressed_fname=args.output_prefix + ".expression.tsv"
+        print("Saving expression table to " + expressed_fname)
+        f = open(expressed_fname, 'w')
+        for k in expressed_transcripts:
+            f.write("%s\t%d\n" % (k, expressed_transcripts[k]))
+        f.close()
 
     gffutils_db = gffutils.FeatureDB(args.genedb, keep_order=True)
     process_gene_db(gffutils_db, main_gtf_fname=args.output_prefix + ".reduced.gtf",
+                    expressed_gtf_fname=args.output_prefix + ".expressed.gtf",
                     excluded_gtf_fname=args.output_prefix + ".excluded.gtf",
                     expressed_transcripts=expressed_transcripts,
                     probability=args.fraction,
