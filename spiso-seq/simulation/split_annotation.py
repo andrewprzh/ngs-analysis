@@ -11,8 +11,8 @@ import random
 import argparse
 from collections import defaultdict
 from Bio import SeqIO
-
 from traceback import print_exc
+
 
 def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname, expressed_transcripts,
                     probability=0.05, min_expressed_transcripts=2,
