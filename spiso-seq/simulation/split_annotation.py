@@ -32,7 +32,9 @@ def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname,
     for g in db.features_of_type('gene', order_by=('seqid', 'start')):
         exon_count = {}
         expressed = set()
+        all_gene_transcripts = 0
         for t in db.children(g, featuretype='transcript', order_by='start'):
+            all_gene_transcripts += 1
             t_id = t.id.split('.')[0]
             if len(expressed_transcripts) > 0 and expressed_transcripts[t_id] < min_expression:
                 continue
@@ -51,16 +53,17 @@ def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname,
         ignored_transcripts = set()
         if len(exon_count) > min_expressed_transcripts:
             for t_id in exon_count.keys():
-                if expressed_transcripts[t_id] < min_excluded_expression:
+                if expressed_transcripts[t_id] < min_excluded_expression or len(ignored_transcripts) == all_gene_transcripts - 1:
                     continue
                 r = random.random()
                 if r < probability:
                     ignored_transcripts.add(t_id)
 
         gene_str = '%s\n' % g
+        assert len(ignored_transcripts) < all_gene_transcripts
         main_gtf.write(gene_str)
         genes_kept += 1
-        if len(expressed) > len(ignored_transcripts):
+        if len(expressed):
             expr_gtf.write(gene_str)
             genes_expressed += 1
         if len(ignored_transcripts):
