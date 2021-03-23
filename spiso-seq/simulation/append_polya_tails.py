@@ -17,4 +17,4 @@ def append_polya(input_fasta, output_fasta, poly_len):
     SeqIO.write(new_fasta, output_fasta, "fasta")
 
 
-append_polya(sys.argv[1], sys.argv[2], 80)
+append_polya(sys.argv[1], sys.argv[2], 120)
