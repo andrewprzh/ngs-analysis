@@ -14,13 +14,17 @@ from Bio import SeqIO
 from traceback import print_exc
 
 
-def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname, expressed_transcripts,
-                    probability=0.05, min_expressed_transcripts=2,
+def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, expressed_kept_fname, excluded_gtf_fname,
+                    expressed_transcripts,
+                    probability=0.2,
+                    min_expressed_transcripts=1,
                     min_expression=1,
-                    min_excluded_expression=2):
+                    min_excluded_expression=2,
+                    remove_unspliced=True):
     main_gtf = open(main_gtf_fname, "w")
     excl_gtf = open(excluded_gtf_fname, "w")
     expr_gtf = open(expressed_gtf_fname, "w")
+    expr_kept_gtf = open(expressed_kept_fname, "w")
 
     genes_kept = 0
     transcripts_kept = 0
@@ -28,6 +32,7 @@ def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname,
     transcripts_dropped = 0
     genes_expressed = 0
     transcripts_expressed = 0
+    transcripts_kept_expressed = 0
 
     for g in db.features_of_type('gene', order_by=('seqid', 'start')):
         exon_count = {}
@@ -36,66 +41,77 @@ def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, excluded_gtf_fname,
         for t in db.children(g, featuretype='transcript', order_by='start'):
             all_gene_transcripts += 1
             t_id = t.id.split('.')[0]
-            if len(expressed_transcripts) > 0 and expressed_transcripts[t_id] < min_expression:
-                continue
-            expressed.add(t_id)
+            if len(expressed_transcripts) == 0 or expressed_transcripts[t_id] >= min_expression:
+                expressed.add(t_id)
             exon_count[t_id] = 0
             for e in db.children(t, featuretype='exon', order_by='start'):
                 exon_count[t_id] += 1
 
-        to_remove = set()
-        for t_id in exon_count.keys():
-            if exon_count[t_id] == 1:
-                to_remove.add(t_id)
-        for t_id in to_remove:
-            del exon_count[t_id]
+        if not remove_unspliced:
+            to_remove = set()
+            for t_id in exon_count.keys():
+                if exon_count[t_id] == 1:
+                    to_remove.add(t_id)
+            for t_id in to_remove:
+                del exon_count[t_id]
 
         ignored_transcripts = set()
-        if len(exon_count) > min_expressed_transcripts:
-            for t_id in exon_count.keys():
-                if expressed_transcripts[t_id] < min_excluded_expression or len(ignored_transcripts) == all_gene_transcripts - 1:
+        kept_expressed = set()
+        if len(expressed) >= min_expressed_transcripts:
+            for t_id in sorted(expressed):
+                if expressed_transcripts[t_id] < min_excluded_expression or \
+                        len(ignored_transcripts) == all_gene_transcripts - 1:
+                    kept_expressed.add(t_id)
                     continue
                 r = random.random()
                 if r < probability:
                     ignored_transcripts.add(t_id)
+                else:
+                    kept_expressed.add(t_id)
 
         gene_str = '%s\n' % g
         assert len(ignored_transcripts) < all_gene_transcripts
         main_gtf.write(gene_str)
         genes_kept += 1
-        if len(expressed):
+        if expressed:
             expr_gtf.write(gene_str)
             genes_expressed += 1
-        if len(ignored_transcripts):
+        if ignored_transcripts:
             excl_gtf.write(gene_str)
             genes_reduced += 1
+        if kept_expressed:
+            expr_kept_gtf.write(gene_str)
 
         for t in db.children(g, featuretype='transcript', order_by='start'):
-            transcript_str = '%s\n' % t
             t_id = t.id.split('.')[0]
             if t_id in ignored_transcripts:
-                current_file = excl_gtf
+                dump_transcript_to_file(excl_gtf, db, t)
                 transcripts_dropped += 1
             else:
-                current_file = main_gtf
+                dump_transcript_to_file(main_gtf_fname, db, t)
                 transcripts_kept += 1
-            current_file.write(transcript_str)
-            for e in db.children(t, featuretype='exon', order_by='start'):
-                current_file.write('%s\n' % e)
 
             if t_id in expressed:
                 transcripts_expressed += 1
-                expr_gtf.write(transcript_str)
-                for e in db.children(t, featuretype='exon', order_by='start'):
-                    expr_gtf.write('%s\n' % e)
-
+                dump_transcript_to_file(expr_gtf, db, t)
+            if t_id in kept_expressed:
+                transcripts_kept_expressed += 1
+                dump_transcript_to_file(expr_kept_gtf, db, t)
 
     main_gtf.close()
     excl_gtf.close()
-    expr_gtf.close()   
+    expr_gtf.close()
+    expr_kept_gtf.close()
+
     print("Expressed genes: %d, transcripts: %d" % (genes_expressed, transcripts_expressed))
     print("Kept genes: %d, transcripts: %d" % (genes_kept, transcripts_kept))
     print("Reduced genes: %d, dropped transcripts: %d" % (genes_reduced, transcripts_dropped))
+    print("Kept expressed trnanscripts: %d" % transcripts_kept_expressed)
+
+def dump_transcript_to_file(f, db, t):
+    f.write('%s\n' % t)
+    for e in db.children(t, featuretype='exon', order_by='start'):
+        f.write('%s\n' % e)
 
 
 def read_expressed_isoforms(fname):
@@ -126,14 +142,14 @@ def parse_args():
     parser.add_argument("--output_prefix", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--seed", help="randomization seed [11]", type=int, default=11)
     parser.add_argument("--min_expression", help="minimal number reads in transcript to be considered as expressed",
-                        type=int, default=2)
+                        type=int, default=1)
     parser.add_argument("--min_excluded_expression", help="minimal number reads in transcript to be possibly excluded",
                         type=int, default=4)
     parser.add_argument("--min_transcripts_expressed", help="minimal number of transcripts expressed in a gene to "
-                                                            "consider them for dropping", type=int, default=2)
+                                                            "consider them for dropping", type=int, default=1)
 
-    parser.add_argument("--fraction", help="fraction of non-monoexonic transcripts to be removed",
-                        type=float, default=0.05)
+    parser.add_argument("--fraction", help="fraction of transcripts to be removed",
+                        type=float, default=0.2)
     parser.add_argument("--expressed", help="simulated reads or count table, "
                                             "will consider the entire annotation if not set", type=str)
     args = parser.parse_args()
@@ -159,9 +175,11 @@ def main():
         f.close()
 
     gffutils_db = gffutils.FeatureDB(args.genedb, keep_order=True)
-    process_gene_db(gffutils_db, main_gtf_fname=args.output_prefix + ".reduced.gtf",
+    process_gene_db(gffutils_db,
+                    main_gtf_fname=args.output_prefix + ".reduced.gtf",
                     expressed_gtf_fname=args.output_prefix + ".expressed.gtf",
                     excluded_gtf_fname=args.output_prefix + ".excluded.gtf",
+                    expressed_kept_fname=args.output_prefix + ".expressed_kept.gtf",
                     expressed_transcripts=expressed_transcripts,
                     probability=args.fraction,
                     min_expressed_transcripts=args.min_transcripts_expressed,
