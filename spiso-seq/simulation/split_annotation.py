@@ -88,7 +88,7 @@ def process_gene_db(db, main_gtf_fname, expressed_gtf_fname, expressed_kept_fnam
                 dump_transcript_to_file(excl_gtf, db, t)
                 transcripts_dropped += 1
             else:
-                dump_transcript_to_file(main_gtf_fname, db, t)
+                dump_transcript_to_file(main_gtf, db, t)
                 transcripts_kept += 1
 
             if t_id in expressed:
@@ -166,6 +166,7 @@ def main():
 
     expressed_transcripts = {}
     if args.expressed:
+        print("Reading expression from " + args.expressed)
         expressed_transcripts = read_expressed_isoforms(args.expressed)
         expressed_fname=args.output_prefix + ".expression.tsv"
         print("Saving expression table to " + expressed_fname)
@@ -174,7 +175,9 @@ def main():
             f.write("%s\t%d\n" % (k, expressed_transcripts[k]))
         f.close()
 
+    print("Loading gene db")
     gffutils_db = gffutils.FeatureDB(args.genedb, keep_order=True)
+    print("Excluding transcripts")
     process_gene_db(gffutils_db,
                     main_gtf_fname=args.output_prefix + ".reduced.gtf",
                     expressed_gtf_fname=args.output_prefix + ".expressed.gtf",
