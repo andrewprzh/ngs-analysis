@@ -2,6 +2,8 @@ import numpy
 import sys
 from collections import defaultdict
 import gffutils
+import re
+
 
 def print_stats(read_intron_dict, max_len = 5):
     # sum up everythin above max_len
@@ -62,9 +64,11 @@ for l in open(sys.argv[1]):
 
     for mt in match_types:
         event_info = t[3]
-        event_pos = event_info.find(mt)
-        if event_pos != -1:
-            read_intron_dict[intron_count][mt] += 1
+        event_found = 0
+        event_supported = 0
+        for occ in re.finditer(mt, event_info):
+            event_pos = occ.start()
+            event_found = 1
             next_event = event_info.find(",", event_pos)
             if next_event == -1:
                 intron_str = event_info[event_pos+len(mt)+1:]
@@ -73,12 +77,16 @@ for l in open(sys.argv[1]):
             coords = intron_str.split("-")
             intron = (chrid, int(coords[0]), int(coords[1]))
             if intron in supported_introns:
-                confirmed_reads_introns[intron_count][mt] += 1
+                event_supported = 1
+        read_intron_dict[intron_count][mt] += event_found
+        confirmed_reads_introns[intron_count][mt] += event_supported
 
     read_intron_dict[intron_count]["total_reads"] += 1
     confirmed_reads_introns[intron_count]["total_reads"] += 1
 
+print("Inconsistency event distribution")
 print_stats(read_intron_dict)
+print("Supported inconsistency event distribution")
 print_stats(confirmed_reads_introns)
 
 

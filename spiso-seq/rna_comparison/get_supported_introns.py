@@ -3,6 +3,7 @@ import gffutils
 import argparse
 from traceback import print_exc
 from collections import defaultdict
+import re
 
 match_types = (["extra_intron_novel", "fake_terminal_exon_3", "fake_terminal_exon_5", "extra_intron_5", "extra_intron_3", "alternative_structure_novel"])
 
@@ -46,8 +47,8 @@ def load_tsv(read_assignments, isoform_map):
 
         for mt in match_types:
             event_info = t[3]
-            event_pos = event_info.find(mt)
-            if event_pos != -1:
+            for occ in re.finditer(mt, event_info):
+                event_pos = occ.start()
                 next_event = event_info.find(",", event_pos)
                 if next_event == -1:
                     intron_str = event_info[event_pos + len(mt) + 1:]
