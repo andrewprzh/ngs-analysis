@@ -25,10 +25,7 @@ def parse_args():
 
 def get_isoform_chromosomes(gene_db):
     print("Loading gene db from " + gene_db)
-    file_db = gffutils.FeatureDB(gene_db, keep_order=True)
-    gffutils_db = gffutils.create_db(file_db, ":memory:", keep_order=True, merge_strategy='warning',
-                                     sort_attribute_values=False, disable_infer_transcripts=True,
-                                     disable_infer_genes=True)
+    gffutils_db = gffutils.FeatureDB(gene_db, keep_order=True)
     isoform_map = {}
     for g in gffutils_db.features_of_type('transcript', order_by=('seqid')):
         isoform_map[g.id] = g.seqid

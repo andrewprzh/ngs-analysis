@@ -29,15 +29,11 @@ def print_stats(read_intron_dict, max_len = 5):
 
 
 def get_isoform_chromosomes(gene_db):
-    file_db = gffutils.FeatureDB(gene_db, keep_order=True)
-    gffutils_db = gffutils.create_db(file_db, ":memory:", keep_order=True, merge_strategy='warning',
-                                     sort_attribute_values=False, disable_infer_transcripts=True,
-                                     disable_infer_genes=True)
+    gffutils_db = gffutils.FeatureDB(gene_db, keep_order=True)
     isoform_map = {}
     for g in gffutils_db.features_of_type('transcript', order_by=('seqid')):
         isoform_map[g.id] = g.seqid
     return isoform_map
-
 
 
 match_types = (["extra_intron_novel", "fake_terminal_exon_3", "fake_terminal_exon_5", "extra_intron_5", "extra_intron_3", "alternative_structure_novel"])
