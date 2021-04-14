@@ -67,7 +67,7 @@ def main():
     isoform_map = get_isoform_chromosomes(args.gene_db)
     support_map = load_tsv(args.assignments1, isoform_map)
 
-    outf = open(args.output)
+    outf = open(args.output, 'w')
     if args.assignments2:
         support_map2 = load_tsv(args.assignments2, isoform_map)
         print("Saving shared introns to " + args.output)
