@@ -12,7 +12,7 @@ def print_stats(read_intron_dict, max_len = 5):
             read_intron_dict[max_len][k] += read_intron_dict[intron_count][k]
             read_intron_dict[intron_count][k] = 0
 
-    print("introns\t" + "\t".join(match_types))
+    print("introns\ttotal\t" + "\t".join(match_types))
     for intron_count in sorted(read_intron_dict.keys()):
         if intron_count > max_len:
             continue
@@ -48,6 +48,8 @@ for l in open(sys.argv[1]):
     intron_count = t[4].count(",")
     if intron_count not in read_intron_dict:
         read_intron_dict[intron_count] = defaultdict(int)
+    if intron_count not in confirmed_reads_introns:
+        confirmed_reads_introns[intron_count] = defaultdict(int)
 
     for mt in match_types:
         event_info = t[3]
@@ -59,8 +61,8 @@ for l in open(sys.argv[1]):
                 intron_str = event_info[event_pos+len(mt)+1:]
             else:
                 intron_str = event_info[event_pos + len(mt) + 1:next_event]
-            t = intron_str.split("-")
-            intron = (int(t[0]), int(t[1]))
+            coords = intron_str.split("-")
+            intron = (int(coords[0]), int(coords[1]))
             if intron in supported_introns:
                 confirmed_reads_introns[intron_count][mt] += 1
 
