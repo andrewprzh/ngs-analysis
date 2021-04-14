@@ -30,12 +30,13 @@ def get_isoform_chromosomes(gene_db):
                                      sort_attribute_values=False, disable_infer_transcripts=True,
                                      disable_infer_genes=True)
     isoform_map = {}
-    for g in gffutils_db.features_of_type('gene', order_by=('seqid')):
+    for g in gffutils_db.features_of_type('transcript', order_by=('seqid')):
         isoform_map[g.id] = g.seqid
     return isoform_map
 
 
 def load_tsv(read_assignments, isoform_map):
+    print("Loading assignments from " + read_assignments)
     support_map = defaultdict(set)
     for l in open(read_assignments):
         t = l.strip().split()
@@ -69,14 +70,18 @@ def main():
     outf = open(args.output)
     if args.assignments2:
         support_map2 = load_tsv(args.assignments2, isoform_map)
+        print("Saving shared introns to " + args.output)
         for intron in support_map.keys():
             if intron in support_map2:
                 outf.write("%s\t%d\t%d\n" % (intron[0], intron[1], intron[2]))
     else:
         for intron in support_map.keys():
+            print("Saving supported introns to " + args.output)
             if len(support_map[intron]) >= args.cutoff:
                 outf.write("%s\t%d\t%d\n" % (intron[0], intron[1], intron[2]))
     outf.close()
+    print("Done")
+
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
