@@ -1,7 +1,7 @@
 import numpy
 import sys
 from collections import defaultdict
-
+import gffutils
 
 def print_stats(read_intron_dict, max_len = 5):
     # sum up everythin above max_len
@@ -28,15 +28,26 @@ def print_stats(read_intron_dict, max_len = 5):
         print("%d\t%s" % (intron_count, "\t".join(["%.2f" % x for x in fractions])))
 
 
+def get_isoform_chromosomes(gene_db):
+    file_db = gffutils.FeatureDB(gene_db, keep_order=True)
+    gffutils_db = gffutils.create_db(file_db, ":memory:", keep_order=True, merge_strategy='warning',
+                                     sort_attribute_values=False, disable_infer_transcripts=True,
+                                     disable_infer_genes=True)
+    isoform_map = {}
+    for g in gffutils_db.features_of_type('transcript', order_by=('seqid')):
+        isoform_map[g.id] = g.seqid
+    return isoform_map
+
+
+
 match_types = (["extra_intron_novel", "fake_terminal_exon_3", "fake_terminal_exon_5", "extra_intron_5", "extra_intron_3", "alternative_structure_novel"])
 
+isoform_map = get_isoform_chromosomes(sys.argv[3])
 
 supported_introns = set()
 for l in open(sys.argv[2]):
-    if l.strip("EN"):
-        continue
-    t = l.strip().split("-")
-    supported_introns.add((int(t[0]), int(t[1])))
+    t = l.strip().split()
+    supported_introns.add((t[0], int(t[1]), int(t[2])))
 
 read_intron_dict = {}
 confirmed_reads_introns = {}
@@ -45,6 +56,8 @@ for l in open(sys.argv[1]):
     if t[2] != "inconsistent":
         continue
     read_id = t[0]
+    isoform_id = t[1]
+    chrid = isoform_map[isoform_id]
     intron_count = t[4].count(",")
     if intron_count not in read_intron_dict:
         read_intron_dict[intron_count] = defaultdict(int)
@@ -62,7 +75,7 @@ for l in open(sys.argv[1]):
             else:
                 intron_str = event_info[event_pos + len(mt) + 1:next_event]
             coords = intron_str.split("-")
-            intron = (int(coords[0]), int(coords[1]))
+            intron = (chrid, int(coords[0]), int(coords[1]))
             if intron in supported_introns:
                 confirmed_reads_introns[intron_count][mt] += 1
 

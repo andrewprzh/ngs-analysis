@@ -75,8 +75,8 @@ def main():
             if intron in support_map2:
                 outf.write("%s\t%d\t%d\n" % (intron[0], intron[1], intron[2]))
     else:
+        print("Saving supported introns to " + args.output)
         for intron in support_map.keys():
-            print("Saving supported introns to " + args.output)
             if len(support_map[intron]) >= args.cutoff:
                 outf.write("%s\t%d\t%d\n" % (intron[0], intron[1], intron[2]))
     outf.close()
