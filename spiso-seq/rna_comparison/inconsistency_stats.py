@@ -47,6 +47,7 @@ for l in open(sys.argv[2]):
     t = l.strip().split()
     supported_introns.add((t[0], int(t[1]), int(t[2])))
 
+
 read_intron_dict = {}
 confirmed_reads_introns = {}
 for l in open(sys.argv[1]):
