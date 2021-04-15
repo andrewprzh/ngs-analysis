@@ -106,9 +106,9 @@ def count_splice_site_stats(ref_records, intron_map, allow_repeats=True):
 
 def print_stats(donor_counts, acc_counts):
     shifts = [x for x in range(-10, 11)]
-    print("shift\t%s" % "\t".join(str(x) for x in shifts))
-    print("d\t%s" % "\t".join(str(donor_counts[x]) for x in shifts))
-    print("a\t%s" % "\t".join(str(acc_counts[x]) for x in shifts))
+    print("shift\ttotal\t%s" % "\t".join(str(x) for x in shifts))
+    print("d\t%d\t%s" % (sum(donor_counts.values()), "\t".join(str(donor_counts[x]) for x in shifts)))
+    print("a\t%d\t%s" % (sum(acc_counts.values()), "\t".join(str(acc_counts[x]) for x in shifts)))
 
 
 sys.stderr.write("Loading gene db from %s\n" % sys.argv[1])
