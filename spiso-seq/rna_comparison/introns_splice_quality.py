@@ -16,8 +16,8 @@ def print_stats(consistent_dict, inconsistent_dict):
             cons = consistent_dict[shift][q]
             inc = inconsistent_dict[shift][q]
             total = cons + inc
-            rates.append(0 if total == 0 else 100 * inc / cons)
-        print("%d\t%s" % (shift, "\t".join([str(x) for x in rates])))
+            rates.append(0 if total == 0 else 100 * inc / total)
+        print("%d\t%s" % (shift, "\t".join([("%.2f" % x) for x in rates])))
 
 
 sys.stderr.write("Loading qualities\n")
