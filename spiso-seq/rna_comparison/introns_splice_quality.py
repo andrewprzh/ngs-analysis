@@ -32,12 +32,12 @@ def print_dict(count_dict):
 
 
 def add_to_dict(up_shift, down_shift, info_dict, read_q):
-    if up_shift != 0 and donor_down != 0:
+    if up_shift != 0 and down_shift != 0:
         info_dict[up_shift][read_q] += 1
         info_dict[down_shift][read_q] += 1
     elif up_shift != 0:
         info_dict[up_shift][read_q] += 2
-    elif donor_down != 0:
+    elif down_shift != 0:
         info_dict[down_shift][read_q] += 2
 
 
