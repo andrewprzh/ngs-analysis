@@ -1,7 +1,7 @@
 import sys
 import glob
 from collections import  defaultdict
-
+import os
 
 def print_stats(consistent_dict, inconsistent_dict):
     qrange = (10, 20)
@@ -20,6 +20,7 @@ def print_stats(consistent_dict, inconsistent_dict):
         print("%d\t%s" % (shift, "\t".join([str(x) for x in rates])))
 
 
+sys.stderr.write("Loading qualities\n")
 current_id = ""
 read_qualities = defaultdict(float)
 for l in open(sys.argv[2]):
@@ -34,6 +35,7 @@ consistent_donor_dict = defaultdict(lambda: defaultdict(int))
 inconsistent_donor_dict = defaultdict(lambda: defaultdict(int))
 
 for f in glob.glob(sys.argv[1] + "*.tsv"):
+    sys.stderr.write("Processing %s\n" % f)
     for l in open(f):
         if l.startswith("#"):
             continue
@@ -67,6 +69,8 @@ for f in glob.glob(sys.argv[1] + "*.tsv"):
                 inconsistent_acc_dict[acc_diff][read_q] += 2
             if donor_diff != 0:
                 inconsistent_donor_dict[donor_diff][read_q] += 2
+
+sys.stderr.write("Outputting stats\n")
 
 print("donor stats")
 print_stats(consistent_donor_dict, inconsistent_donor_dict)
