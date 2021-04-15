@@ -1,7 +1,7 @@
 import sys
 import glob
 from collections import  defaultdict
-import os
+import math
 
 def print_stats(consistent_dict, inconsistent_dict):
     qrange = (10, 20)
@@ -20,6 +20,16 @@ def print_stats(consistent_dict, inconsistent_dict):
         print("%d\t%s" % (shift, "\t".join([("%.2f" % x) for x in rates])))
 
 
+def add_to_dict(up_shift, down_shift, info_dict, read_q):
+    if up_shift != 0 and donor_down != 0:
+        info_dict[up_shift][read_q] += 1
+        info_dict[down_shift][read_q] += 1
+    elif up_shift != 0:
+        info_dict[up_shift][read_q] += 2
+    elif donor_down != 0:
+        info_dict[down_shift][read_q] += 2
+
+
 sys.stderr.write("Loading qualities\n")
 current_id = ""
 read_qualities = defaultdict(float)
@@ -34,6 +44,7 @@ inconsistent_acc_dict = defaultdict(lambda: defaultdict(int))
 consistent_donor_dict = defaultdict(lambda: defaultdict(int))
 inconsistent_donor_dict = defaultdict(lambda: defaultdict(int))
 
+
 for f in glob.glob(sys.argv[1] + "*.tsv"):
     sys.stderr.write("Processing %s\n" % f)
     for l in open(f):
@@ -42,33 +53,30 @@ for f in glob.glob(sys.argv[1] + "*.tsv"):
         t = l.strip().split()
         read_id = t[0]
         read_type = t[5]
-        read_q = int(round(read_qualities[read_id]))
+        read_q = int(math.floor(read_qualities[read_id]))
         if read_type == "consistent":
             donor_up = -int(t[6])
             donor_down = int(t[7])
-            if donor_up != 0 and donor_down != 0:
-                consistent_donor_dict[donor_up][read_q] += 1
-                consistent_donor_dict[donor_down][read_q] += 1
-            elif donor_up != 0:
-                consistent_donor_dict[donor_up][read_q] += 2
-            elif donor_down != 0:
-                consistent_donor_dict[donor_down][read_q] += 2
+            add_to_dict(donor_up, donor_down, consistent_donor_dict, read_q)
             acc_up = -int(t[8])
             acc_down = int(t[9])
-            if acc_up != 0 and acc_down != 0:
-                consistent_acc_dict[acc_up][read_q] += 1
-                consistent_acc_dict[acc_down][read_q] += 1
-            elif acc_up != 0:
-                consistent_acc_dict[acc_up][read_q] += 2
-            elif acc_down != 0:
-                consistent_acc_dict[acc_down][read_q] += 2
+            add_to_dict(acc_up, acc_down, consistent_acc_dict, read_q)
         elif read_type == "incosistent":
             donor_diff = int(t[10])
             acc_diff = int(t[11])
             if acc_diff != 0:
                 inconsistent_acc_dict[acc_diff][read_q] += 2
+            else:
+                acc_up = -int(t[8])
+                acc_down = int(t[9])
+                add_to_dict(acc_up, acc_down, consistent_acc_dict, read_q)
             if donor_diff != 0:
                 inconsistent_donor_dict[donor_diff][read_q] += 2
+            else:
+                donor_up = -int(t[6])
+                donor_down = int(t[7])
+                add_to_dict(donor_up, donor_down, consistent_donor_dict, read_q)
+
 
 sys.stderr.write("Outputting stats\n")
 
