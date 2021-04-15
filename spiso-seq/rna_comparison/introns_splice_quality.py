@@ -39,6 +39,8 @@ def add_to_dict(up_shift, down_shift, info_dict, read_q):
         info_dict[up_shift][read_q] += 2
     elif down_shift != 0:
         info_dict[down_shift][read_q] += 2
+    else:
+        info_dict[0][read_q] += 2
 
 
 read_qualities = None
