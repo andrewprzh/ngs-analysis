@@ -110,7 +110,7 @@ def count_splice_site_stats(ref_records, intron_map, allow_repeats=True):
                     acc_counts[acceptor_down] += 1
                 elif acceptor_up != 0:
                     acc_counts[acceptor_up] += 1
-                if acceptor_up != 0:
+                if acceptor_down != 0:
                     acc_counts[acceptor_down] += 1
                 else:
                     acc_counts[0] += 1
