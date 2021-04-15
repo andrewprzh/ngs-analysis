@@ -94,12 +94,26 @@ def count_splice_site_stats(ref_records, intron_map, allow_repeats=True):
             donor_pos = intron[0] if strand == "+" else intron[1]
             acc_pos = intron[0] if strand == "-" else intron[1]
             if allow_repeats or (chr_id, strand, donor_pos) not in donor_set:
-                donor_counts[donor_up] += 1
-                donor_counts[donor_down] += 1
+                if donor_up != 0 and donor_down != 0:
+                    donor_counts[donor_up] += 1
+                    donor_counts[donor_down] += 1
+                elif donor_up != 0:
+                    donor_counts[donor_up] += 1
+                elif donor_down != 0:
+                    donor_counts[donor_down] += 1
+                else:
+                    donor_counts[0] += 1
                 donor_set.add((chr_id, strand, donor_pos))
             if allow_repeats or (chr_id, strand, acc_pos) not in acceptor_set:
-                acc_counts[acceptor_up] += 1
-                acc_counts[acceptor_down] += 1
+                if acceptor_up != 0 and acceptor_down != 0:
+                    acc_counts[acceptor_up] += 1
+                    acc_counts[acceptor_down] += 1
+                elif acceptor_up != 0:
+                    acc_counts[acceptor_up] += 1
+                if acceptor_up != 0:
+                    acc_counts[acceptor_down] += 1
+                else:
+                    acc_counts[0] += 1
                 acceptor_set.add((chr_id, strand, acc_pos))
     return donor_counts, acc_counts
 
