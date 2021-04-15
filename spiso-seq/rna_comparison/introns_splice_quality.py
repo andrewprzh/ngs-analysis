@@ -33,22 +33,25 @@ def print_dict(count_dict):
 
 def add_to_dict(up_shift, down_shift, info_dict, read_q):
     if up_shift != 0 and down_shift != 0:
-        info_dict[up_shift][read_q] += 1
-        info_dict[down_shift][read_q] += 1
+        info_dict[up_shift][read_q] += 2
+        info_dict[down_shift][read_q] += 2
     elif up_shift != 0:
         info_dict[up_shift][read_q] += 2
     elif down_shift != 0:
         info_dict[down_shift][read_q] += 2
 
 
-sys.stderr.write("Loading qualities\n")
-current_id = ""
-read_qualities = defaultdict(float)
-for l in open(sys.argv[2]):
-    if l.startswith(">"):
-        current_id = l.strip()[1:]
-    else:
-        read_qualities[current_id] = float(l.strip())
+read_qualities = None
+if len(sys.argv) > 2:
+    sys.stderr.write("Loading qualities\n")
+    current_id = ""
+    read_qualities = defaultdict(float)
+    for l in open(sys.argv[2]):
+        if l.startswith(">"):
+            current_id = l.strip()[1:]
+        else:
+            read_qualities[current_id] = float(l.strip())
+
 
 consistent_acc_dict = defaultdict(lambda: defaultdict(int))
 inconsistent_acc_dict = defaultdict(lambda: defaultdict(int))
@@ -64,7 +67,7 @@ for f in glob.glob(sys.argv[1] + "*.tsv"):
         t = l.strip().split()
         read_id = t[0]
         read_type = t[5]
-        read_q = int(math.floor(read_qualities[read_id]))
+        read_q = 10 if not read_qualities else int(math.floor(read_qualities[read_id]))
         if read_type == "consistent":
             donor_up = -int(t[6])
             donor_down = int(t[7])
