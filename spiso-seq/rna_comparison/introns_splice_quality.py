@@ -21,7 +21,7 @@ def print_stats(consistent_dict, inconsistent_dict):
 
 
 current_id = ""
-read_qualities = {}
+read_qualities = defaultdict(float)
 for l in open(sys.argv[2]):
     if l.startswith(">"):
         current_id = l.strip()[1:]
@@ -35,6 +35,8 @@ inconsistent_donor_dict = defaultdict(lambda: defaultdict(int))
 
 for f in glob.glob(sys.argv[1] + "*.tsv"):
     for l in open(f):
+        if l.startswith("#"):
+            continue
         t = l.strip().split()
         read_id = t[0]
         read_type = t[5]
