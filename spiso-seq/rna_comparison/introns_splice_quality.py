@@ -20,6 +20,17 @@ def print_stats(consistent_dict, inconsistent_dict):
         print("%d\t%s" % (shift, "\t".join([("%.2f" % x) for x in rates])))
 
 
+def print_dict(count_dict):
+    qrange = (10, 20)
+    print("shift\ttotal\t" + "\t".join([str(x) for x in range(qrange[0], qrange[1] + 1)]))
+    for shift in range(-10, 11):
+        total = sum(count_dict[shift].values())
+        rates = [total]
+        for q in range(qrange[0], qrange[1] + 1):
+            rates.append(count_dict[shift][q])
+        print("%d\t%s" % (shift, "\t".join([("%.1f" % (x / 2)) for x in rates])))
+
+
 def add_to_dict(up_shift, down_shift, info_dict, read_q):
     if up_shift != 0 and donor_down != 0:
         info_dict[up_shift][read_q] += 1
@@ -80,7 +91,17 @@ for f in glob.glob(sys.argv[1] + "*.tsv"):
 
 sys.stderr.write("Outputting stats\n")
 
-print("donor stats")
+print("== donor stats ==")
+print("= consistent =")
+print_dict(consistent_donor_dict)
+print("= inconsistent =")
+print_dict(inconsistent_donor_dict)
+print("= percent =")
 print_stats(consistent_donor_dict, inconsistent_donor_dict)
-print("acceptor stats")
+print("== acceptor stats ==")
+print("= consistent =")
+print_dict(consistent_acc_dict)
+print("= inconsistent =")
+print_dict(inconsistent_acc_dict)
+print("= percent =")
 print_stats(consistent_acc_dict, inconsistent_acc_dict)
