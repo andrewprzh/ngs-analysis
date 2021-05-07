@@ -128,6 +128,8 @@ def read_expressed_isoforms(fname):
             expressed_transcripts[t_id] += 1
     else:
         for l in open(fname):
+            if l.startswith("#"):
+                continue
             t = l.strip().split()
             t_id = t[0].split('.')[0]
             assert t_id.startswith("E")
