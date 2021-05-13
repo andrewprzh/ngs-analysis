@@ -8,6 +8,10 @@ from Bio.pairwise2 import format_alignment
 from collections import defaultdict
 import numpy
 from traceback import print_exc
+import random
+
+
+ALPHABET = "ACGT"
 
 
 class ExonPair:
@@ -62,9 +66,29 @@ class ExonComparator:
                 exon2_seq = str(chr_record[exon_pair.exon2[0]:exon_pair.exon2[1] + 1].seq)
                 exon_min_len = min(len(exon1_seq), len(exon2_seq))
                 exon_pair.global_similarity = pairwise2.align.globalms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only = True) / exon_min_len
-                local_al = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=False)[0]
-                print(format_alignment(*local_al))
+                #local_al = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=False)[0]
+                #print(format_alignment(*local_al))
                 exon_pair.local_similarity = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=True) / exon_min_len
+
+    def map_random(self, exon_storage):
+        print("Aligning decoy exon pairs")
+        for chr_id, exon_list in exon_storage.items():
+            ref_exons = len(exon_list)
+            for j in range(ref_exons):
+                exon_pair = exon_list[j]
+                exon1_len = exon_pair.exon1[1] - exon_pair.exon1[1] + 1
+                exon2_len = exon_pair.exon2[1] - exon_pair.exon2[1] + 1
+                exon1_seq = ""
+                for i in range(len(exon1_len)):
+                    exon1_seq += ALPHABET[random.randint(0, 3)]
+                exon2_seq = ""
+                for i in range(len(exon2_len)):
+                    exon2_seq += ALPHABET[random.randint(0, 3)]
+                exon_min_len = min(exon1_len, exon2_len)
+                decoy_exon_pair = ExonPair(chr_id, exon_pair.strand, (0, exon1_len), (0, exon2_len), exon_type="Decoy")
+                decoy_exon_pair.global_similarity = pairwise2.align.globalms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only = True) / exon_min_len
+                decoy_exon_pair.local_similarity = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=True) / exon_min_len
+                exon_list.append(decoy_exon_pair)
 
     def compute_hist(self, exon_storage, property_func=lambda x:x.global_similarity):
         print("Computing histograms")
@@ -72,12 +96,10 @@ class ExonComparator:
         for chr_id, exon_list in exon_storage.items():
             for exon_pair in exon_list:
                 exon_similarity_map[exon_pair.exon_type].append(property_func(exon_pair))
-        #print(exon_similarity_map)
         hist_map = {}
         bins = [0.1 * i for i in range(11)]
         for exon_type, similarity_values in exon_similarity_map.items():
             hist_map[exon_type] = numpy.histogram(similarity_values, bins)[0]
-        #print(hist_map)
         return hist_map
 
 
@@ -85,6 +107,7 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--reference", "-r", help="reference genome", type=str)
     parser.add_argument("--exon_pairs", "-e", help="exon pairs in 4-column TSV", type=str)
+    parser.add_argument("--seed", help="random seed", type=int, default=11)
     parser.add_argument("--output", "-o", help="output file", type=str, default="exon_similarity.tsv")
     args = parser.parse_args()
     if not args.reference or not args.exon_pairs:
@@ -95,9 +118,11 @@ def parse_args():
 
 def main():
     args = parse_args()
+    random.seed(args.seed)
     exon_storage = load_exon_pairs(args.exon_pairs)
     exon_comparator = ExonComparator(args)
     exon_comparator.map_exon_pairs(exon_storage)
+    exon_comparator.map_random(exon_storage)
     outf = open(args.output, "w")
     hist_map = exon_comparator.compute_hist(exon_storage, property_func=lambda x:x.global_similarity)
     outf.write("Global similarity histograms\n")
