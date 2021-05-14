@@ -17,7 +17,7 @@ ALPHABET = "ACGT"
 class ExonPair:
     def __init__(self, chr_id, strand, exon1, exon2, exon_type="", gene_id=""):
         self.chr_id = chr_id
-        self.stand = strand
+        self.strand = strand
         self.exon1 = exon1
         self.exon2 = exon2
         self.exon_type = exon_type
@@ -69,6 +69,16 @@ class ExonComparator:
                 #local_al = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=False)[0]
                 #print(format_alignment(*local_al))
                 exon_pair.local_similarity = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=True) / exon_min_len
+                if exon_pair.global_similarity > 0.5 or exon_pair.local_similarity > 0.5:
+                    print("%s_%d_%d_%s\t%s_%d_%d_%s\t%s\t%s\t%.2f\t%.2f" % (
+                        chr_id, exon_pair.exon1[0], exon_pair.exon1[1], exon_pair.strand, chr_id, exon_pair.exon2[0],
+                        exon_pair.exon2[1], exon_pair.strand, exon_pair.gene_id, exon_pair.exon_type, exon_pair.global_similarity, exon_pair.local_similarity))
+
+                    global_al = pairwise2.align.globalms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=False)[0]
+                    print(format_alignment(*global_al))
+                    local_al = pairwise2.align.localms(exon1_seq, exon2_seq, 1, -1, -1, -1, score_only=False)[0]
+                    print(format_alignment(*local_al))
+
 
     def map_random(self, exon_storage):
         print("Aligning decoy exon pairs")
@@ -76,13 +86,13 @@ class ExonComparator:
             ref_exons = len(exon_list)
             for j in range(ref_exons):
                 exon_pair = exon_list[j]
-                exon1_len = exon_pair.exon1[1] - exon_pair.exon1[1] + 1
-                exon2_len = exon_pair.exon2[1] - exon_pair.exon2[1] + 1
+                exon1_len = exon_pair.exon1[1] - exon_pair.exon1[0] + 1
+                exon2_len = exon_pair.exon2[1] - exon_pair.exon2[0] + 1
                 exon1_seq = ""
-                for i in range(len(exon1_len)):
+                for i in range(exon1_len):
                     exon1_seq += ALPHABET[random.randint(0, 3)]
                 exon2_seq = ""
-                for i in range(len(exon2_len)):
+                for i in range(exon2_len):
                     exon2_seq += ALPHABET[random.randint(0, 3)]
                 exon_min_len = min(exon1_len, exon2_len)
                 decoy_exon_pair = ExonPair(chr_id, exon_pair.strand, (0, exon1_len), (0, exon2_len), exon_type="Decoy")
@@ -97,7 +107,7 @@ class ExonComparator:
             for exon_pair in exon_list:
                 exon_similarity_map[exon_pair.exon_type].append(property_func(exon_pair))
         hist_map = {}
-        bins = [0.1 * i for i in range(11)]
+        bins = [-1] + [0.1 * i for i in range(11)]
         for exon_type, similarity_values in exon_similarity_map.items():
             hist_map[exon_type] = numpy.histogram(similarity_values, bins)[0]
         return hist_map
