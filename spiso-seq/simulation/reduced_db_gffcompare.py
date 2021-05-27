@@ -26,42 +26,83 @@ class TranscriptType(Enum):
     undefined = 0
 
 
-def separate_isoquant(l):
-    if l.find("known") != -1:
-        return TranscriptType.known
-    elif l.find("nic") != -1:
-        return TranscriptType.novel
-    return TranscriptType.undefined
+class IsoQuantSeparator:
+    def __init__(self, args):
+        pass
+
+    def separate(self, l):
+        if l.find("known") != -1:
+            return TranscriptType.known
+        elif l.find("nic") != -1:
+            return TranscriptType.novel
+        return TranscriptType.undefined
 
 
-def separate_stringtie(l):
-    if l.find("reference_id") != -1:
-        return TranscriptType.known
-    else:
-        return TranscriptType.novel
+class StringTieSeparator:
+    def __init__(self, args):
+        pass
+
+    def separate(self, l):
+        if l.find("reference_id") != -1:
+            return TranscriptType.known
+        else:
+            return TranscriptType.novel
 
 
-def separate_tid(l):
-    if l.find('transcript_id "ENSMUST') != -1:
-        return TranscriptType.known
-    else:
-        return TranscriptType.novel
+class TranscriptIdSeparator:
+    def __init__(self, args):
+        pass
+
+    def separate(self, l):
+        if l.find('transcript_id "ENSMUST') != -1:
+            return TranscriptType.known
+        else:
+            return TranscriptType.novel
 
 
-SEPARATE_FUNCTORS = {'isoquant':separate_isoquant,
-                     'stringtie':separate_stringtie,
-                     'flair':separate_tid,
-                     'talon':separate_tid,
-                     'bambu':separate_tid}
+class CountTranscriptIdSeparator:
+    def __init__(self, args):
+        print("Reading counts")
+        self.count_dict = defaultdict(float)
+        for l in open(args.gtf + ".counts"):
+            if l.startswith("#") or l.startswith("TXNAME"):
+                continue
+            t = l.strip().split()
+            self.count_dict[t[0]] = float(t[2])
+
+    def separate(self, l):
+        tpos = l.find('transcript_id')
+        if tpos == -1:
+            return TranscriptType.undefined
+        idpos = tpos + len('transcript_id') + 2
+        endpos = l.find(";", start=idpos)
+        if endpos == -1:
+            print("Warning, unable to find ;")
+            return TranscriptType.undefined
+        tid = l[idpos:endpos-1]
+
+        if tid not in self.count_dict or self.count_dict[tid] == 0:
+            return TranscriptType.undefined
+        elif tid.startswith('ENSMUST'):
+            return TranscriptType.known
+        else:
+            return TranscriptType.novel
 
 
-def split_gtf(ingtf_path, seaprate_functor, out_known_path, out_novel_path):
+SEPARATE_FUNCTORS = {'isoquant':IsoQuantSeparator,
+                     'stringtie':StringTieSeparator,
+                     'flair':TranscriptIdSeparator,
+                     'talon':TranscriptIdSeparator,
+                     'bambu':CountTranscriptIdSeparator}
+
+
+def split_gtf(ingtf_path, seaprator, out_known_path, out_novel_path):
     out_known = open(out_known_path, "w")
     out_novel = open(out_novel_path, "w")
     for l in open(ingtf_path):
         if l.startswith("#"):
             continue
-        ttype = seaprate_functor(l)
+        ttype = seaprator.separate(l)
         if ttype == TranscriptType.novel:
             out_novel.write(l)
         elif ttype == TranscriptType.known:
@@ -102,7 +143,8 @@ def main():
     out_known_path = os.path.join(args.output, args.tool + ".known.gtf")
     out_novel_path= os.path.join(args.output, args.tool + ".novel.gtf")
     print("Seprating known and novel transcripts")
-    split_gtf(args.gtf, SEPARATE_FUNCTORS[args.tool], out_known_path, out_novel_path)
+    separator = SEPARATE_FUNCTORS[args.tool](args)
+    split_gtf(args.gtf, separator, out_known_path, out_novel_path)
     print("Running gffcompare for entire GTF")
     expressed_gtf = args.genedb + ".expressed.gtf"
     run_gff_compare(expressed_gtf, args.gtf, os.path.join(args.output, args.tool + ".full.stats"))
