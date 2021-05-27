@@ -75,7 +75,7 @@ class CountTranscriptIdSeparator:
         if tpos == -1:
             return TranscriptType.undefined
         idpos = tpos + len('transcript_id') + 2
-        endpos = l.find(";", start=idpos)
+        endpos = l.find(";", idpos)
         if endpos == -1:
             print("Warning, unable to find ;")
             return TranscriptType.undefined
@@ -96,18 +96,22 @@ SEPARATE_FUNCTORS = {'isoquant':IsoQuantSeparator,
                      'bambu':CountTranscriptIdSeparator}
 
 
-def split_gtf(ingtf_path, seaprator, out_known_path, out_novel_path):
+def split_gtf(ingtf_path, seaprator, out_full_path, out_known_path, out_novel_path):
+    out_full = open(out_full_path, "w")
     out_known = open(out_known_path, "w")
     out_novel = open(out_novel_path, "w")
     for l in open(ingtf_path):
         if l.startswith("#"):
             continue
         ttype = seaprator.separate(l)
+        if ttype == TranscriptType.undefined:
+            continue
+        out_full.write(l)
         if ttype == TranscriptType.novel:
             out_novel.write(l)
         elif ttype == TranscriptType.known:
             out_known.write(l)
-
+    out_full.close()
     out_novel.close()
     out_known.close()
 
@@ -140,14 +144,15 @@ def main():
     if not os.path.exists(args.output):
         os.makedirs(args.output)
 
+    out_full_path = os.path.join(args.output, args.tool + ".full.gtf")
     out_known_path = os.path.join(args.output, args.tool + ".known.gtf")
     out_novel_path= os.path.join(args.output, args.tool + ".novel.gtf")
     print("Seprating known and novel transcripts")
     separator = SEPARATE_FUNCTORS[args.tool](args)
-    split_gtf(args.gtf, separator, out_known_path, out_novel_path)
+    split_gtf(args.gtf, separator, out_full_path, out_known_path, out_novel_path)
     print("Running gffcompare for entire GTF")
     expressed_gtf = args.genedb + ".expressed.gtf"
-    run_gff_compare(expressed_gtf, args.gtf, os.path.join(args.output, args.tool + ".full.stats"))
+    run_gff_compare(expressed_gtf, out_full_path, os.path.join(args.output, args.tool + ".full.stats"))
     print("Running gffcompare for known transcripts")
     expressed_gtf = args.genedb + ".expressed_kept.gtf"
     run_gff_compare(expressed_gtf, out_known_path, os.path.join(args.output, args.tool + ".known.stats"))
