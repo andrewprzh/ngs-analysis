@@ -31,10 +31,10 @@ class IsoQuantSeparator:
         pass
 
     def separate(self, l):
-        if l.find("known") != -1:
-            return TranscriptType.known
-        elif l.find("nic") != -1:
+        if l.find("nic") != -1:
             return TranscriptType.novel
+        elif l.find(".known") != -1:
+            return TranscriptType.known
         return TranscriptType.undefined
 
 
@@ -68,7 +68,8 @@ class CountTranscriptIdSeparator:
             if l.startswith("#") or l.startswith("TXNAME"):
                 continue
             t = l.strip().split()
-            self.count_dict[t[0]] = float(t[2])
+            tid = t[0]
+            self.count_dict[tid] = max(self.count_dict[tid], float(t[2]))
 
     def separate(self, l):
         tpos = l.find('transcript_id')
