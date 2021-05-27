@@ -27,22 +27,22 @@ class TranscriptType(Enum):
 
 
 def separate_isoquant(l):
-    if l.find("known"):
+    if l.find("known") != -1:
         return TranscriptType.known
-    elif l.find("nic"):
+    elif l.find("nic") != -1:
         return TranscriptType.novel
     return TranscriptType.undefined
 
 
 def separate_stringtie(l):
-    if l.find("reference_id"):
+    if l.find("reference_id") != -1:
         return TranscriptType.known
     else:
         return TranscriptType.novel
 
 
 def separate_tid(l):
-    if l.find('transcript_id "ENSMUST'):
+    if l.find('transcript_id "ENSMUST') != -1:
         return TranscriptType.known
     else:
         return TranscriptType.novel
@@ -100,7 +100,7 @@ def main():
         os.makedirs(args.output)
 
     out_known_path = os.path.join(args.output, args.tool + ".known.gtf")
-    out_novel_path= os.path.join(args.output, args.tool + ".known.gtf")
+    out_novel_path= os.path.join(args.output, args.tool + ".novel.gtf")
     print("Seprating known and novel transcripts")
     split_gtf(args.gtf, SEPARATE_FUNCTORS[args.tool], out_known_path, out_novel_path)
     print("Running gffcompare for entire GTF")
