@@ -100,7 +100,8 @@ class GeneDBHandler:
         self.gene_db = gene_db
         if not gene_db.lower().endswith('db'):
             self.gene_db = output_prefix + '.' + dbname + '.db'
-            self.gtf2db(gene_db, self.gene_db, complete_genedb)
+            if not os.path.exists(self.gene_db):
+                self.gtf2db(gene_db, self.gene_db, complete_genedb)
         self.db = gffutils.FeatureDB(self.gene_db, keep_order=True)
         self.isoform_to_exon = defaultdict(str)
         self.parse_db()
