@@ -142,7 +142,7 @@ class StatCounter:
     def process_incorrect(self):
         logger.info("Saving incorrect isoforms to %s" % self.incorrect_isoforms_file)
         with open(self.incorrect_isoforms_file, 'w') as outf:
-            for info_tuple in self.gff_compare_data:
+            for info_tuple in self.gff_compare_data.incorrect_isoforms:
                 (assignment_type, ref_isoform, isoform_id) = info_tuple
                 outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
                 outf.write('%s\t%s\n' % (ref_isoform, isoform_id))
@@ -169,7 +169,7 @@ class StatCounter:
     def process_unmapped(self):
         logger.info("Saving unmapped isoforms to %s" % self.unmapped_isoforms_file)
         with open(self.unmapped_isoforms_file, 'w') as outf:
-            for isoform_id in self.isoquant_data.unmapped_isoforms:
+            for isoform_id in self.gff_compare_data.unmapped_isoforms:
                 outf.write('\n= Unmapped isoform %s\n' % isoform_id)
                 outf.write(self.isoquant_db.isoform_to_exon[isoform_id] + '\n')
                 outf.write("Reads contributed: %d\n" % len(self.isoquant_data.isoform_to_read[isoform_id]))
@@ -180,10 +180,10 @@ class StatCounter:
     def process_duplicated(self):
         logger.info("Saving duplicated isoforms to %s" % self.duplicated_isoforms_file)
         with open(self.duplicated_isoforms_file, 'w') as outf:
-            for ref_isoform_id in self.isoquant_data.duplicate_isoforms:
+            for ref_isoform_id in self.gff_compare_data.duplicate_isoforms:
                 outf.write('\n= Duplicated reference isoform %s\n' % ref_isoform_id)
                 outf.write(self.isoquant_db.isoform_to_exon[ref_isoform_id] + '\n')
-                for i, isoform_id in enumerate(self.isoquant_data.duplicate_isoforms[ref_isoform_id]):
+                for i, isoform_id in enumerate(self.gff_compare_data.duplicate_isoforms[ref_isoform_id]):
                     outf.write("> Isoform #%d, %s, reads contributed: %d\n" %
                                (i, isoform_id, len(self.isoquant_data.isoform_to_read[isoform_id])))
                     for read_id in self.isoquant_data.isoform_to_read[isoform_id]:
@@ -197,7 +197,7 @@ def parse_args():
     parser.add_argument("--isoquant_prefix", "-i", type=str, help="path to IsoQuant output")
     parser.add_argument("--gffcompare_tracking", "-t", type=str, help="gffcompare tracking output")
     parser.add_argument("--genedb", "-g", type=str, help="reference gene database")
-    parser.add_argument("--isoquantdb", "-g", type=str, help="IsoQuant gene database used for gffcompare")
+    parser.add_argument("--isoquantdb", "-q", type=str, help="IsoQuant gene database used for gffcompare")
 
 
     args = parser.parse_args()
