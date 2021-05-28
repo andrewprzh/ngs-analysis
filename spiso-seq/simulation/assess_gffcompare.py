@@ -208,7 +208,7 @@ def parse_args():
 def main():
     set_logger(logger)
     args = parse_args()
-    ref_db = GeneDBHandler(args.gene_db, args.output, 'reference', True)
+    ref_db = GeneDBHandler(args.genedb, args.output, 'reference', True)
     isoquant_db = GeneDBHandler(args.isoquant_prefix + "transcript_models.gtf", args.output, 'isoquant', False)
     isoquant_data = AssignmentData(args.isoquant_prefix)
     gff_compare_data = TrackingData(args.gffcompare_tracking)
