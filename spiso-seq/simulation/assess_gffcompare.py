@@ -197,9 +197,11 @@ def parse_args():
     parser.add_argument("--isoquant_prefix", "-i", type=str, help="path to IsoQuant output")
     parser.add_argument("--gffcompare_tracking", "-t", type=str, help="gffcompare tracking output")
     parser.add_argument("--genedb", "-g", type=str, help="reference gene database")
+    parser.add_argument("--isoquantdb", "-g", type=str, help="IsoQuant gene database used for gffcompare")
+
 
     args = parser.parse_args()
-    if not args.isoquant_prefix or not args.gffcompare_tracking or not args.genedb:
+    if not args.isoquant_prefix or not args.gffcompare_tracking or not args.genedb or not args.isoquantdb:
         parser.print_usage()
         exit(-1)
     return args
@@ -209,7 +211,7 @@ def main():
     set_logger(logger)
     args = parse_args()
     ref_db = GeneDBHandler(args.genedb, args.output, 'reference', True)
-    isoquant_db = GeneDBHandler(args.isoquant_prefix + "transcript_models.gtf", args.output, 'isoquant', False)
+    isoquant_db = GeneDBHandler(args.isoquantdb, args.output, 'isoquant', False)
     isoquant_data = AssignmentData(args.isoquant_prefix)
     gff_compare_data = TrackingData(args.gffcompare_tracking)
     stat_counter = StatCounter(ref_db, isoquant_db, isoquant_data, gff_compare_data, args.output)
