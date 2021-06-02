@@ -80,7 +80,7 @@ class AssignmentData:
             tokens = l.strip().split()
             read_id = tokens[0]
             original_isoform_id = get_original_isoform(read_id)
-            info = '\t'.join(tokens[4:8])
+            info = '\t'.join([tokens[3]] + tokens[5:9])
             self.assigned_reads[original_isoform_id][read_id] = info
 
     def parse_isoform_map(self, tsv_file):
