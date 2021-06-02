@@ -128,6 +128,7 @@ class StatCounter:
         self.missed_isoforms_file = output_prefix + ".missed_isoforms.tsv"
         self.duplicated_isoforms_file = output_prefix + ".duplicated_isoforms.tsv"
         self.incorrect_isoforms_file = output_prefix + ".incorrect_isoforms.tsv"
+        self.incorrect_isoforms_orig_file = output_prefix + ".incorrect_isoforms.original.tsv"
         self.unmapped_isoforms_file = output_prefix + ".unmapped_isoforms.tsv"
         self.ref_db = ref_db
         self.isoquant_db = isoquant_db
@@ -142,7 +143,7 @@ class StatCounter:
 
     def process_incorrect(self):
         logger.info("Saving incorrect isoforms to %s" % self.incorrect_isoforms_file)
-        with open(self.incorrect_isoforms_file, 'w') as outf:
+        with open(self.incorrect_isoforms_file, 'w') as outf, open(self.incorrect_isoforms_orig_file, 'w') as orig_outf:
             for info_tuple in self.gff_compare_data.incorrect_isoforms:
                 (assignment_type, ref_isoform, isoform_id) = info_tuple
                 outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
@@ -150,9 +151,23 @@ class StatCounter:
                 outf.write(self.ref_db.isoform_to_exon[ref_isoform] + '\n')
                 outf.write(self.isoquant_db.isoform_to_exon[isoform_id] + '\n')
                 outf.write("Reads contributed: %d\n" % len(self.isoquant_data.isoform_to_read[isoform_id]))
+                original_isoform_count = defaultdict(int)
                 for read_id in self.isoquant_data.isoform_to_read[isoform_id]:
                     original_isoform = get_original_isoform(read_id)
+                    original_isoform_count[original_isoform] += 1
                     outf.write(read_id + '\t' + self.isoquant_data.assigned_reads[original_isoform][read_id] + '\n')
+
+                _, best_isoform_id = max((v, k) for k, v in original_isoform_count.items())
+                orig_outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
+                if best_isoform_id != ref_isoform:
+                    orig_outf.write("@ Original isoform id is not the one assigned to")
+                orig_outf.write('%s\t%s\t%s\n' % (ref_isoform, best_isoform_id, isoform_id))
+                orig_outf.write(self.ref_db.isoform_to_exon[best_isoform_id] + '\n')
+                orig_outf.write(self.isoquant_db.isoform_to_exon[isoform_id] + '\n')
+                all_reads = self.isoquant_data.assigned_reads[best_isoform_id]
+                orig_outf.write("Original reads : %d\n" % len(all_reads))
+                for read_id in all_reads:
+                    orig_outf.write(read_id + '\t' + all_reads[read_id] + '\n')
 
     def process_missing(self):
         logger.info("Saving missing isoforms to %s" % self.missed_isoforms_file)
