@@ -124,13 +124,14 @@ class GeneDBHandler:
 
 
 class StatCounter:
-    def __init__(self, ref_db, isoquant_db, isoquant_data, gff_compare_data, output_prefix):
+    def __init__(self, ref_db, reduced_db, isoquant_db, isoquant_data, gff_compare_data, output_prefix):
         self.missed_isoforms_file = output_prefix + ".missed_isoforms.tsv"
         self.duplicated_isoforms_file = output_prefix + ".duplicated_isoforms.tsv"
         self.incorrect_isoforms_file = output_prefix + ".incorrect_isoforms.tsv"
         self.incorrect_isoforms_orig_file = output_prefix + ".incorrect_isoforms.original.tsv"
         self.unmapped_isoforms_file = output_prefix + ".unmapped_isoforms.tsv"
         self.ref_db = ref_db
+        self.reduced_db = reduced_db
         self.isoquant_db = isoquant_db
         self.isoquant_data = isoquant_data
         self.gff_compare_data = gff_compare_data
@@ -152,18 +153,27 @@ class StatCounter:
                 outf.write(self.isoquant_db.isoform_to_exon[isoform_id] + '\n')
                 outf.write("Reads contributed: %d\n" % len(self.isoquant_data.isoform_to_read[isoform_id]))
                 original_isoform_count = defaultdict(int)
+                assigned_isoform_count = defaultdict(int)
                 for read_id in self.isoquant_data.isoform_to_read[isoform_id]:
                     original_isoform = get_original_isoform(read_id)
                     original_isoform_count[original_isoform] += 1
-                    outf.write(read_id + '\t' + self.isoquant_data.assigned_reads[original_isoform][read_id] + '\n')
+                    read_info = self.isoquant_data.assigned_reads[original_isoform][read_id]
+                    assigned_isoform = read_info.split()[0]
+                    if assigned_isoform != '.':
+                        assigned_isoform_count[assigned_isoform] += 1
+                    outf.write(read_id + '\t' + read_info + '\n')
 
                 _, best_isoform_id = max((v, k) for k, v in original_isoform_count.items())
+                _, assigned_isoform_id = max((v, k) for k, v in assigned_isoform_count.items())
                 orig_outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
                 if best_isoform_id != ref_isoform:
-                    orig_outf.write("@ Original isoform id is not the one assigned to")
+                    orig_outf.write("# Original isoform id is not the one assigned to")
                 orig_outf.write('%s\t%s\t%s\n' % (ref_isoform, best_isoform_id, isoform_id))
                 orig_outf.write(self.ref_db.isoform_to_exon[best_isoform_id] + '\n')
                 orig_outf.write(self.isoquant_db.isoform_to_exon[isoform_id] + '\n')
+                orig_outf.write("Known isoform used as a template %s\n" % assigned_isoform_id)
+                if self.reduced_db:
+                    orig_outf.write(self.reduced_db.isoform_to_exon[assigned_isoform_id] + '\n')
                 all_reads = self.isoquant_data.assigned_reads[best_isoform_id]
                 orig_outf.write("Original reads : %d\n" % len(all_reads))
                 for read_id in all_reads:
@@ -213,6 +223,7 @@ def parse_args():
     parser.add_argument("--isoquant_prefix", "-i", type=str, help="path to IsoQuant output")
     parser.add_argument("--gffcompare_tracking", "-t", type=str, help="gffcompare tracking output")
     parser.add_argument("--genedb", "-g", type=str, help="reference gene database")
+    parser.add_argument("--reduced_genedb", "-r", type=str, help="reduced reference gene database")
     parser.add_argument("--isoquantdb", "-q", type=str, help="IsoQuant gene database used for gffcompare")
 
 
@@ -227,10 +238,13 @@ def main():
     set_logger(logger)
     args = parse_args()
     ref_db = GeneDBHandler(args.genedb, args.output, 'reference', True)
+    reduced_genedb = None
+    if args.reduced_genedb:
+        reduced_genedb = GeneDBHandler(args.reduced_genedb, args.output, 'reduced', True)
     isoquant_db = GeneDBHandler(args.isoquantdb, args.output, 'isoquant', False)
     isoquant_data = AssignmentData(args.isoquant_prefix)
     gff_compare_data = TrackingData(args.gffcompare_tracking)
-    stat_counter = StatCounter(ref_db, isoquant_db, isoquant_data, gff_compare_data, args.output)
+    stat_counter = StatCounter(ref_db, reduced_genedb, isoquant_db, isoquant_data, gff_compare_data, args.output)
     stat_counter.process_all()
 
 
