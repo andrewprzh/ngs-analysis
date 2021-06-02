@@ -138,9 +138,9 @@ class StatCounter:
 
     def process_all(self):
         self.process_incorrect()
-        self.process_missing()
-        self.process_unmapped()
-        self.process_duplicated()
+        #self.process_missing()
+        #self.process_unmapped()
+        #self.process_duplicated()
 
     def process_incorrect(self):
         logger.info("Saving incorrect isoforms to %s" % self.incorrect_isoforms_file)
