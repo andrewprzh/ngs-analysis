@@ -166,12 +166,12 @@ class StatCounter:
                 if original_isoform_count:
                     _, best_isoform_id = max((v, k) for k, v in original_isoform_count.items())
                 else:
-                    logger.warning("Zero original isoform count for %s" % read_id)
+                    logger.warning("Zero original isoform count for %s" % isoform_id)
                     continue
                 _, assigned_isoform_id = max((v, k) for k, v in assigned_isoform_count.items())
                 orig_outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
                 if best_isoform_id != ref_isoform:
-                    orig_outf.write("# Original isoform id is not the one assigned to")
+                    orig_outf.write("# Original isoform id is not the one assigned to\n")
                 orig_outf.write('%s\t%s\t%s\n' % (ref_isoform, best_isoform_id, isoform_id))
                 orig_outf.write(self.ref_db.isoform_to_exon[best_isoform_id] + '\n')
                 orig_outf.write(self.isoquant_db.isoform_to_exon[isoform_id] + '\n')
