@@ -163,7 +163,11 @@ class StatCounter:
                         assigned_isoform_count[assigned_isoform] += 1
                     outf.write(read_id + '\t' + read_info + '\n')
 
-                _, best_isoform_id = max((v, k) for k, v in original_isoform_count.items())
+                if original_isoform_count:
+                    _, best_isoform_id = max((v, k) for k, v in original_isoform_count.items())
+                else:
+                    logger.warning("Zero original isoform count for %s" % read_id)
+                    continue
                 _, assigned_isoform_id = max((v, k) for k, v in assigned_isoform_count.items())
                 orig_outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
                 if best_isoform_id != ref_isoform:
