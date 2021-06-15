@@ -19,6 +19,7 @@ from Bio import SeqIO
 import gffutils
 from enum import Enum
 import logging
+import pysam
 
 logger = logging.getLogger('IsoQuantQA')
 
@@ -34,6 +35,14 @@ def set_logger(logger_instance):
 
 def get_original_isoform(read_id):
     return read_id.split('_')[1]
+
+
+def save_reads_to_bam(bamfile_in, chr_id, start, end, output_fname, read_set=None):
+    bamfile_out = pysam.AlignmentFile(output_fname, "wb", template=bamfile_in)
+    for alignment in bamfile_in.fetch(chr_id, start, end):
+        if read_set and alignment.query_name not in read_set:
+            continue
+        bamfile_out.write(alignment)
 
 
 class TrackingData:
@@ -53,8 +62,8 @@ class TrackingData:
                 continue
             ref_isoform = t[2].split('|')[1]
             all_ref_tracking[ref_isoform].append(isoform_id)
-            if assignment_type != '=':
-                self.incorrect_isoforms.append((assignment_type, ref_isoform, isoform_id))
+            # if assignment_type != '=':
+            self.incorrect_isoforms.append((assignment_type, ref_isoform, isoform_id))
 
         self.all_ref_isoforms = all_ref_tracking.keys()
         for ref_iso in all_ref_tracking.keys():
@@ -62,12 +71,12 @@ class TrackingData:
             if len(isoform_list) > 1:
                 self.duplicate_isoforms[ref_iso] = isoform_list
 
-        self.incorrect_isoforms = sorted(self.incorrect_isoforms )
+        self.incorrect_isoforms = sorted(self.incorrect_isoforms)
 
 
 class AssignmentData:
     def __init__(self, isoquant_output_prefix):
-        self.isoform_to_read = defaultdict(list)
+        self.isoform_to_read = defaultdict(set)
         self.assigned_reads = defaultdict(dict)
         self.parse_assignments(isoquant_output_prefix + "read_assignments.tsv")
         self.parse_isoform_map(isoquant_output_prefix + "transcript_models_reads.tsv")
@@ -92,7 +101,7 @@ class AssignmentData:
             read_id = tokens[0]
             isoform_id = tokens[1]
             if isoform_id != '*':
-                self.isoform_to_read[isoform_id].append(read_id)
+                self.isoform_to_read[isoform_id].add(read_id)
 
 
 class GeneDBHandler:
@@ -103,6 +112,7 @@ class GeneDBHandler:
             if not os.path.exists(self.gene_db):
                 self.gtf2db(gene_db, self.gene_db, complete_genedb)
         self.db = gffutils.FeatureDB(self.gene_db, keep_order=True)
+        self.isoform_to_coords = {}
         self.isoform_to_exon = defaultdict(str)
         self.parse_db()
 
@@ -117,6 +127,7 @@ class GeneDBHandler:
         logger.info("Loading gene database")
         for t in self.db.features_of_type(featuretype=('transcript', 'mRNA')):
             exon_strs = []
+            self.isoform_to_coords[t.id] = (t.seqid, t.start, t.end)
             for e in self.db.children(t, featuretype=('exon')):
                 exon_strs.append("%d-%d" % (e.start, e.end))
             self.isoform_to_exon[t.id] = ','.join(exon_strs)
@@ -124,13 +135,15 @@ class GeneDBHandler:
 
 
 class StatCounter:
-    def __init__(self, ref_db, reduced_db, isoquant_db, isoquant_data, gff_compare_data, output_prefix):
+    def __init__(self, ref_db, reduced_db, isoquant_db, isoquant_data, gff_compare_data, bam, output_prefix):
         self.missed_isoforms_file = output_prefix + ".missed_isoforms.tsv"
         self.duplicated_isoforms_file = output_prefix + ".duplicated_isoforms.tsv"
         self.incorrect_isoforms_file = output_prefix + ".incorrect_isoforms.tsv"
         self.incorrect_isoforms_orig_file = output_prefix + ".incorrect_isoforms.original.tsv"
         self.unmapped_isoforms_file = output_prefix + ".unmapped_isoforms.tsv"
+        self.output_prefix = output_prefix
         self.ref_db = ref_db
+        self.bam = bam
         self.reduced_db = reduced_db
         self.isoquant_db = isoquant_db
         self.isoquant_data = isoquant_data
@@ -138,9 +151,9 @@ class StatCounter:
 
     def process_all(self):
         self.process_incorrect()
-        #self.process_missing()
-        #self.process_unmapped()
-        #self.process_duplicated()
+        self.process_missing()
+        self.process_unmapped()
+        self.process_duplicated()
 
     def process_incorrect(self):
         logger.info("Saving incorrect isoforms to %s" % self.incorrect_isoforms_file)
@@ -154,6 +167,8 @@ class StatCounter:
                 outf.write("Reads contributed: %d\n" % len(self.isoquant_data.isoform_to_read[isoform_id]))
                 original_isoform_count = defaultdict(int)
                 assigned_isoform_count = defaultdict(int)
+
+                # get contributing reads
                 for read_id in self.isoquant_data.isoform_to_read[isoform_id]:
                     original_isoform = get_original_isoform(read_id)
                     original_isoform_count[original_isoform] += 1
@@ -169,6 +184,11 @@ class StatCounter:
                     logger.warning("Zero original isoform count for %s" % isoform_id)
                     continue
                 _, assigned_isoform_id = max((v, k) for k, v in assigned_isoform_count.items())
+
+                (chr_id, start, end) = self.ref_db.isoform_to_coords[isoform_id]
+                save_reads_to_bam(self.bam, chr_id, start, end, self.output_prefix + "." + isoform_id + ".bam",
+                                  self.isoquant_data.isoform_to_read[isoform_id])
+
                 orig_outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
                 if best_isoform_id != ref_isoform:
                     orig_outf.write("# Original isoform id is not the one assigned to\n")
@@ -195,6 +215,10 @@ class StatCounter:
                 outf.write("Original reads : %d\n" % len(all_reads))
                 for read_id in all_reads:
                     outf.write(read_id + '\t' + all_reads[read_id] + '\n')
+
+                (chr_id, start, end) = self.ref_db.isoform_to_coords[ref_isoform_id]
+                save_reads_to_bam(self.bam, chr_id, start, end, self.output_prefix + "." + ref_isoform_id + ".bam",
+                                  set(all_reads))
 
     def process_unmapped(self):
         logger.info("Saving unmapped isoforms to %s" % self.unmapped_isoforms_file)
@@ -229,6 +253,7 @@ def parse_args():
     parser.add_argument("--genedb", "-g", type=str, help="reference gene database")
     parser.add_argument("--reduced_genedb", "-r", type=str, help="reduced reference gene database")
     parser.add_argument("--isoquantdb", "-q", type=str, help="IsoQuant gene database used for gffcompare")
+    parser.add_argument("--bam", "-b", type=str, help="bam file")
 
 
     args = parser.parse_args()
@@ -245,10 +270,13 @@ def main():
     reduced_genedb = None
     if args.reduced_genedb:
         reduced_genedb = GeneDBHandler(args.reduced_genedb, args.output, 'reduced', True)
+    bam_handler = None
+    if args.bam:
+        bam_handler = pysam.AlignmentFile(args.bam, "rb")
     isoquant_db = GeneDBHandler(args.isoquantdb, args.output, 'isoquant', False)
     isoquant_data = AssignmentData(args.isoquant_prefix)
     gff_compare_data = TrackingData(args.gffcompare_tracking)
-    stat_counter = StatCounter(ref_db, reduced_genedb, isoquant_db, isoquant_data, gff_compare_data, args.output)
+    stat_counter = StatCounter(ref_db, reduced_genedb, isoquant_db, isoquant_data, gff_compare_data, bam_handler, args.output)
     stat_counter.process_all()
 
 
