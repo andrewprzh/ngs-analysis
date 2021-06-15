@@ -185,8 +185,8 @@ class StatCounter:
                     continue
                 _, assigned_isoform_id = max((v, k) for k, v in assigned_isoform_count.items())
 
-                (chr_id, start, end) = self.ref_db.isoform_to_coords[isoform_id]
-                save_reads_to_bam(self.bam, chr_id, start, end, self.output_prefix + "." + isoform_id + ".bam",
+                (chr_id, start, end) = self.ref_db.isoform_to_coords[best_isoform_id]
+                save_reads_to_bam(self.bam, chr_id, start - 1000, end + 1000, self.output_prefix + "." + isoform_id + ".bam",
                                   self.isoquant_data.isoform_to_read[isoform_id])
 
                 orig_outf.write('\n= Incorrect isoform, assignment type %s\n' % assignment_type)
