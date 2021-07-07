@@ -31,7 +31,10 @@ def set_logger(logger_instance):
 def load_tags(inbam):
     tag_dict = {}
     for a in pysam.AlignmentFile(inbam, "rb"):
-        tag_dict[a.query_name] = a.get_tag("ts")
+        try:
+            tag_dict[a.query_name] = a.get_tag("ts")
+        except KeyError:
+            continue
     return tag_dict
 
 
@@ -58,7 +61,6 @@ def main():
     set_logger(logger)
     args = parse_args()
     tags = load_tags(args.original_bam)
-    print(tags)
     if not args.output:
         base, ext = os.path.splitext(args.bam)
         args.output = base + ".tagged.bam"
