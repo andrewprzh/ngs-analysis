@@ -32,7 +32,7 @@ def load_tags(inbam):
     tag_dict = {}
     for a in pysam.AlignmentFile(inbam, "rb"):
         try:
-            tag_dict[a.query_name] = a.get_tag("ts")
+            tag_dict[a.query_name] = a.get_tags(with_value_type=True)
         except KeyError:
             continue
     return tag_dict
@@ -43,7 +43,7 @@ def save_reads_to_bam(input_fname, output_fname, tags):
     bamfile_out = pysam.AlignmentFile(output_fname, "wb", template=bamfile_in)
     for alignment in bamfile_in:
         if alignment.query_name in tags:
-            alignment.set_tag("ts", tags[alignment.query_name], value_type='A')
+            alignment.set_tags(tags[alignment.query_name])
         bamfile_out.write(alignment)
 
 
