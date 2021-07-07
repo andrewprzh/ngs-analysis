@@ -84,13 +84,10 @@ def parse_args():
     parser.add_argument("--assignment_subtype", type=str, help="only use assignments of this subtype")
     parser.add_argument("--isoform_set", type=str, help="limit isoforms to this set (second column)")
     parser.add_argument("--ignored_reads", type=str, help="ignore these reads (third column)")
-    parser.add_argument("--no_equal", type=bool, help="do not force read to be originated from the assigned isoform",
+    parser.add_argument("--no_equal", help="do not force read to be originated from the assigned isoform",
                         action='store_true', default=False)
 
     args = parser.parse_args()
-    if not args.isoquant_prefix or not args.gffcompare_tracking or not args.genedb or not args.isoquantdb:
-        parser.print_usage()
-        exit(-1)
     return args
 
 
