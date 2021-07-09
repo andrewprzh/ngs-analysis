@@ -29,12 +29,31 @@ def set_logger(logger_instance):
 
 
 def load_tags(inbam):
-    tag_dict = {}
+    tag_dict = defaultdict(dict)
     for a in pysam.AlignmentFile(inbam, "rb"):
         try:
-            tag_dict[a.query_name] = a.get_tags(with_value_type=True)
+            read_id = a.query_name
+            if read_id in tag_dict[a.reference_name]:
+                continue
+            tag_dict[a.reference_name][read_id] = a.get_tag("ts")
         except KeyError:
             continue
+    return tag_dict
+
+
+def load_tags_from_tsv(intsv):
+    tag_dict = defaultdict(dict)
+    for l in open(intsv):
+        if l.startswith('#'):
+            continue
+        t = l.split('\t')
+        read_id = t[0]
+        chr_id = t[1]
+        strand = t[2]
+        if read_id in tag_dict[chr_id]:
+            continue
+        if strand != '.':
+            tag_dict[chr_id][read_id] = strand
     return tag_dict
 
 
@@ -42,15 +61,17 @@ def save_reads_to_bam(input_fname, output_fname, tags):
     bamfile_in = pysam.AlignmentFile(input_fname, "rb")
     bamfile_out = pysam.AlignmentFile(output_fname, "wb", template=bamfile_in)
     for alignment in bamfile_in:
-        if alignment.query_name in tags:
-            alignment.set_tags(tags[alignment.query_name])
+        if alignment.reference_name in tags and alignment.query_name in tags[alignment.reference_name]:
+            tag = tags[alignment.reference_name][alignment.query_name]
+            alignment.set_tag("ts", tag, value_type='A')
         bamfile_out.write(alignment)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output BAM name [default = input.tsa.bam", default="")
-    parser.add_argument("--original_bam", "-g", required=True, type=str, help="BAM file with TS:A tag")
+    parser.add_argument("--original_bam", "-g", type=str, help="BAM file with TS:A tag")
+    parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments in TSV")
     parser.add_argument("--bam", "-b", required=True, type=str, help="input BAM file to fix")
 
     args = parser.parse_args()
@@ -60,7 +81,13 @@ def parse_args():
 def main():
     set_logger(logger)
     args = parse_args()
-    tags = load_tags(args.original_bam)
+    if args.original_bam:
+        tags = load_tags(args.original_bam)
+    elif args.read_assignments:
+        tags = load_tags(args.read_assignments)
+    else:
+        logger.error("Tags were not provided")
+        return -1
     if not args.output:
         base, ext = os.path.splitext(args.bam)
         args.output = base + ".tagged.bam"
