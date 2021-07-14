@@ -57,12 +57,16 @@ def load_tags_from_tsv(intsv):
     return tag_dict
 
 
-def save_reads_to_bam(input_fname, output_fname, tags):
+def save_reads_to_bam(input_fname, output_fname, tags, invert_strand=False):
     bamfile_in = pysam.AlignmentFile(input_fname, "rb")
     bamfile_out = pysam.AlignmentFile(output_fname, "wb", template=bamfile_in)
     for alignment in bamfile_in:
         if alignment.reference_name in tags and alignment.query_name in tags[alignment.reference_name]:
             tag = tags[alignment.reference_name][alignment.query_name]
+            if tag == '.':
+                continue
+            if invert_strand and alignment.is_reverse:
+                tag = '-' if tag == '+' else '+'
             alignment.set_tag("ts", tag, value_type='A')
         bamfile_out.write(alignment)
 
@@ -81,17 +85,21 @@ def parse_args():
 def main():
     set_logger(logger)
     args = parse_args()
+    logger.info("Loading tags")
+    invert_strand = False
     if args.original_bam:
         tags = load_tags(args.original_bam)
     elif args.read_assignments:
-        tags = load_tags(args.read_assignments)
+        tags = load_tags_from_tsv(args.read_assignments)
+        invert_strand = True
     else:
         logger.error("Tags were not provided")
         return -1
     if not args.output:
         base, ext = os.path.splitext(args.bam)
         args.output = base + ".tagged.bam"
-    save_reads_to_bam(args.bam, args.output, tags)
+    logger.info("Convertin bam to %s" % args.output)
+    save_reads_to_bam(args.bam, args.output, tags, invert_strand)
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
