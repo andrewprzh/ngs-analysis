@@ -54,7 +54,7 @@ class TranscriptIdSeparator:
         pass
 
     def separate(self, l):
-        if l.find('transcript_id "ENSMUST') != -1:
+        if l.find('transcript_id "ENSMUST') != -1 and l.find("aligned_") == -1:
             return TranscriptType.known
         else:
             return TranscriptType.novel
