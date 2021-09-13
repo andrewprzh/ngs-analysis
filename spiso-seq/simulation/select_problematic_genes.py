@@ -78,7 +78,8 @@ def process_gene_db(db, chr_dict, main_gtf_fname, microexon_gtf_fname, ambigous_
     for g in db.features_of_type('gene', order_by=('seqid', 'start')):
         if g.seqid != current_chr_id:
             current_chr_id = g.seqid
-            chr_record = chr_dict[g.seqid]
+            chr_record = str(chr_dict[g.seqid].seq)
+            print("Processing chromosome %s" % current_chr_id)
 
         genes_total += 1
         microexon_found = set()
@@ -144,9 +145,6 @@ def parse_args():
                         type=int, default=6)
     args = parser.parse_args()
 
-    if args.fraction < 0 or args.fraction > 1:
-        print("Invalid fraction value")
-        sys.exit(-1)
     return args
 
 
