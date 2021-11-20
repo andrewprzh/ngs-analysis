@@ -85,11 +85,15 @@ def process_genome(args, genedb, reference, outstream, genestram):
     for g in genedb.features_of_type('gene', order_by=('seqid', 'start')):
         if g.seqid not in reference:
             continue
+        gene_len, isoform_count, exon_count = get_avg_transcript_len(genedb, g)
+        if exon_count == 1:
+            continue
         chr_record = reference[g.seqid]
         stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
         intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
-        gene_len, isoform_count, exon_count = get_avg_transcript_len(genedb, g)
-        genestram.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches)))
+        nopolya_gene = gene_len >= 1000 and isoform_count >= 3 and exon_count >= 5
+        genestram.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
+                        % (g.seqid, g.id, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
         for s in intronic_stretches:
             outstream.write("%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, s[0], s[1]))
 
@@ -108,7 +112,8 @@ def main():
     with open(args.output + ".tsv", 'w') as outstream, open(args.output + ".genes.tsv", 'w') as genestream:
         print("Saving stretches to " + args.output)
         outstream.write("#%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "strand", "gene_len", "polya_start", "polya_end"))
-        genestream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "strand", "gene_len", "isoform_count", "exon_count", "total_stretches"))
+        genestream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+                         ("chr", "gene_id", "strand", "gene_len", "isoform_count", "exon_count", "total_stretches", "no_polya"))
         process_genome(args, gffutils_db, reference_record_dict, outstream, genestream)
 
 
