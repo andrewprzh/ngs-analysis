@@ -6,18 +6,15 @@
 
 import sys
 import os
-import gffutils
+import shutil
 import random
 import argparse
-from collections import defaultdict
-from Bio import SeqIO
 from traceback import print_exc
 from common import *
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--gtf_list", "-g", nargs='+',
-                        help="list of GTFs to process", type=str, required=True)
+    parser.add_argument("--gtf_list", "-g", help="list of GTFs to process", type=str, required=True)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
     args = parser.parse_args()
 
@@ -26,11 +23,11 @@ def parse_args():
 
 def process_tracking(gffcompare_output_prefix, gtf_num):
     reliable_transcripts = 0
-    unique_transcripts = [0 * gtf_num]
-    missed_transcripts = [0 * gtf_num]
-    total_transcripts = [0 * gtf_num]
+    unique_transcripts = [0] * gtf_num
+    missed_transcripts = [0] * gtf_num
+    total_transcripts = [0] * gtf_num
 
-    for l in open(gffcompare_output_prefix + ".tracking", "w"):
+    for l in open(gffcompare_output_prefix + ".tracking", "r"):
         vals = l.strip().split()[4:]
         assert len(vals) == gtf_num
         equality_vector = [0 if vals[i] == '-' else 1 for i in range(gtf_num)]
@@ -56,10 +53,11 @@ def process_tracking(gffcompare_output_prefix, gtf_num):
 def print_stats(name, reliable_transcripts, total_transcripts, unique_transcripts, missed_transcripts, out=sys.stdout):
     out.write(name + "\n")
     total_columns = len(total_transcripts)
-    out.write("\t".join([str(reliable_transcripts)] * total_columns))
-    out.write("\t".join([str(total_transcripts[i] - unique_transcripts[i] - reliable_transcripts) for i in range(total_columns)]))
-    out.write("\t".join([str(unique_transcripts[i]) for i in range(total_columns)]))
-    out.write("\t".join([str(-missed_transcripts[i]) for i in range(total_columns)]))
+    out.write("\t".join([str(reliable_transcripts)] * total_columns) + "\n")
+    out.write("\t".join([str(total_transcripts[i] - unique_transcripts[i] - reliable_transcripts) for i in range(total_columns)]) + "\n")
+    out.write("\t".join([str(unique_transcripts[i]) for i in range(total_columns)]) + "\n")
+    out.write("\t".join([str(-missed_transcripts[i]) for i in range(total_columns)]) + "\n")
+    out.flush()
 
 
 def split_all(args):
@@ -67,7 +65,8 @@ def split_all(args):
     known_gtfs = []
     novel_gtfs = []
     for l in open(args.gtf_list):
-        v = l.strip().split(l)
+        v = l.strip().split()
+
         if len(v) < 2:
             continue
         gtf_path = v[0]
@@ -76,13 +75,21 @@ def split_all(args):
             gtf_id = v[2]
         else:
             gtf_id = tool
+        #print(gtf_path, gtf_id)
 
         out_full_path = os.path.join(args.output, gtf_id + ".full.gtf")
         out_known_path = os.path.join(args.output, gtf_id + ".known.gtf")
         out_novel_path = os.path.join(args.output, gtf_id + ".novel.gtf")
-        print("Seprating known and novel transcripts")
-        separator = SEPARATE_FUNCTORS[tool](args)
-        split_gtf(gtf_path, separator, out_full_path, out_known_path, out_novel_path)
+        if not os.path.exists(out_full_path):
+            print("Seprating known and novel transcripts for " + gtf_id)
+            if tool == 'bambu':
+                shutil.copyfile(gtf_path, out_full_path)
+                gtf_prefix = gtf_path[:-9]
+                shutil.copyfile(gtf_prefix + ".known.gtf", out_known_path)
+                shutil.copyfile(gtf_prefix + ".novel.gtf", out_novel_path)
+            else:
+                separator = SEPARATE_FUNCTORS[tool](args)
+                split_gtf(gtf_path, separator, out_full_path, out_known_path, out_novel_path)
         full_gtfs.append(out_full_path)
         known_gtfs.append(out_known_path)
         novel_gtfs.append(out_novel_path)
@@ -96,11 +103,13 @@ def main():
         os.makedirs(args.output)
 
     gtfs = split_all(args)
+    #print(gtfs)
     out_stats = open(os.path.join(args.output, "all_stats.tsv"), "w")
-    for name, gtf_list in gtfs:
-        print("Running gffcompare for " + name)
+    for name, gtf_list in gtfs.items():
         gff_compare_out = os.path.join(args.output, name)
-        run_gff_compare_noref(gtf_list, gff_compare_out)
+        if not os.path.exists(gff_compare_out + ".tracking"):
+            print("Running gffcompare for " + name)
+            run_gff_compare_noref(gtf_list, gff_compare_out)
         reliable_transcripts, total_transcripts, unique_transcripts, missed_transcripts = \
             process_tracking(gff_compare_out, len(gtf_list))
         print_stats(name, reliable_transcripts, total_transcripts, unique_transcripts, missed_transcripts, out=out_stats)

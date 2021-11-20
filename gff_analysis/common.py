@@ -118,7 +118,9 @@ def split_gtf(ingtf_path, seaprator, out_full_path, out_known_path, out_novel_pa
 
 
 def run_gff_compare_noref(gtf_list, output):
-    result = subprocess.run(["gffcompare", "-o", output] + gtf_list)
+    cmd_list = ["gffcompare", "-o", output] + gtf_list
+    print(cmd_list)
+    result = subprocess.run(cmd_list)
 
     if result.returncode != 0:
         print("gffcompare failed ")
