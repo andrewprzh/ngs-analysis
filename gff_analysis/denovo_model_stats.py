@@ -82,14 +82,8 @@ def split_all(args):
         out_novel_path = os.path.join(args.output, gtf_id + ".novel.gtf")
         if not os.path.exists(out_full_path):
             print("Seprating known and novel transcripts for " + gtf_id)
-            if tool == 'bambu':
-                shutil.copyfile(gtf_path, out_full_path)
-                gtf_prefix = gtf_path[:-9]
-                shutil.copyfile(gtf_prefix + ".known.gtf", out_known_path)
-                shutil.copyfile(gtf_prefix + ".novel.gtf", out_novel_path)
-            else:
-                separator = SEPARATE_FUNCTORS[tool](args)
-                split_gtf(gtf_path, separator, out_full_path, out_known_path, out_novel_path)
+            separator = SEPARATE_FUNCTORS[tool](gtf_path)
+            split_gtf(gtf_path, separator, out_full_path, out_known_path, out_novel_path)
         full_gtfs.append(out_full_path)
         known_gtfs.append(out_known_path)
         novel_gtfs.append(out_novel_path)

@@ -24,7 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output folder", default="gtf_stats")
     parser.add_argument("--genedb", "-d", type=str, help="prefix to reduced gene db")
-    parser.add_argument("--gtf", "-g", type=str, help="output gtf")
+    parser.add_argument("--gtf", "-g", type=str, help="gtf to assess")
     parser.add_argument("--tool", type=str, choices=['isoquant', 'talon', 'sqanti', 'flair', 'bambu', 'stringtie'],
                         help="tool used for generating GTF")
 
@@ -44,7 +44,7 @@ def main():
     out_known_path = os.path.join(args.output, args.tool + ".known.gtf")
     out_novel_path= os.path.join(args.output, args.tool + ".novel.gtf")
     print("Seprating known and novel transcripts")
-    separator = SEPARATE_FUNCTORS[args.tool](args)
+    separator = SEPARATE_FUNCTORS[args.tool](args.gtf)
     split_gtf(args.gtf, separator, out_full_path, out_known_path, out_novel_path)
     print("Running gffcompare for entire GTF")
     expressed_gtf = args.genedb + ".expressed.gtf"

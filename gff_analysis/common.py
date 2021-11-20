@@ -119,7 +119,7 @@ def split_gtf(ingtf_path, seaprator, out_full_path, out_known_path, out_novel_pa
 
 def run_gff_compare_noref(gtf_list, output):
     cmd_list = ["gffcompare", "-o", output] + gtf_list
-    print(cmd_list)
+    print(' '.join(cmd_list))
     result = subprocess.run(cmd_list)
 
     if result.returncode != 0:
@@ -128,7 +128,9 @@ def run_gff_compare_noref(gtf_list, output):
 
 
 def run_gff_compare(reference_gtf, compared_gtf, output):
-    result = subprocess.run(["gffcompare", "-r", reference_gtf, "-o", output, compared_gtf])
+    cmd_list = ["gffcompare", "-r", reference_gtf, "-o", output, compared_gtf]
+    print(' '.join(cmd_list))
+    result = subprocess.run(cmd_list)
 
     if result.returncode != 0:
         print("gffcompare failed for " + compared_gtf)
