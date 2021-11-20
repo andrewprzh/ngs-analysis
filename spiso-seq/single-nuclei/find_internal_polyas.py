@@ -33,11 +33,15 @@ def overlaps(range1, range2):
 
 def get_avg_transcript_len(genedb, gene):
     transcript_lengths = []
+    isoform_count = 0
+    exon_set = set()
     for t in genedb.children(gene, featuretype=('transcript', 'mRNA'), order_by='start'):
+        isoform_count += 1
         for e in genedb.children(t, order_by='start'):
             if e.featuretype == 'exon':
                 transcript_lengths.append(e.end - e.start + 1)
-    return int(sum(transcript_lengths) / len(transcript_lengths))
+                exon_set.add((e.start, e.end))
+    return int(sum(transcript_lengths) / len(transcript_lengths)), isoform_count, len(exon_set)
 
 
 def find_polya_stretches(args, chr_record, start, end, strand):
@@ -84,8 +88,8 @@ def process_genome(args, genedb, reference, outstream, genestram):
         chr_record = reference[g.seqid]
         stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
         intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
-        gene_len = get_avg_transcript_len(genedb, g)
-        genestram.write("%s\t%s\t%s\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, len(intronic_stretches)))
+        gene_len, isoform_count, exon_count = get_avg_transcript_len(genedb, g)
+        genestram.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches)))
         for s in intronic_stretches:
             outstream.write("%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, s[0], s[1]))
 
@@ -101,9 +105,11 @@ def main():
             reference_record_dict = SeqIO.to_dict(SeqIO.parse(handle, "fasta"))
     else:
         reference_record_dict = SeqIO.to_dict(SeqIO.parse(args.reference, "fasta"))
-    with open(args.output + ".tsv", 'w') as outstream, open(args.output + ".genes.tsv", 'w') as genestram:
+    with open(args.output + ".tsv", 'w') as outstream, open(args.output + ".genes.tsv", 'w') as genestream:
         print("Saving stretches to " + args.output)
-        process_genome(args, gffutils_db, reference_record_dict, outstream, genestram)
+        outstream.write("#%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "strand", "gene_len", "polya_start", "polya_end"))
+        genestream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "strand", "gene_len", "isoform_count", "exon_count", "total_stretches"))
+        process_genome(args, gffutils_db, reference_record_dict, outstream, genestream)
 
 
 if __name__ == "__main__":
