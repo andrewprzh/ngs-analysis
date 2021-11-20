@@ -12,6 +12,7 @@ import argparse
 import gffutils
 from Bio import SeqIO
 import gzip
+from traceback import print_exc
 
 
 def parse_args():
@@ -50,7 +51,7 @@ def find_polya_stretches(args, chr_record, start, end, strand):
         i = pos + 1
         while i < len(genic_seq) and genic_seq[i] == nucl:
             i += 1
-        resulting_stretches.append((start + pos, start + i - 1))
+        resulting_stretches.append((start + pos , start + i - 1))
         pos = i
         pos = genic_seq.find(sample, pos)
 
@@ -76,20 +77,21 @@ def find_intronic_stretches(args, genedb, gene, polya_stretches):
     return resulting_list
 
 
-def process_genome(args, genedb, reference, outstream):
+def process_genome(args, genedb, reference, outstream, genestram):
     for g in genedb.features_of_type('gene', order_by=('seqid', 'start')):
+        if g.seqid not in reference:
+            continue
         chr_record = reference[g.seqid]
         stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
         intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
+        gene_len = get_avg_transcript_len(genedb, g)
+        genestram.write("%s\t%s\t%s\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, len(intronic_stretches)))
         for s in intronic_stretches:
-            outstream.write("%s\t%s\t%s\t%d\t%d\n" % (g.seqid, g.id, g.strand, s[0], s[1]))
+            outstream.write("%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, s[0], s[1]))
 
 
 def main():
     args = parse_args()
-    if not os.path.exists(args.output):
-        os.makedirs(args.output)
-
     print("Loading gene database from " + args.genedb)
     gffutils_db = gffutils.FeatureDB(args.genedb, keep_order=True)
     print("Loading reference genome from " + args.reference)
@@ -99,8 +101,9 @@ def main():
             reference_record_dict = SeqIO.to_dict(SeqIO.parse(handle, "fasta"))
     else:
         reference_record_dict = SeqIO.to_dict(SeqIO.parse(args.reference, "fasta"))
-    with open(args.output, 'w') as outstream:
-        process_genome(args, gffutils_db, reference_record_dict, outstream)
+    with open(args.output + ".tsv", 'w') as outstream, open(args.output + ".genes.tsv", 'w') as genestram:
+        print("Saving stretches to " + args.output)
+        process_genome(args, gffutils_db, reference_record_dict, outstream, genestram)
 
 
 if __name__ == "__main__":
