@@ -91,7 +91,7 @@ def process_genome(args, genedb, reference, outstream, genestram):
         chr_record = reference[g.seqid]
         stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
         intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
-        nopolya_gene = gene_len >= 1000 and isoform_count >= 3 and exon_count >= 5
+        nopolya_gene = gene_len >= 1000 and exon_count >= 2 and len(intronic_stretches) == 0
         genestram.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
                         % (g.seqid, g.id, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
         for s in intronic_stretches:
