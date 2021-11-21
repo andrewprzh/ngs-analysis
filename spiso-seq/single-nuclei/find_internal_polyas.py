@@ -96,9 +96,9 @@ def process_genome(args, genedb, reference, outstream, genestram):
         nopolya_gene = gene_len >= 1000 and exon_count >= 2 and len(intronic_stretches) == 0
         gene_info[g.id] = (gene_len, len(intronic_stretches))
         genestram.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
-                        % (g.seqid, g.id, g.name, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
+                        % (g.seqid, g.id, g["gene_name"][0][1:-1], g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
         for s in intronic_stretches:
-            outstream.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.name, g.strand, gene_len, s[0], s[1]))
+            outstream.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g["gene_name"][0][1:-1], g.strand, gene_len, s[0], s[1]))
     return gene_info
 
 
