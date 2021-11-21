@@ -83,6 +83,7 @@ def find_intronic_stretches(args, genedb, gene, polya_stretches):
 
 
 def process_genome(args, genedb, reference, outstream, genestram):
+    gene_info = {}
     for g in genedb.features_of_type('gene', order_by=('seqid', 'start')):
         if g.seqid not in reference:
             continue
@@ -93,10 +94,22 @@ def process_genome(args, genedb, reference, outstream, genestram):
         stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
         intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
         nopolya_gene = gene_len >= 1000 and exon_count >= 2 and len(intronic_stretches) == 0
+        gene_info[g.id] = (gene_len, len(intronic_stretches))
         genestram.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
                         % (g.seqid, g.id, g.name, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
         for s in intronic_stretches:
             outstream.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.name, g.strand, gene_len, s[0], s[1]))
+    return gene_info
+
+
+def filter_annotation(db, gtf, gene_info_dict, min_len=1000):
+    with open(gtf, "w") as f:
+        for g in db.features_of_type('gene', order_by=('seqid', 'start')):
+            if g.id not in gene_info_dict or gene_info_dict[g.id][1] > 0 or gene_info_dict[g.id][0] < min_len:
+                continue
+            f.write(str(g) + "\n")
+            for t in db.children(g):
+                f.write(str(t) + '\n')
 
 
 def main():
@@ -115,7 +128,10 @@ def main():
         outstream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "gene_name", "strand", "gene_len", "polya_start", "polya_end"))
         genestream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
                          ("chr", "gene_id", "gene_name", "strand", "gene_len", "isoform_count", "exon_count", "total_stretches", "no_polya"))
-        process_genome(args, gffutils_db, reference_record_dict, outstream, genestream)
+        gene_info = process_genome(args, gffutils_db, reference_record_dict, outstream, genestream)
+
+    for min_len in [1000, 2000, 3000]:
+        filter_annotation(gffutils_db, args.output + "." + str(min_len) + ".gtf", gene_info, min_len)
 
 
 if __name__ == "__main__":
