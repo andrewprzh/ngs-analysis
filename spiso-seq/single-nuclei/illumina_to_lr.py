@@ -17,9 +17,6 @@ from collections import defaultdict
 import numpy
 
 
-MAX_LONG_READS = 20000
-
-
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output folder", required=True)
@@ -28,6 +25,8 @@ def parse_args():
     parser.add_argument("--illumina", "-i", type=str, help="input file with Illumina sequences", required=True)
     parser.add_argument("--illumina_column", type=int, help="illumina read id column in all info", default=2)
     parser.add_argument("--lr_column", type=int, help="long read id column in all info", default=0)
+    parser.add_argument("--max_long_reads", type=int, help="max long reads to extract", default=10000)
+
 
     args = parser.parse_args()
     return args
@@ -65,7 +64,7 @@ def select_reads(args, read_dict):
             SeqIO.write([r], fname, 'fasta')
             for sr_id in read_dict[r.id]:
                 selected_ids[sr_id] = fprefix
-        if lr_count > MAX_LONG_READS:
+        if lr_count > args.max_long_reads:
             break
 
     print("Extracting short reads from " + args.illumina)
