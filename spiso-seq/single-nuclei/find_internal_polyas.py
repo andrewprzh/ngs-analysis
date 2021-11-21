@@ -93,10 +93,10 @@ def process_genome(args, genedb, reference, outstream, genestram):
         stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
         intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
         nopolya_gene = gene_len >= 1000 and exon_count >= 2 and len(intronic_stretches) == 0
-        genestram.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
-                        % (g.seqid, g.id, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
+        genestram.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
+                        % (g.seqid, g.id, g.name, g.strand, gene_len, isoform_count, exon_count, len(intronic_stretches), str(nopolya_gene)))
         for s in intronic_stretches:
-            outstream.write("%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.strand, gene_len, s[0], s[1]))
+            outstream.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\n" % (g.seqid, g.id, g.name, g.strand, gene_len, s[0], s[1]))
 
 
 def main():
@@ -112,9 +112,9 @@ def main():
         reference_record_dict = SeqIO.to_dict(SeqIO.parse(args.reference, "fasta"))
     with open(args.output + ".tsv", 'w') as outstream, open(args.output + ".genes.tsv", 'w') as genestream:
         print("Saving stretches to " + args.output)
-        outstream.write("#%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "strand", "gene_len", "polya_start", "polya_end"))
-        genestream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
-                         ("chr", "gene_id", "strand", "gene_len", "isoform_count", "exon_count", "total_stretches", "no_polya"))
+        outstream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % ("chr", "gene_id", "gene_name", "strand", "gene_len", "polya_start", "polya_end"))
+        genestream.write("#%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+                         ("chr", "gene_id", "gene_name", "strand", "gene_len", "isoform_count", "exon_count", "total_stretches", "no_polya"))
         process_genome(args, gffutils_db, reference_record_dict, outstream, genestream)
 
 
