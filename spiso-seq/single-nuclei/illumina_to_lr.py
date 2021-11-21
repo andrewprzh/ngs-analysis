@@ -113,6 +113,7 @@ def count_tlen(args, file_prefixes):
                 tlens.append(long_read_len - a.reference_start)
             else:
                 tlens.append(a.reference_start + a.query_length)
+    tlens = filter(lambda x: x < 1000, tlens)
 
     with open(os.path.join(args.output, 'stats.tsv'), 'w') as outf:
         outf.write("%s\t%s\n\n" % (str(numpy.mean(tlens)), str(numpy.std(tlens))))
@@ -130,6 +131,7 @@ def main():
     file_prefixes = select_reads(args, read_dict)
     map_reads(args, file_prefixes)
     count_tlen(args, file_prefixes)
+
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
