@@ -17,7 +17,7 @@ from collections import defaultdict
 import numpy
 
 
-MAX_LONG_READS = 10
+MAX_LONG_READS = 10000
 
 
 def parse_args():
@@ -117,10 +117,10 @@ def count_tlen(args, file_prefixes):
                 tlens.append(a.reference_start + a.query_length)
 
     with open(os.path.join(args.output, 'stats.tsv'), 'w') as outf:
-        outf.write("%s\t%s\n" % (str(numpy.mean(tlens)), str(numpy.std(tlens))))
+        outf.write("%s\t%s\n\n" % (str(numpy.mean(tlens)), str(numpy.std(tlens))))
         tlen_hist, tlen_bins = numpy.histogram(tlens, bins=[i for i in range(max(tlens) + 1)])
-        outf.write('\t'.join([str(x) for x in tlen_hist]))
-        outf.write('\t'.join([str(x) for x in tlen_bins]))
+        outf.write('\t'.join([str(x) for x in tlen_hist]) + '\n')
+        outf.write('\t'.join([str(x) for x in tlen_bins]) + '\n')
 
 
 def main():
