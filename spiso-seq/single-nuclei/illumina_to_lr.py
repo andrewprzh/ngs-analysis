@@ -59,9 +59,8 @@ def select_reads(args, read_dict):
             lr_count += 1
             fprefix = r.id.replace('/', '_')
             fname = os.path.join(args.output, fprefix + '.fasta')
-            if os.path.exists(fname):
-                continue
-            SeqIO.write([r], fname, 'fasta')
+            if not os.path.exists(fname):
+                SeqIO.write([r], fname, 'fasta')
             for sr_id in read_dict[r.id]:
                 selected_ids[sr_id] = fprefix
         if lr_count > args.max_long_reads:
@@ -81,9 +80,8 @@ def select_reads(args, read_dict):
         fname = os.path.join(args.output, fprefix + '.sr.fastq')
         total_files += 1
         total_reads += len(selected_records[fprefix])
-        if os.path.exists(fname):
-            continue
-        SeqIO.write(selected_records[fprefix], fname, 'fastq')
+        if not os.path.exists(fname):
+            SeqIO.write(selected_records[fprefix], fname, 'fastq')
 
     print("Saved %d reads into %d files " % (total_reads, total_files))
     return selected_records.keys()
@@ -113,7 +111,7 @@ def count_tlen(args, file_prefixes):
                 tlens.append(long_read_len - a.reference_start)
             else:
                 tlens.append(a.reference_start + a.query_length)
-    tlens = filter(lambda x: x < 1000, tlens)
+    tlens = list(filter(lambda x: x < 1000, tlens))
 
     with open(os.path.join(args.output, 'stats.tsv'), 'w') as outf:
         outf.write("%s\t%s\n\n" % (str(numpy.mean(tlens)), str(numpy.std(tlens))))
