@@ -47,7 +47,7 @@ def get_avg_transcript_len(genedb, gene):
 
 def find_polya_stretches(args, chr_record, start, end, strand):
     genic_seq = str(chr_record.seq[start:end+1])
-    nucl = 'A' if strand == '=' else 'T'
+    nucl = 'A' if strand == '+' else 'T'
     sample = nucl * args.min_polya_len
     resulting_stretches = []
     pos = 0
