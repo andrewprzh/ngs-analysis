@@ -14,7 +14,6 @@ from Bio import SeqIO
 import gzip
 from traceback import print_exc
 
-
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output TSV file", default="polya.tsv")
@@ -37,10 +36,12 @@ def get_avg_transcript_len(genedb, gene):
     exon_set = set()
     for t in genedb.children(gene, featuretype=('transcript', 'mRNA'), order_by='start'):
         isoform_count += 1
+        tlen = 0
         for e in genedb.children(t, order_by='start'):
             if e.featuretype == 'exon':
-                transcript_lengths.append(e.end - e.start + 1)
+                tlen += e.end - e.start + 1
                 exon_set.add((e.start, e.end))
+        transcript_lengths.append(tlen)
     return int(sum(transcript_lengths) / len(transcript_lengths)), isoform_count, len(exon_set)
 
 
