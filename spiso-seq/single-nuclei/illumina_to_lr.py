@@ -17,7 +17,7 @@ from collections import defaultdict
 import numpy
 
 
-MAX_LONG_READS = 10000
+MAX_LONG_READS = 20000
 
 
 def parse_args():
@@ -63,7 +63,6 @@ def select_reads(args, read_dict):
             if os.path.exists(fname):
                 continue
             SeqIO.write([r], fname, 'fasta')
-            lr_count += 1
             for sr_id in read_dict[r.id]:
                 selected_ids[sr_id] = fprefix
         if lr_count > MAX_LONG_READS:
