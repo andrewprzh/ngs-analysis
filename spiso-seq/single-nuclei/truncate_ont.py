@@ -69,7 +69,8 @@ def truncate_reads(args, read_dict):
             seq = r.query_sequence
             quality = r.query_qualities
             tlen = int(numpy.random.normal(args.mean_frag, args.stdev_frag))
-            if assigned_strand ^ mapped_strand:
+            tlen = max(tlen, args.read_length + 40)
+            if assigned_strand == mapped_strand:
                 end = min(len(seq), tlen)
                 start = end - args.read_length
                 seq = seq[start:end]
@@ -81,8 +82,10 @@ def truncate_reads(args, read_dict):
                 seq = seq[start:end]
                 if r.query_qualities:
                     qual = quality[start:end]
+            if not seq:
+                continue
             total_sequences += 1
-            seq_records.append(SeqIO.SeqRecord(seq=Seq.Seq(seq), id=r_id + "_%d" % tlen, description="", name="",
+            seq_records.append(SeqIO.SeqRecord(seq=Seq.Seq(seq), id=r_id + "_%d_%d_%d" % (tlen, assigned_strand, mapped_strand), description="", name="",
                                                letter_annotations={'phred_quality':qual}))
 
             if len(seq_records) > 10000:
