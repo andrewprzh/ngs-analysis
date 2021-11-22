@@ -47,22 +47,28 @@ def read_all_info(info_file):
             read_id = read_id[1:]
 
         read_dict[read_id] = 1 if vals[2] == 'rev' else 0
+    print('Loaded %d reads' % len(read_dict))
     return read_dict
 
 
 def truncate_reads(args, read_dict):
     print("Extracting sequences from " + args.ont)
     total_sequences = 0
+    not_found_in_bam = 0
+    total_in_bam = 0
     with open(args.output, 'w') as outf:
         seq_records = []
         for r in pysam.AlignmentFile(args.ont, 'rb'):
-            if r.id not in read_dict:
+            total_in_bam += 1
+            r_id = r.query_name
+            if r_id not in read_dict:
+                not_found_in_bam += 1
                 continue
-            assigned_strand = read_dict[r.id]
+            assigned_strand = read_dict[r_id]
             mapped_strand = (r.flag & 16) >> 4
             seq = r.query_sequence
-            quality = ''.join(map(lambda x: chr(x+33), r.query_qualities)) if r.query_qualities else ''
-            tlen = numpy.random.normal(args.mean_frag, args.stdev_frag)
+            quality = r.query_qualities
+            tlen = int(numpy.random.normal(args.mean_frag, args.stdev_frag))
             if assigned_strand ^ mapped_strand:
                 end = min(len(seq), tlen)
                 start = end - args.read_length
@@ -76,12 +82,13 @@ def truncate_reads(args, read_dict):
                 if r.query_qualities:
                     qual = quality[start:end]
             total_sequences += 1
-            seq_records.append(SeqIO.SeqRecord(seq=Seq.Seq(seq), id=r.id + "_%d" % tlen, description="", name="",
-                                               letter_annotations=qual))
+            seq_records.append(SeqIO.SeqRecord(seq=Seq.Seq(seq), id=r_id + "_%d" % tlen, description="", name="",
+                                               letter_annotations={'phred_quality':qual}))
 
             if len(seq_records) > 10000:
                 SeqIO.write(seq_records, outf, 'fastq')
                 seq_records = []
+    print("Extracted %d sequences from %d, not found %d" % (total_sequences, total_in_bam, not_found_in_bam))
 
 
 def main():
