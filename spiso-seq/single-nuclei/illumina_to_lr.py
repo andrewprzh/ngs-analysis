@@ -22,6 +22,8 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output folder", required=True)
     parser.add_argument("--all_info", "-a", type=str, help="read IDs tab file", required=True)
+    parser.add_argument("--barcode_info", "-b", type=str, help="read barcode info", required=True)
+
     parser.add_argument("--long_reads", "-l", type=str, help="input file with ONT/PB sequences (FASTQ/BAM)", required=True)
     parser.add_argument("--illumina", "-i", type=str, help="input file with Illumina sequences (FASTQ/BAM)", required=True)
     parser.add_argument("--illumina_column", type=int, help="illumina read id column in all info", default=1)
@@ -52,6 +54,22 @@ def read_all_info(args):
         if lr_read_id[0] == '@':
             lr_read_id = lr_read_id[1:]
         read_dict[lr_read_id].append(sr_read_id)
+    return read_dict
+
+
+def read_barcode_positions(info_file):
+    print("Reading barcodes from " + info_file)
+    read_dict = {}
+    for l in open(info_file):
+        vals = l.strip().split()
+        if len(vals) < 4:
+            continue
+        read_id = vals[0]
+        if read_id[0] == '@':
+            read_id = read_id[1:]
+
+        read_dict[read_id] = int(vals[3])
+    print('Loaded %d barcode offsets ' % len(read_dict))
     return read_dict
 
 
@@ -129,18 +147,23 @@ def map_reads(args, file_prefixes):
         os.system("samtools index " + bam)
 
 
-def count_tlen(args, file_prefixes):
+def count_tlen(args, file_prefixes, barcode_offsets=None):
     tlens = []
     print("Running position analysis for %d sets" % len(file_prefixes))
     for fprefix in file_prefixes:
         bam = os.path.join(args.output, fprefix + '.bam')
         bam_file = pysam.AlignmentFile(bam, 'r')
+        ont_read_id = bam_file.get_reference_name(0)
         long_read_len = bam_file.lengths[0]
         for a in bam_file:
-            if a.flag & 16 == 0:
-                tlens.append(long_read_len - a.reference_start)
+            if barcode_offsets is None or ont_read_id not in barcode_offsets:
+                offset = 0
             else:
-                tlens.append(a.reference_start + a.query_length)
+                offset = barcode_offsets[ont_read_id]
+            if a.flag & 16 == 0:
+                tlens.append(long_read_len - a.reference_start - offset)
+            else:
+                tlens.append(a.reference_start + a.query_length - offset)
     tlens = list(filter(lambda x: x < 1000, tlens))
 
     with open(os.path.join(args.output, 'stats.tsv'), 'w') as outf:
@@ -156,9 +179,10 @@ def main():
         os.makedirs(args.output)
 
     read_dict = read_all_info(args)
+    barcode_offsets = read_barcode_positions(args.barcode_info)
     file_prefixes = select_reads(args, read_dict)
     map_reads(args, file_prefixes)
-    count_tlen(args, file_prefixes)
+    count_tlen(args, file_prefixes, barcode_offsets)
 
 
 if __name__ == "__main__":
