@@ -46,7 +46,11 @@ def read_all_info(args):
         if len(vals) < max_col:
             continue
         sr_read_id = vals[args.illumina_column]
+        if sr_read_id[0] == '@':
+            sr_read_id = sr_read_id[1:]
         lr_read_id = vals[args.lr_column]
+        if lr_read_id[0] == '@':
+            lr_read_id = lr_read_id[1:]
         read_dict[lr_read_id].append(sr_read_id)
     return read_dict
 
@@ -120,8 +124,8 @@ def map_reads(args, file_prefixes):
         bam = os.path.join(args.output, fprefix + '.bam')
         if os.path.exists(bam):
             continue
-        minimap2 = os.path.join(args.minimap2, minimap2)
-        os.system("minimap2 %s %s -t 4 -ax sr 2> /dev/null | samtools sort -o %s" % (lr, sr, bam))
+        minimap2 = os.path.join(args.minimap2, 'minimap2') if args.minimap2 else 'minimap2'
+        os.system("%s %s %s -t 4 -ax sr 2> /dev/null | samtools sort -o %s" % (minimap2, lr, sr, bam))
         os.system("samtools index " + bam)
 
 
