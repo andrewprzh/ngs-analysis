@@ -108,7 +108,7 @@ def filter_annotation(db, gtf, gene_info_dict, min_len=1000):
             if g.id not in gene_info_dict or gene_info_dict[g.id][1] > 0 or gene_info_dict[g.id][0] < min_len:
                 continue
             f.write(str(g) + "\n")
-            for t in db.children(g):
+            for t in db.children(g, order_by='start'):
                 f.write(str(t) + '\n')
 
 

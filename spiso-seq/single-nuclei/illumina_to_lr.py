@@ -62,13 +62,15 @@ def read_barcode_positions(info_file):
     read_dict = {}
     for l in open(info_file):
         vals = l.strip().split()
-        if len(vals) < 4:
+        if len(vals) < 6:
             continue
         read_id = vals[0]
         if read_id[0] == '@':
             read_id = read_id[1:]
-
-        read_dict[read_id] = int(vals[3])
+        try:
+            read_dict[read_id] = int(vals[5])
+        except ValueError:
+            continue
     print('Loaded %d barcode offsets ' % len(read_dict))
     return read_dict
 
