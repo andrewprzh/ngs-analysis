@@ -91,8 +91,8 @@ def process_genome(args, genedb, reference, outstream, genestram):
         if exon_count == 1:
             continue
         chr_record = reference[g.seqid]
-        stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
-        intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
+        intronic_stretches = find_polya_stretches(args, chr_record, g.start, g.end, g.strand)
+        # intronic_stretches = find_intronic_stretches(args, genedb, g, stretches)
         nopolya_gene = gene_len >= 1000 and exon_count >= 2 and len(intronic_stretches) == 0
         gene_info[g.id] = (gene_len, len(intronic_stretches))
         genestram.write("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\n"
