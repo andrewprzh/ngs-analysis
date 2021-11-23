@@ -11,6 +11,7 @@ import subprocess
 import sys
 import argparse
 import pysam
+from Bio import Seq
 from Bio import SeqIO
 from traceback import print_exc
 from collections import defaultdict
@@ -20,13 +21,13 @@ import numpy
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output folder", required=True)
-    parser.add_argument("--all_info", "-a", type=str, help="read IDs", required=True)
-    parser.add_argument("--long_reads", "-l", type=str, help="input file with ONT/PB sequences", required=True)
-    parser.add_argument("--illumina", "-i", type=str, help="input file with Illumina sequences", required=True)
-    parser.add_argument("--illumina_column", type=int, help="illumina read id column in all info", default=2)
+    parser.add_argument("--all_info", "-a", type=str, help="read IDs tab file", required=True)
+    parser.add_argument("--long_reads", "-l", type=str, help="input file with ONT/PB sequences (FASTQ/BAM)", required=True)
+    parser.add_argument("--illumina", "-i", type=str, help="input file with Illumina sequences (FASTQ/BAM)", required=True)
+    parser.add_argument("--illumina_column", type=int, help="illumina read id column in all info", default=1)
     parser.add_argument("--lr_column", type=int, help="long read id column in all info", default=0)
     parser.add_argument("--max_long_reads", type=int, help="max long reads to extract", default=10000)
-
+    parser.add_argument("--minimap2", type=str, help="path to minimap2 (expected to be in $PATH if not set", default='')
 
     args = parser.parse_args()
     return args
@@ -54,24 +55,48 @@ def select_reads(args, read_dict):
     selected_ids = {}
     lr_count = 0
     print("Extracting long reads from " + args.long_reads)
-    for r in SeqIO.parse(args.long_reads, 'fastq'):
-        if r.id in read_dict:
-            lr_count += 1
-            fprefix = r.id.replace('/', '_')
-            fname = os.path.join(args.output, fprefix + '.fasta')
-            if not os.path.exists(fname):
-                SeqIO.write([r], fname, 'fasta')
-            for sr_id in read_dict[r.id]:
-                selected_ids[sr_id] = fprefix
-        if lr_count > args.max_long_reads:
-            break
+    if args.long_reads.endswith('bam'):
+        for r in pysam.AlignmentFile(args.long_reads, 'rb'):
+            r_id = r.query_name
+            if r_id in read_dict:
+                lr_count += 1
+                fprefix = r_id.replace('/', '_')
+                fname = os.path.join(args.output, fprefix + '.fasta')
+                if not os.path.exists(fname):
+                    seq_record = SeqIO.SeqRecord(seq=Seq.Seq(r.query_sequence), id=r_id,  description="", name="")
+                    SeqIO.write([seq_record], fname, 'fasta')
+                for sr_id in read_dict[r_id]:
+                    selected_ids[sr_id] = fprefix
+            if lr_count > args.max_long_reads:
+                break
+    else:
+        for r in SeqIO.parse(args.long_reads, 'fastq'):
+            if r.id in read_dict:
+                lr_count += 1
+                fprefix = r.id.replace('/', '_')
+                fname = os.path.join(args.output, fprefix + '.fasta')
+                if not os.path.exists(fname):
+                    SeqIO.write([r], fname, 'fasta')
+                for sr_id in read_dict[r.id]:
+                    selected_ids[sr_id] = fprefix
+            if lr_count > args.max_long_reads:
+                break
 
     print("Extracting short reads from " + args.illumina)
     #print(selected_ids)
     selected_records = defaultdict(list)
-    for r in SeqIO.parse(args.illumina, 'fastq'):
-        if r.id in selected_ids:
-            selected_records[selected_ids[r.id]].append(r)
+
+    if args.illumina.endswith('bam'):
+        for r in pysam.AlignmentFile(args.illumina, 'rb'):
+            r_id = r.query_name
+            if r_id in selected_ids:
+                seq_record = SeqIO.SeqRecord(seq=Seq.Seq(r.query_sequence), id=r_id, description="", name="",
+                                             letter_annotations={'phred_quality': r.query_qualities})
+                selected_records[selected_ids[r_id]].append(seq_record)
+    else:
+        for r in SeqIO.parse(args.illumina, 'fastq'):
+            if r.id in selected_ids:
+                selected_records[selected_ids[r.id]].append(r)
 
     print("Writing short reads")
     total_reads = 0
@@ -95,6 +120,7 @@ def map_reads(args, file_prefixes):
         bam = os.path.join(args.output, fprefix + '.bam')
         if os.path.exists(bam):
             continue
+        minimap2 = os.path.join(args.minimap2, minimap2)
         os.system("minimap2 %s %s -t 4 -ax sr 2> /dev/null | samtools sort -o %s" % (lr, sr, bam))
         os.system("samtools index " + bam)
 
