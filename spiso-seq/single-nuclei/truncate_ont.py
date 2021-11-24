@@ -85,7 +85,9 @@ def truncate_reads(args, read_dict):
             if not seq:
                 continue
             total_sequences += 1
-            seq_records.append(SeqIO.SeqRecord(seq=Seq.Seq(seq), id=r_id + "_%d_%d_%d" % (tlen, assigned_strand, mapped_strand), description="", name="",
+            seq_records.append(SeqIO.SeqRecord(seq=Seq.Seq(seq), id=r_id + "_%d_%s_%d_%d" %
+                                                                    (tlen, r.reference_name, r.reference_start, r.reference_end),
+                                               description="", name="",
                                                letter_annotations={'phred_quality':qual}))
 
             if len(seq_records) > 10000:
