@@ -48,7 +48,7 @@ def simulate_metag(genomes, counts, output_prefix):
         os.remove(tmp_out + '_R2.fastq')
 
 
-    print("All reads written to " + main_output)
+    print("All reads written to " + output_prefix)
 
 
 def parse_args():
