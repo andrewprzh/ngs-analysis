@@ -20,8 +20,8 @@ def count_coverage(chr_id, start, end, bam):
     gene_len = end - start + 1
     coverage = [0 for _ in range(gene_len + 1)]
     for a in bam.fetch(chr_id, start, end):
-        covered_start = max(a.refrence_start + 1, start)
-        covered_end = min(a.refrence_end + 1, end)
+        covered_start = max(a.reference_start + 1, start)
+        covered_end = min(a.reference_end + 1, end)
         for pos in range(covered_start, covered_end + 1):
             coverage[pos - start] += 1
     return 1 - (coverage.count(0) / gene_len)
@@ -29,10 +29,11 @@ def count_coverage(chr_id, start, end, bam):
 
 def get_gene_stats(gene_db, bam):
     gene_cov_dict = {}
-    for g in gene_db.features_of_type('gene', order_by=('seqid', 'start')):
+    for g in gene_db.features_of_type('CDS', order_by=('seqid', 'start')):
         gene_name = g.id
         gene_cov = count_coverage(g.seqid, g.start, g.end, bam)
         gene_cov_dict[gene_name] = gene_cov
+    print("Genes processed %d" % len(gene_cov_dict))
     return gene_cov_dict
 
 
