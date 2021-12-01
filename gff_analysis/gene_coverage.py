@@ -18,8 +18,8 @@ from common import *
 
 def count_coverage(chr_id, start, end, bam):
     gene_len = end - start + 1
-    coverage = [0 for _ in range(gene_len + 1)]
-    for a in bam.fetch(chr_id, start, end):
+    coverage = [0 for _ in range(gene_len)]
+    for a in bam.fetch(chr_id, start - 1, end):
         covered_start = max(a.reference_start + 1, start)
         covered_end = min(a.reference_end + 1, end)
         for pos in range(covered_start, covered_end + 1):
