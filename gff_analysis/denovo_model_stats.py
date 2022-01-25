@@ -45,12 +45,11 @@ def process_tracking(gffcompare_output_prefix, gtf_num):
             for i, e in enumerate(equality_vector):
                 if e == 1:
                     almost_reliable[i] += 1
+            index = equality_vector.index(0)
+            missed_transcripts[index] += 1
         elif matches_transcripts == 1:
             index = equality_vector.index(1)
             unique_transcripts[index] += 1
-        elif matches_transcripts == gtf_num - 1:
-            index = equality_vector.index(0)
-            missed_transcripts[index] += 1
 
     return reliable_transcripts, almost_reliable, total_transcripts, unique_transcripts, missed_transcripts
 
