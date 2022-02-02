@@ -28,6 +28,15 @@ def parse_args():
     return args
 
 
+def default_split_func(tid):
+    return tid
+
+
+def flair_split(tid):
+    new_tid = "_".join(tid.split("_")[:-1])
+    return new_tid
+
+
 def convert_dict_to_tpm(count_dict):
     scale_factor = 1000000.0 / sum(count_dict.values())
     for k in count_dict.keys():
@@ -35,15 +44,16 @@ def convert_dict_to_tpm(count_dict):
     return  count_dict
 
 
-def load_counts(counts_file, column=3, convert_to_tpm=True):
+def load_counts(counts_file, tid_column=1, count_column=3, convert_to_tpm=True, split_func=default_split_func):
     count_dict = {}
     for l in open(counts_file):
-        if l.startswith("#") or l.startswith('TXNAME') or l.startswith('feature_id'):
+        if l.startswith("#") or l.startswith('TXNAME') or l.startswith('feature_id') or l.startswith('gene_ID') or l.startswith('ids'):
             continue
         t = l.strip().split()
-        if len(t) < column:
+        if len(t) < count_column:
             continue
-        count_dict[t[0]] = float(t[column - 1])
+        tid = split_func(t[tid_column-1])
+        count_dict[tid] = float(t[count_column - 1])
     print("Loaded %d counts" % len(count_dict))
     if convert_to_tpm:
         return convert_dict_to_tpm(count_dict)
@@ -120,13 +130,26 @@ def count_total(count_dict, transcript_set, bins):
 def main():
     args = parse_args()
     bins = [0, 5, 10, 50, 100]
+    split_funct = flair_split if args.tool == 'flair' else default_split_func
+
     if args.tool == 'stringtie':
         transcript_set, count_dict = load_transcripts(args.genedb, load_tpm=True)
     else:
         transcript_set, count_dict = load_transcripts(args.genedb, load_tpm=False)
-        normalize = args.tool in {'bambu'}
-        column = 2 if args.tool in {'isoquant'} else 3
-        count_dict = load_counts(args.counts, column=column, convert_to_tpm=normalize)
+        normalize = args.tool in {'bambu', 'talon'}
+        # 1 base column index
+        if  args.tool in {'isoquant', 'flair'}:
+            count_column = 2
+            tid_column = 1
+        elif args.tool in {'talon'}:
+            count_column = 12
+            tid_column = 4
+        else:
+            count_column = 3
+            tid_column = 1
+        split_funct = flair_split if args.tool == 'flair' else default_split_func
+
+        count_dict = load_counts(args.counts, tid_column, count_column, convert_to_tpm=normalize, split_func=split_funct)
 
     total_hist = count_total(count_dict, transcript_set, bins)
     restored_hist = count_stats(args.tracking, count_dict, transcript_set, bins)
