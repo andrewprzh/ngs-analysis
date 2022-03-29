@@ -128,7 +128,7 @@ def run_gff_compare_noref(gtf_list, output):
 
 
 def run_gff_compare(reference_gtf, compared_gtf, output, additional_option=""):
-    cmd_list = ["gffcompare", additional_option, "-r", reference_gtf, "-o", output, compared_gtf]
+    cmd_list = ["gffcompare", compared_gtf, "-r", reference_gtf, "-o", output]
     print(' '.join(cmd_list))
     result = subprocess.run(cmd_list)
 
