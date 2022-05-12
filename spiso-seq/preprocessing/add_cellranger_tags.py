@@ -30,15 +30,17 @@ def parse_args():
 
 def read_gene_names(genedb):
     gene_name_dict = {}
+    print("Loading " + genedb)
     db = gffutils.FeatureDB(genedb)
     for g in db.features_of_type('gene'):
-        gene_name_dict[g.id.split('.')[0]] = g['gene_name']
+        gene_name_dict[g.id.split('.')[0]] = g['gene_name'][0]
     return gene_name_dict
 
 
 def add_cellranger_tags(args, gene_name_dict):
     inf = pysam.AlignmentFile(args.bam, "rb")
     outf = pysam.AlignmentFile(args.output, "wb", template=inf)
+    print("Reading " + args.bam)
 
     count = 0
     for read in inf:
@@ -66,6 +68,7 @@ def add_cellranger_tags(args, gene_name_dict):
         read.set_tag("UY", 'F' * len(umi), value_type='Z')
         outf.write(read)
     outf.close()
+    print("Saved to " + args.output)
 
 
 def main():
