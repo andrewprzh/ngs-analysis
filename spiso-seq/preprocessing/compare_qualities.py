@@ -6,9 +6,10 @@ from traceback import print_exc
 
 
 def process_bam(bam, split_id=False):
+    print("Reading " + bam)
     q_dict = {}
     for a in pysam.AlignmentFile(bam, "rb"):
-        if not a.is_primary:
+        if a.is_secondary or a.is_supplementary:
             continue
         read_id = a.query_name
         if split_id:
@@ -19,6 +20,7 @@ def process_bam(bam, split_id=False):
         except KeyError:
             dpas = -1
         q_dict[read_id] = [mapq, dpas]
+    print("Read %d alignments" % len(q_dict))
     return q_dict
 
 
@@ -27,8 +29,8 @@ def process_bam_pair(raw_bam, corr_bam):
     corr_qdict = process_bam(corr_bam, split_id=True)
     corrected_reads = 0
     dropped_reads = 0
-    for read_id in corr_qdict:
-        if read_id in raw_qdict:
+    for read_id in raw_qdict:
+        if read_id in corr_qdict:
             corr_qdict[read_id] += raw_qdict[read_id]
             corrected_reads +=1
         else:
@@ -58,15 +60,21 @@ def main():
             t = l.strip().split()
             if len(t) == 2:
                 file_pairs.append((t[0], t[1]))
+            elif len(t) == 3:
+                file_pairs.append((t[0], t[1], t[2]))
+
     else:
         file_pairs = [(args.rawbam, args.corrbam)]
 
-    for pair in file_pairs:
-        print("Processing pair[0]")
+    for i, pair in enumerate(file_pairs):
+        print("Processing " + pair[0])
         qdict, corrected_reads, dropped_reads = process_bam_pair(pair[0], pair[1])
         print("Corrected reads %d, dropped %d" % (corrected_reads, dropped_reads))
+        outname = str(i + 1)
+        if len(pair) == 3:
+            outname = pair[2]
 
-        with open(os.path.join(args.output, os.path.basename(pair[0]) + ".qualities.tsv")) as outf:
+        with open(os.path.join(args.output, outname + ".qualities.tsv"), "w") as outf:
             for read_id in qdict:
                 outf.write("\t".join([read_id] + list(map(str, qdict[read_id]))) + "\n")
 
