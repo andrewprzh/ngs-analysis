@@ -64,6 +64,7 @@ def add_cellranger_tags(args, gene_name_dict):
         read.set_tag("CR", barcode, value_type='Z')
         read.set_tag("CY", 'F' * len(barcode), value_type='Z')
         read.set_tag("CB", barcode + '-1', value_type='Z')
+        read.set_tag("UB", umi, value_type='Z')
         read.set_tag("UR", umi, value_type='Z')
         read.set_tag("UY", 'F' * len(umi), value_type='Z')
         outf.write(read)
