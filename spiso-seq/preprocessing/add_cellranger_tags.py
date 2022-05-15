@@ -10,7 +10,13 @@ import sys
 import argparse
 import pysam
 import gffutils
+from Bio import Seq
 from traceback import print_exc
+import random
+
+
+nucls = ['A', 'C', 'G', 'T']
+
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
@@ -68,6 +74,13 @@ def add_cellranger_tags(args, gene_name_dict):
         read.set_tag("UR", umi, value_type='Z')
         read.set_tag("UY", 'F' * len(umi), value_type='Z')
         outf.write(read)
+        for i in range(3):
+            fake_umi = ""
+            for j in range(len(umi)):
+                fake_umi += nucls[random.randint(0, 3)]
+            read.set_tag("UB", fake_umi, value_type='Z')
+            read.set_tag("UR", fake_umi, value_type='Z')
+            outf.write(read)
     outf.close()
     print("Saved to " + args.output)
 
