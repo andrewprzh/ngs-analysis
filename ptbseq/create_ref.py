@@ -41,8 +41,8 @@ def generate_sequence(tsv_entry, column, head_seq, tail_seq):
     header = "_".join(tsv_entry[:column] + tsv_entry[column+1:])
     gene_id = "GENE_" + header
     t_id = "TRANSCRIPT_" + header
-    start = len(head_seq) - 50
-    end = len(head_seq) + len(tsv_entry[column]) + 50
+    start = len(head_seq) - 10
+    end = len(head_seq) + len(tsv_entry[column]) + 10
     gtf_gene = "\t".join([header, "GuideRNA", "gene", str(start), str(end), ".", "+", ".", 'gene_id "' + gene_id + '";'])
     gtf_transcript = "\t".join([header, "GuideRNA", "transcript", str(start), str(end), ".", "+", ".",
                                 'gene_id "' + gene_id + '"; transcript_id "' + t_id + '";'])
