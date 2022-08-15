@@ -20,9 +20,6 @@ def parse_args():
     required_group.add_argument("--gffcompare", "-g", help="gffcompare tracking file", type=str, required=True)
     args = parser.parse_args()
 
-    if args.bam is None:
-        parser.print_help()
-        exit(-1)
     return args
 
 
@@ -47,6 +44,8 @@ def parse_gffcompare(tracking_file):
     partial_transcripts = set()
     unmapped_transcripts = set()
     for l in open(tracking_file):
+        if l.find('|2|') == -1:
+            continue
         #TCONS_00000005  XLOC_000004     ENSMUSG00000054493.3|ENSMUST00000067599.2       =       q1:novel_gene_chr1_132|transcript_131.chr1.nnic|1|0.000000|0.000000|0.000000|2920
         v = l.strip().split('\t')
         status = v[3]
@@ -61,8 +60,12 @@ def parse_gffcompare(tracking_file):
 
 
 def make_hist(qmap, id_set):
-    values = [qmap[t_id] for t_id in id_set]
-    bins = [i * 5 for i in range(0, 13)]
+    values = []
+    for t_id in id_set:
+        if t_id in qmap:
+            values.append(qmap[t_id])
+
+    bins = [i * 2 for i in range(0, 31)]
     hist, bin_edges = numpy.histogram(values, bins)
     return hist
 
