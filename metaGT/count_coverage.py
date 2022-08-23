@@ -18,11 +18,8 @@ MAX_OVERLAP = 0.2
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--bam", "-b", type=str, help="BAM file to assess")
+    parser.add_argument("--bam", "-b", type=str, help="SAM/BAM file to assess", required=True)
     args = parser.parse_args()
-    if not args.isoquant_prefix or not args.gffcompare_tracking or not args.genedb or not args.isoquantdb:
-        parser.print_usage()
-        exit(-1)
     return args
 
 
@@ -102,14 +99,20 @@ def count_misassemblies(samf):
         if len(alignment_dict[contig_name]) == 1:
             continue
         candidates += 1
+#        print("Candidate: %s" % contig_name)
         if is_misassembled(alignment_dict[contig_name]):
             misassemblies += 1
+#            print("misassembled")
 
     print("Candidates: %d, misassemblies %d" % (candidates, misassemblies))
 
 def main():
     args = parse_args()
-    count_coverage(pysam.AlignmentFile(args.bam, "r"))
+    samf = pysam.AlignmentFile(args.bam, "r")
+    count_coverage(samf)
+    samf = pysam.AlignmentFile(args.bam, "r")
+    count_misassemblies(samf)
+
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
