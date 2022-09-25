@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 ############################################################################
-# Copyright (c) 2020 Saint Petersburg State University
+# Copyright (c) 2022 Saint Petersburg State University
 # # All Rights Reserved
 # See file LICENSE for details.
 ############################################################################
@@ -14,6 +14,7 @@ from collections import defaultdict
 
 COVERAGE_PERCENT = 0.95
 MAX_OVERLAP = 0.2
+MIN_DISTANCE = 1000
 
 
 def parse_args():
@@ -77,9 +78,13 @@ def is_misassembled(alignment_list):
     for a in alignment_list:
         if not a.is_supplementary:
             continue
-        if primary_alignment.reference_name != a.reference_name and \
-                overlap_fraction((primary_alignment.query_alignment_start, primary_alignment.query_alignment_end),
-                                 (a.query_alignment_start, a.query_alignment_end)) <= MAX_OVERLAP:
+        ovlp = overlap_fraction((primary_alignment.query_alignment_start, primary_alignment.query_alignment_end),
+                                 (a.query_alignment_start, a.query_alignment_end))
+        dist_diff = abs(abs(primary_alignment.reference_start-a.reference_start) -
+                        abs(primary_alignment.query_alignment_start-a.query_alignment_start))
+        if ovlp <= MAX_OVERLAP and (primary_alignment.reference_name != a.reference_name or dist_diff >= MIN_DISTANCE):
+            #print(primary_alignment.reference_start,a.reference_start)
+            #print(primary_alignment.query_alignment_start,a.query_alignment_start)
             return True
 
     return False
@@ -102,14 +107,12 @@ def count_misassemblies(samf):
 #
         if is_misassembled(alignment_dict[contig_name]):
             misassemblies += 1
-            # print("Misassembly: %s: %s" % (contig_name, str([a.reference_name for a in alignment_dict[contig_name]])))
+            print("Misassembly: %s: %s" % (contig_name, str([a.reference_name for a in alignment_dict[contig_name]])))
 
     print("Candidates: %d, misassemblies %d" % (candidates, misassemblies))
 
 def main():
     args = parse_args()
-    samf = pysam.AlignmentFile(args.bam, "r")
-    count_coverage(samf)
     samf = pysam.AlignmentFile(args.bam, "r")
     count_misassemblies(samf)
 
