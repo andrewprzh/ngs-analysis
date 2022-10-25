@@ -55,7 +55,6 @@ def count_gene(gene_dict):
     print(sum(gene_counts_filt.values()))
 
 
-
 umi_dict, gene_dict = read_barcodes(sys.argv[1], "CROP")
-
+count_barcode_stats(umi_dict)
 
