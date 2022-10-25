@@ -5,9 +5,9 @@ library(plyr)
 library(parallel)
 
 # args <- commandArgs(trailing=TRUE)
-bcFile <- "barcodes.tsv"  # make sure no -1 is there!
-h5File <- "./NovaPertrubseqShortMay/outs/molecule_info.h5"
-outName <- "short_gene/out"
+bcFile <- "./NovaPertrubseqShort10June/outs/raw_feature_bc_matrix/barcodes.tsv"  # make sure no -1 is there!
+h5File <- "./NovaPertrubseqShort10June/outs/molecule_info.h5"
+outName <- "short_gene10/raw/BC_UMI_gene"
 
 bc <- read.table(bcFile)
 
@@ -38,7 +38,7 @@ twoBit_toSeq <- function(deci,uLen){
 }
 
 
-par_umis <- unlist(mclapply(molecule_df$umi, function(umi) twoBit_toSeq(umi,12),mc.cores=12))
+par_umis <- unlist(mclapply(molecule_df$umi, function(umi) twoBit_toSeq(umi,12),mc.cores=16))
 
 molecule_df$UMI <- par_umis
 
