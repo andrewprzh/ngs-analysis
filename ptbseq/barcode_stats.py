@@ -22,9 +22,10 @@ def read_barcodes(inf_name, gene_prefix=""):
 
 def count_barcode_stats(umi_dict):
     umi_counts = [len(x) for x in umi_dict.values()]
-    bins = [i * 1000 for i in range(200)]
+    bins = [i * 1000 for i in range(200)] + [10000000]
     hist = numpy.histogram(umi_counts, bins=bins)
-    print(hist[1])
+    print(hist)
+    print(sum(hist[0]))
 
 
 def count_gene_stats(gene_dict):
