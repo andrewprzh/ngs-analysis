@@ -36,7 +36,7 @@ def count_bams(bam_files, no_secondary=False):
         for a in pysam.AlignmentFile(bam, "r"):
             if a.is_unmapped:
                 continue
-            if not no_secondary and (a.is_secondary or a.is_supplementary):
+            if no_secondary and (a.is_secondary or a.is_supplementary):
                 continue
 
             if a.reference_name not in count_dict:
@@ -69,8 +69,8 @@ def main():
             filtered_seq_records.append(seq)
     out_tsv.close()
 
-    SeqIO.write(seq_records, os.path.join(args.output, args.prefix + ".expressed.fastq"), "fasta")
-    SeqIO.write(filtered_seq_records, os.path.join(args.output, args.prefix + ".expressed10.fastq"), "fasta")
+    SeqIO.write(seq_records, os.path.join(args.output, args.prefix + ".expressed.fasta"), "fasta")
+    SeqIO.write(filtered_seq_records, os.path.join(args.output, args.prefix + ".expressed10.fasta"), "fasta")
 
 
 if __name__ == "__main__":
