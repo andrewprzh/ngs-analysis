@@ -64,7 +64,7 @@ def intersection_len(range1, range2):
 class GuideCaller:
     def __init__(self, args):
         self.args = args
-        self.minimal_overlap=10
+        self.minimal_overlap=20
         self.max_mismatches=0
         self.max_indels=0
         self.min_count=2
@@ -122,7 +122,7 @@ class GuideCaller:
         barcode_umis = defaultdict(set)
         barcode_counts = defaultdict(int)
         for a in in_bam.fetch(guide_id):
-            if a.is_supplementary or a.is_secondary:
+            if a.is_supplementary: # or a.is_secondary:
                 continue
 
             if self.check_alignment and not self.verify_alignment(a, reference_sequence):
@@ -167,8 +167,15 @@ class GuideCaller:
         for k in dict_with_counts.keys():
             counts[len(dict_with_counts[k])] += 1
         print("# distinct %s\t# %s" % (value_label, key_label))
-        for k in sorted(counts.keys()):
-            print("%d\t%d" % (k, counts[k]))
+        for k in range(max(counts.keys()) + 1):
+            v = 0 if k not in counts else counts[k]
+            print("%d\t%d" % (k, v))
+
+    def print_barcode_dict(self, barcode_to_guide, outf):
+        with open(outf, "w") as output_file:
+            for bc in sorted(barcode_to_guide.keys()):
+                for guide in barcode_to_guide[bc]:
+                    output_file.write("%s\t%s\n" % (bc, guide[0]))
 
     def collect_barcodes(self):
         barcode_to_guide = defaultdict(set)
@@ -184,9 +191,11 @@ class GuideCaller:
 
         print("Unfiltered barcodes: %d" % len(barcode_to_guide))
         self.dict_stats(barcode_to_guide)
+        self.print_barcode_dict(barcode_to_guide, self.args.output + ".raw.tsv")
         filtered_barcode_to_guide = self.filter_barcodes(barcode_to_guide)
         print("Filtered barcodes: %d" % len(filtered_barcode_to_guide))
         self.dict_stats(filtered_barcode_to_guide)
+        self.print_barcode_dict(filtered_barcode_to_guide, self.args.output + ".filtered.tsv")
 
         guide_to_barcode = self.reverse_map(barcode_to_guide)
         print("Unfiltered guides: %d" % len(guide_to_barcode))
