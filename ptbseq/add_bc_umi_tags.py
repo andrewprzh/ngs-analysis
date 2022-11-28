@@ -42,9 +42,10 @@ def load_barcodes(args):
     read_bc_umi = {}
     print("Loading " + args.bam)
     bam_reads = set()
-    for a in pysam.AlignmentFile(sys.argv[1], "r"):
+    for a in pysam.AlignmentFile(args.bam, "r"):
         bam_reads.add(a.query_name)
 
+    print("Loading " + args.tsv)
     min_cols = max([args.read_id_column, args.barcode_column, args.umi_column]) + 1
     for l in open(args.tsv):
         v = l.strip().split('\t')
@@ -65,15 +66,16 @@ def add_barcode_tags(args, read_bc_umi):
     print("Reading " + args.bam)
 
     count = 0
+    w_bc = 0
     for read in inf:
         count += 1
         if count % 100000 == 0:
             sys.stdout.write("Processed " + str(count) + " reads\r")
 
         read_id = read.query_name
-        if read_id not in bc_umi_pair:
-            print("Missing read" + read_id)
+        if read_id not in read_bc_umi:
             continue
+        w_bc += 1
         bc_umi_pair = read_bc_umi[read_id]
         barcode = bc_umi_pair[0]
         umi = bc_umi_pair[1]
@@ -89,6 +91,7 @@ def add_barcode_tags(args, read_bc_umi):
         outf.write(read)
 
     outf.close()
+    print("Total reads %d, with barcodes %d" % (count, w_bc))
     print("Saved to " + args.output)
 
 
