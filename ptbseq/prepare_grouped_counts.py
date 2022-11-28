@@ -20,7 +20,7 @@ from Bio import SeqIO
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--output", "-o", type=str, help="output prefix name", default="guides_output")
+    parser.add_argument("--output", "-o", type=str, help="output prefix name", required=True)
     parser.add_argument("--grouped_exon_counts", "-e", type=str, help="IsoQuant barcode grouped exon counts")
     parser.add_argument("--grouped_transcript_counts", "-t", type=str, help="IsoQuant barcode grouped isoform counts")
     parser.add_argument("--guide_info", "-g", type=str, help="Table with guides / factors", required=True)
@@ -66,9 +66,10 @@ def convert_exon_counts(exon_counts, barcode_dict, output_file):
         barcode = v[6]
         inc_count = int(v[7])
         exc_count = int(v[8])
-        if barcode in barcode_dict:
+        total_count = inc_count + exc_count
+        if barcode in barcode_dict and total_count > 0:
             group = barcode_dict[barcode]
-            outf.write("%s\t%d\t%d\t%d\t%s\n" % (exon_id, inc_count, exc_count, inc_count + exc_count, group))
+            outf.write("%s\t%d\t%d\t%d\t%s\n" % (exon_id, inc_count, exc_count, total_count, group))
     outf.close()
 
 
@@ -92,10 +93,23 @@ def convert_isoform_counts(isoform_counts, barcode_dict, output_file):
                 outf.write("%s\t%.2f\t%s\n" % (isoform_id, values[i], group))
     outf.close()
 
+
+def print_dict(barcode_dict, output_file):
+    outf = open(output_file, "w")
+    for bc in sorted(barcode_dict.keys()):
+        outf.write("%s\t%s\n" % (bc, barcode_dict[bc]))
+    outf.close()
+
+
 def main():
     #set_logger(logger)
     args = parse_args()
-
+    barcode_dict = parse_barcode_table(args.guide_info, args.guide_columns, args.barcode2guide)
+    print_dict(barcode_dict, args.output + ".groups.tsv")
+    if args.grouped_exon_counts:
+        convert_exon_counts(args.grouped_exon_counts, barcode_dict, args.output + ".exon_counts.tsv")
+    if args.grouped_transcript_counts:
+        convert_isoform_counts(args.grouped_transcript_counts, barcode_dict, args.output + ".transcript_counts.tsv")
 
 
 if __name__ == "__main__":
