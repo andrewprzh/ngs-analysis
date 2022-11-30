@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument("--grouped_exon_counts", "-e", type=str, help="IsoQuant barcode grouped exon counts")
     parser.add_argument("--grouped_transcript_counts", "-t", type=str, help="IsoQuant barcode grouped isoform counts")
     parser.add_argument("--guide_info", "-g", type=str, help="Table with guides / factors", required=True)
-    parser.add_argument("--guide_columns", type=str, help="comma-separated guide columns, first one is the guide column", default="1,4,2")
+    parser.add_argument("--guide_columns", type=str, help="comma-separated guide columns, first one is the guide column", default="0,3,1")
     parser.add_argument("--barcode2guide", "-b", type=str, help="Table with barcodes and guides", required=True)
 
     args = parser.parse_args()
@@ -34,6 +34,7 @@ def parse_args():
 def parse_barcode_table(guides, barcodes, columns):
     cols = list(map(int, columns.split(',')))
     guide_column = cols[0]
+    print(cols)
     min_cols = max(cols)
     cols = cols[1:]
     guide_dict = {}
@@ -104,7 +105,7 @@ def print_dict(barcode_dict, output_file):
 def main():
     #set_logger(logger)
     args = parse_args()
-    barcode_dict = parse_barcode_table(args.guide_info, args.guide_columns, args.barcode2guide)
+    barcode_dict = parse_barcode_table(args.guide_info, args.barcode2guide, args.guide_columns)
     print_dict(barcode_dict, args.output + ".groups.tsv")
     if args.grouped_exon_counts:
         convert_exon_counts(args.grouped_exon_counts, barcode_dict, args.output + ".exon_counts.tsv")
