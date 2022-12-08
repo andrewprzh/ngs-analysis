@@ -156,10 +156,7 @@ class GuideCaller:
                 print("Detected wrongly mapped guide %s, %s, %s" % (guide_seq, barcode, umi))
                 wrongly_mapped_guides[(guide_dict[guide_seq], barcode)].add(umi)
 
-        #print(barcode_umis)
-        for bc in barcode_umis.keys():
-            barcode_counts[bc] += len(barcode_umis[bc])
-        return barcode_counts, wrongly_mapped_guides
+        return barcode_umis, wrongly_mapped_guides
 
     def filter_barcodes(self, barcode_to_guide):
         filtered_barcode_to_guide = defaultdict(set)
@@ -195,7 +192,8 @@ class GuideCaller:
         with open(outf, "w") as output_file:
             for bc in sorted(barcode_to_guide.keys()):
                 for guide in barcode_to_guide[bc]:
-                    output_file.write("%s\t%s\n" % (bc, guide[0]))
+                    for umi in guide[2]:
+                        output_file.write("%s\t%s\t%s\n" % (guide[0], bc, umi))
 
     def collect_barcodes(self):
         barcode_to_guide = defaultdict(set)
@@ -204,15 +202,15 @@ class GuideCaller:
         in_bam = pysam.AlignmentFile(self.args.bam, "rb")
 
         for ref_id in full_ref_sequences.keys():
-            barcode_counts, wrongly_mapped_guides = self.get_guide_barcodes(in_bam, ref_id, full_ref_sequences[ref_id], guide_dict)
-            for bc in barcode_counts.keys():
-                count = barcode_counts[bc]
-                barcode_to_guide[bc].add((ref_id, count))
+            barcode_umis, wrongly_mapped_guides = self.get_guide_barcodes(in_bam, ref_id, full_ref_sequences[ref_id], guide_dict)
+            for bc in barcode_umis.keys():
+                count = len(barcode_umis[bc])
+                barcode_to_guide[bc].add((ref_id, count, tuple(barcode_umis[bc])))
             for guide_bc_pair in wrongly_mapped_guides.keys():
                 count = len(wrongly_mapped_guides[guide_bc_pair])
-                barcode_to_guide[guide_bc_pair[1]].add((guide_bc_pair[0], count))
-        for k in sorted(barcode_to_guide.keys()):
-            print(k, barcode_to_guide[k])
+                barcode_to_guide[guide_bc_pair[1]].add((guide_bc_pair[0], count, tuple(wrongly_mapped_guides[guide_bc_pair])))
+        #for k in sorted(barcode_to_guide.keys()):
+        #    print(k, barcode_to_guide[k])
 
         print("Unfiltered barcodes: %d" % len(barcode_to_guide))
         self.dict_stats(barcode_to_guide)
