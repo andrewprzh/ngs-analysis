@@ -121,8 +121,8 @@ class IntronCountIterator:
 
 def process_chromosome(genedb, chrid, iterator_list, donor_outf, acc_outf):
     alt_donor_dict, alt_acceptor_dict, intron_to_gene_dict = detect_alt_introns(genedb, chrid)
-    print(alt_donor_dict)
-    print(alt_acceptor_dict)
+    #print(alt_donor_dict)
+    #print(alt_acceptor_dict)
     alt_donor_counts = {}
     alt_acceptor_counts = {}
     n_samples = len(iterator_list)
@@ -184,7 +184,7 @@ def main():
         else:
             assert current_chrid == iterator_list[-1].next()[0]
 
-    print(sample_list)
+    # print(sample_list)
     donor_outf = open(args.output + "_alt_donors.tsv", "w")
     acc_outf = open(args.output + "_alt_acceptors.tsv", "w")
     header = "#chrid\tgroup\tgene\tdonor\tacceptor\tstrand\t%s\n" % "\t".join(sample_list)
