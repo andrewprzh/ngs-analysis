@@ -80,6 +80,11 @@ def is_misassembled(alignment_list):
         if primary_alignment.reference_name != a.reference_name and \
                 overlap_fraction((primary_alignment.query_alignment_start, primary_alignment.query_alignment_end),
                                  (a.query_alignment_start, a.query_alignment_end)) <= MAX_OVERLAP:
+            if min(abs(primary_alignment.query_alignment_start - primary_alignment.query_alignment_end), abs(a.query_alignment_start - a.query_alignment_end)) < 200:
+                return False
+            print("Misassemble: %s" % a.query_name)
+            print("%s: %d - %d" % (primary_alignment.reference_name, primary_alignment.query_alignment_start, primary_alignment.query_alignment_end))
+            print("%s: %d - %d" % (a.reference_name, a.query_alignment_start, a.query_alignment_end))
             return True
 
     return False
