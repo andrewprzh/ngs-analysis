@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
-#
+############################################################################
+# Copyright (c) 2023 University of Helsinki
+# # All Rights Reserved
+# See file LICENSE for details.
+# Author: Andrey Prjibelski
+############################################################################
 
+import argparse
 import os
 import sys
 import psutil
@@ -9,6 +15,27 @@ from traceback import print_exc
 from time import time
 from time import sleep
 from collections import defaultdict
+from threading import Thread
+from threading import Event
+from datetime import datetime
+
+
+task_over = Event()
+
+
+def to_gb(val):
+    return float(val) / float(1024 * 1024 * 1024)
+
+
+def human_readable_time(time_secs):
+    time_secs = int(time_secs)
+    h = time_secs // 3600
+    remain_secs = time_secs - h * 3600
+    m = remain_secs // 60
+    s = remain_secs % 60
+    m_prefix = "0" if m < 10 else ""
+    s_prefix = "0" if s < 10 else ""
+    return "%d:%s%d:%s%d" % (h, m_prefix, m, s_prefix, s)
 
 
 def get_current_stats(pids):
@@ -35,23 +62,19 @@ def get_children(pid):
     return pids
 
 
-def main():
-    if sys.argv[0].startswith("python"):
-        cmd = sys.argv[2:]
-    else:
-        cmd = sys.argv[1:]
-
-    outf = open("performance_stats.tsv", "w")
+def track_ram_and_cpu(task_subprocess, interval, outfile):
+    outf = open(outfile, "w")
     outf.write("Time\tRSS\tVMS\tCPU %\n")
-    launched = subprocess.Popen(cmd, shell=False)
-    main_pid = launched.pid
-    main_proc = psutil.Process(main_pid)
-    all_pids = {main_pid : main_proc}
+
+    task_pid = task_subprocess.pid
+    task_process_obj = psutil.Process(task_pid)
+    all_pids = {task_pid : task_process_obj}
     start_time = time()
     max_rss = 0
     cpu_times = defaultdict(float)
-    while main_proc.status() != 'zombie':
-        children_pids = get_children(main_pid)
+
+    while task_process_obj.status() != 'zombie':
+        children_pids = get_children(task_pid)
         for child in children_pids:
             if child not in all_pids:
                 all_pids[child] = psutil.Process(child)
@@ -64,11 +87,69 @@ def main():
                 cpu_times[p] = max(cpu_times[p], all_pids[p].cpu_times().user)
             except psutil.NoSuchProcess:
                 pass
-        sleep(1)
+        sleep(interval)
 
     outf.close()
     cpu_time = sum(cpu_times.values())
-    print("Max RSS: %d, CPU time: %d, wall clock time: %d" % (max_rss, cpu_time, time() - start_time))
+    print("Max RSS: %.3f GB\n CPU time: %s\n Wall clock time: %s" % (to_gb(max_rss),
+                                                                     human_readable_time(cpu_time),
+                                                                     human_readable_time(time() - start_time)))
+
+
+def track_disk_usage(folder, interval, outfile):
+    outf = open(outfile, "w")
+    outf.write("time\tdisk\n")
+    start_time = time()
+    max_usage = 0
+    while not task_over.is_set():
+        disk_usage = int(subprocess.check_output(['du', '-s', folder]).split()[0].decode('utf-8'))
+        current_time = time() - start_time
+        max_usage =max(max_usage, disk_usage)
+        outf.write("%d\t%d\n" % (current_time, disk_usage))
+        sleep(interval)
+    print("Maximum disk space taken: %.3f GB" % to_gb(max_usage))
+    outf.close()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description="A tiny util for measuring RAM, CPU and disk consumption. "
+                                                 "All children processes will be taken into account and summed up.")
+    parser.add_argument("--cmd", "-c", required=True, help="command line to execute (from current dir); "
+                                                           "~ alias for $HOME is not supported", type=str)
+    parser.add_argument("--interval", "-i", help="time interval between measurements (seconds)", type=int, default=2)
+    parser.add_argument("--out_dir", help="command line output folder to monitor disk usage; "
+                                          "will not be monitored if not set; "
+                                          "note, that disk monitoring may affect perfromance", type=str)
+    parser.add_argument("--disk_interval", help="time interval between disk measurements (seconds)", type=int, default=10)
+    parser.add_argument("--output", "-o", help="output folder, default performance_stats/YYYY_MM_DD_HH_MM_SS/", type=str)
+    args = parser.parse_args()
+
+    return args
+
+
+def main():
+    args = parse_args()
+    cmd = args.cmd.split()
+    if not args.output:
+        args.output = "performance_stats/" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+
+    thread = None
+    if args.out_dir:
+        disk_stat_file = os.path.join(args.output, "disk_usage.tsv")
+        thread = Thread(target=track_disk_usage, args=(args.out_dir, args.disk_interval, disk_stat_file))
+        thread.start()
+
+    task_subprocess = subprocess.Popen(cmd, shell=False)
+    ram_cpu_stat_file = os.path.join(args.output, "ram_cpu_usage.tsv")
+    track_ram_and_cpu(task_subprocess, args.interval, ram_cpu_stat_file)
+
+    task_over.set()
+    if thread:
+        thread.join()
 
 
 if __name__ == "__main__":
