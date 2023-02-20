@@ -4,3 +4,6 @@
 /Bmo/prjbel/tools/cellranger-6.1.2/cellranger count --id="NovaPertrubseqShort10June" --transcriptome="/Bmo/prjbel/RNA_10x/data/pertur
 bseq/ref/GRCh38.chr.plus_CROPseq_guide_short10" --fastqs="/Bmo/prjbel/RNA_10x/data/perturbseq/novaseq/CRISPR_SF_Perturbseq_shortread_02222022/Tilgner-JJ-11914_2022_02_15/" --sample=CRISPR_SF_Perturb --expe
 ct-cells=8000 --localcores=16 --localmem=100
+
+library(scisorseqr)
+GetBarcodes('/Bmo/prjbel/RNA_10x/data/perturbseq/fastq_pass/','/Bmo/prjbel/RNA_10x/analysis/perturbseq/barcode_calling/BC_UMI_gene.tsv', concatenate=FALSE,   filterReads=TRUE, chemistry="v3", numProcesses=6, outputFolder="/Bmo/prjbel/RNA_10x/analysis/perturbseq/barcode_calling/scisorseqR/ONT.FullRun.v3/")
