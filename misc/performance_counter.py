@@ -137,6 +137,9 @@ def main():
     if not os.path.exists(args.output):
         os.makedirs(args.output)
 
+    with open(os.path.join(args.output, "command.txt"), "w") as cmd_file:
+        cmd_file.write(args.cmd + "\n")
+
     thread = None
     if args.out_dir:
         disk_stat_file = os.path.join(args.output, "disk_usage.tsv")
