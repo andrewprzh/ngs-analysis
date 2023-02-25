@@ -38,6 +38,11 @@ def filter_reads(in_file_name, out_file_name, read_set):
 
 
 if len(sys.argv) < 3:
-    print("Usage: " + sys.argv[0] + " <input.bam> <read list>")
+    print("Usage: " + sys.argv[0] + " <input.bam> <read list> [suffix]")
     exit(0)
-filter_reads(sys.argv[1], os.path.splitext(sys.argv[1])[0] + ".filtered.bam", read_reads(sys.argv[2]))
+
+if len(sys.argv) == 4:
+    suffix = "." + sys.argv[3]
+else:
+    suffix = ""
+filter_reads(sys.argv[1], os.path.splitext(sys.argv[1])[0] + ".filtered" + suffix + ".bam", read_reads(sys.argv[2]))
