@@ -7,7 +7,7 @@ whitelist = sys.argv[3]
 
 whitelist_set = set()
 for l in open(whitelist):
-    whitelist_set.add(l.split()[0])
+    whitelist_set.add(l.split()[1])
 
 for l in open(inf):
     if l.startswith("read_id,"):
