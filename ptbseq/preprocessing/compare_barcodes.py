@@ -3,7 +3,7 @@ def load_dict(inf):
     bc_dict = {}
     for l in open(inf):
         v = l.strip().split('\t')
-        if len(v) != 2:
+        if len(v) < 2:
             continue
         bc_dict[v[0]] = v[1]
     return bc_dict
