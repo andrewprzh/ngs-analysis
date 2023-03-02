@@ -310,7 +310,7 @@ def chunkAndProcess(args,d,tooShort):
         for _ in zip(range(startLine), f):
             pass
         for lineno, line in enumerate(f, start = startLine):
-            if lineno % 100 == 0:
+            if lineno % 10000 == 0:
                 print("Processed %d\r" % lineno)
             if lineno < startLine + (toFork * 4):
                 if lineno % step == 0:
