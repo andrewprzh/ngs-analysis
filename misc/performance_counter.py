@@ -91,12 +91,12 @@ def track_ram_and_cpu(task_subprocess, interval, outfile):
 
     outf.close()
     cpu_time = sum(cpu_times.values())
-    print("Max RSS: %.3f GB\n CPU time: %s\n Wall clock time: %s" % (to_gb(max_rss),
-                                                                     human_readable_time(cpu_time),
-                                                                     human_readable_time(time() - start_time)))
+    return "Max RSS: %.3f GB\n CPU time: %s\n Wall clock time: %s" % (to_gb(max_rss),
+                                                                      human_readable_time(cpu_time),
+                                                                      human_readable_time(time() - start_time))
 
 
-def track_disk_usage(folder, interval, outfile):
+def track_disk_usage(folder, interval, outfile, res_stats):
     outf = open(outfile, "w")
     outf.write("time\tdisk\n")
     start_time = time()
@@ -107,8 +107,8 @@ def track_disk_usage(folder, interval, outfile):
         max_usage =max(max_usage, disk_usage)
         outf.write("%d\t%d\n" % (current_time, disk_usage))
         sleep(interval)
-    print("Maximum disk space taken: %.3f GB" % to_gb(max_usage))
     outf.close()
+    res_stats = "Maximum disk space taken: %.3f GB" % to_gb(max_usage)
 
 
 def parse_args():
@@ -141,18 +141,25 @@ def main():
         cmd_file.write(args.cmd + "\n")
 
     thread = None
+    disk_stats = ""
     if args.out_dir:
         disk_stat_file = os.path.join(args.output, "disk_usage.tsv")
-        thread = Thread(target=track_disk_usage, args=(args.out_dir, args.disk_interval, disk_stat_file))
+        thread = Thread(target=track_disk_usage, args=(args.out_dir, args.disk_interval, disk_stat_file, disk_stats))
         thread.start()
 
     task_subprocess = subprocess.Popen(cmd, shell=False)
     ram_cpu_stat_file = os.path.join(args.output, "ram_cpu_usage.tsv")
-    track_ram_and_cpu(task_subprocess, args.interval, ram_cpu_stat_file)
+    res_stats = track_ram_and_cpu(task_subprocess, args.interval, ram_cpu_stat_file)
 
     task_over.set()
     if thread:
         thread.join()
+
+    print(res_stats)
+    print(disk_stats)
+    with open(os.path.join(args.output, "stats.txt"), "w") as stat_file:
+        stat_file.write(res_stats + "\n")
+        stat_file.write(disk_stats + "\n")
 
 
 if __name__ == "__main__":
