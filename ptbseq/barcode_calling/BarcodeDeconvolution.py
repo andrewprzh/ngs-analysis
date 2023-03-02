@@ -25,7 +25,7 @@ def BC_scan(barcodes,start_scan,end_scan,seq):  ## Given start and end position 
     bc_dict = {}
     for i in range(start_scan, end_scan):
         bc_dict[seq[i:i+16]] = i
-    bc_intersect = list(set(bc_dict.keys()).intersection(barcodes.keys()))
+    bc_intersect = barcodes_set.intersection(bc_dict.keys())
     if bc_intersect:
         ## allow for possibility of multiple barcodes matching
         bc_pos = [bc_dict[element] for element in bc_intersect]
@@ -72,6 +72,7 @@ def TSODetectRev(revEnd_seq):   ## If it was actually the reverse strand then it
 
 def prelim(args):
     global barcodes
+    global barcodes_set
     global umiLength
 
     file_name = re.split('/|.fq.gz|.fastq.gz',args.fq)[-2]
@@ -91,6 +92,7 @@ def prelim(args):
     for l in open(bc_file):
       v = l.strip().split('\t')
       barcodes[v[0]] = v[1]
+    barcodes_set = set(barcodes.keys())
 
     if args.chemistry == "v2":
       umiLength = 10
