@@ -18,8 +18,8 @@ for line in inFile:
     if gene == '.':
         continue
 
-    cell = lineCols[3]
-    umi = lineCols[4]
+    cell = lineCols[2]
+    umi = lineCols[3]
     triplet = (gene, cell, umi)
     readDict[triplet] = lineCols[0]
     if triplet not in tripletDict:

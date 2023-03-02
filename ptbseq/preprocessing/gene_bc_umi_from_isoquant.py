@@ -14,7 +14,8 @@ for l in open(sys.argv[2]):
         continue
     read_id = v[0]
     if read_id in read_bc_umi:
+        print("%s\t%s\t%s\t%s" % (read_id, v[3], read_bc_umi[read_id][0], read_bc_umi[read_id][1]))
         bc_umi_gene.add((v[3], read_bc_umi[read_id][0], read_bc_umi[read_id][1]))
 
-for t in bc_umi_gene:
-    print("%s\t%s\t%s" % t)
+#for t in bc_umi_gene:
+#    print("%s\t%s\t%s" % t)
