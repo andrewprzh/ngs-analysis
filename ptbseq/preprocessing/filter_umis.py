@@ -6,8 +6,8 @@ inFilename = sys.argv[1]
 outFilename = sys.argv[2]
 distCutoff = int(sys.argv[3])
 
-inFile = gzip.open(inFilename, 'rt')
-outFile = gzip.open(outFilename, 'w+t')
+inFile = open(inFilename, 'r')
+outFile = open(outFilename, 'w')
 
 tripletDict = dict()   # triplet of gene, barcode combo (ie cell), UMI
 readDict = dict()
