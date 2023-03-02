@@ -9,6 +9,9 @@ for l in open(sys.argv[1]):
 
 bc_umi_gene = set()
 for l in open(sys.argv[2]):
+    if l.startswith('#'):
+        continue
+
     v = l.strip().split('\t')
     if v[3] == '.':
         continue
@@ -19,3 +22,4 @@ for l in open(sys.argv[2]):
 
 #for t in bc_umi_gene:
 #    print("%s\t%s\t%s" % t)
+
