@@ -8,9 +8,9 @@ def read_barcodes(inf_name, gene_prefix=""):
     gene_dict = defaultdict(lambda: defaultdict(set))
     for l in open(inf_name):
         v = l.strip().split('\t')
-        umi = v[2]
-        bc = v[3]
-        gene_id = v[4]
+        umi = v[3]
+        bc = v[2]
+        gene_id = v[1]
         umi_dict[bc].add(umi)
 
         if gene_prefix and not gene_id.startswith(gene_prefix):
@@ -22,7 +22,7 @@ def read_barcodes(inf_name, gene_prefix=""):
 
 def count_barcode_stats(umi_dict):
     umi_counts = [len(x) for x in umi_dict.values()]
-    bins = [i * 1000 for i in range(200)] + [10000000]
+    bins = [i * 100 for i in range(200)] + [10000000]
     hist = numpy.histogram(umi_counts, bins=bins)
     for i, count in enumerate(hist[0]):
         print("%d\t%d" % ((hist[1][i] + hist[1][i + 1]) / 2, count))
