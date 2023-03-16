@@ -35,11 +35,16 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output prefix name", default="guides_output")
     parser.add_argument("--guide_ref", "-g", type=str, help="guides sequences in FASTA format", required=True)
+    parser.add_argument("--read_bc_umi", "-r", type=str, help="Read-Barcode_UMI")
     parser.add_argument("--guide_start", type=int, help="guide starting position in the FASTA reference, 1-based", default=1610)
     parser.add_argument("--guide_len", type=int, help="guide length", default=20)
     parser.add_argument("--guide_tsv", type=str, help="guides sequences in TSV format")
     parser.add_argument("--guide_column", type=int, help="guide position in TSV file", default=2)
     parser.add_argument("--bam", "-b", type=str, help="BAM file with Illumina reads", required=True)
+    parser.add_argument("--min_overlap", type=int, help="min guide overlap (1..20)", default=20)
+    parser.add_argument("--max_mismatches", type=int, help="max mismatches", default=0)
+    parser.add_argument("--use_misaligned", action='store_true', help="max mismatches", default=False)
+
     args = parser.parse_args()
     return args
 
@@ -66,12 +71,13 @@ def intersection_len(range1, range2):
 class GuideCaller:
     def __init__(self, args):
         self.args = args
-        self.minimal_overlap=20
-        self.max_mismatches=0
+        self.minimal_overlap=args.min_overlap
+        self.max_mismatches=args.max_mismatches
         self.max_indels=0
         self.min_count=2
         self.check_alignment = True
         self.guide_region = (args.guide_start - 1, args.guide_start - 2 + args.guide_len)
+        self.read_to_bc = {}
 
     def load_guides(self):
         guide_dict = {}
@@ -88,7 +94,8 @@ class GuideCaller:
         full_ref_sequences = {}
         for r in SeqIO.parse(ref_file, "fasta"):
             guide_seq = str(r.seq)[self.guide_region[0]:self.guide_region[1] + 1]
-            guide_dict[guide_seq] = r.id
+            if not self.args.guide_tsv:
+                guide_dict[guide_seq] = r.id
             full_ref_sequences[r.id] = str(r.seq)
         return full_ref_sequences, guide_dict
 
@@ -128,8 +135,8 @@ class GuideCaller:
             if read_nucl != ref_nucl:
                 subs_count += 1
 
-        #if subs_count <= self.max_indels and indel_counts <= self.max_mismatches:
-        #    return False, None
+        if subs_count <= self.max_indels and indel_counts <= self.max_mismatches:
+            return True, None
         return False, read_guide_seq
 
     def get_guide_barcodes(self, in_bam, guide_id, reference_sequence, guide_dict):
@@ -149,7 +156,12 @@ class GuideCaller:
                 barcode = a.get_tag("CR")
                 umi = a.get_tag("UR")
             except KeyError:
-                continue
+                if a.query_name in self.read_to_bc:
+                    barcode, umi = self.read_to_bc[a.query_name]
+                else:
+                    print("Read %s not found" % a.query_name)
+                    continue
+
             if correct_alignment:
                 barcode_umis[barcode].add(umi)
             elif guide_seq and guide_seq in guide_dict.keys():
@@ -166,9 +178,12 @@ class GuideCaller:
                 continue
             top_count = max(x[1] for x in barcode_to_guide[bc])
             cutoff = 1 if top_count == 1 else max(self.min_count, top_count / 2.0)
+            filtered_guides = set()
             for guide_pair in barcode_to_guide[bc]:
                 if guide_pair[1] >= cutoff:
-                    filtered_barcode_to_guide[bc].add(guide_pair)
+                    filtered_guides.add(guide_pair)
+            if len(filtered_guides) == 1:
+                filtered_barcode_to_guide[bc] = filtered_guides
         return filtered_barcode_to_guide
 
     def reverse_map(self, barcode_to_guide):
@@ -192,12 +207,23 @@ class GuideCaller:
         with open(outf, "w") as output_file:
             for bc in sorted(barcode_to_guide.keys()):
                 for guide in barcode_to_guide[bc]:
-                    for umi in guide[2]:
-                        output_file.write("%s\t%s\t%s\n" % (guide[0], bc, umi))
+                    output_file.write("%s\t%s\n" % (bc, guide[0]))
+
+    def load_read_barcodes(self):
+        read_to_bc = {}
+        for l in open(self.args.read_bc_umi):
+            v = l.strip().split()
+            read_to_bc[v[0]] = (v[2], v[3])
+        return read_to_bc
 
     def collect_barcodes(self):
         barcode_to_guide = defaultdict(set)
+        self.read_to_bc = {}
+        if self.args.read_bc_umi:
+            self.read_to_bc = self.load_read_barcodes()
+
         full_ref_sequences, guide_dict = self.load_guides()
+        print(guide_dict)
 
         in_bam = pysam.AlignmentFile(self.args.bam, "rb")
 
@@ -206,9 +232,10 @@ class GuideCaller:
             for bc in barcode_umis.keys():
                 count = len(barcode_umis[bc])
                 barcode_to_guide[bc].add((ref_id, count, tuple(barcode_umis[bc])))
-            for guide_bc_pair in wrongly_mapped_guides.keys():
-                count = len(wrongly_mapped_guides[guide_bc_pair])
-                barcode_to_guide[guide_bc_pair[1]].add((guide_bc_pair[0], count, tuple(wrongly_mapped_guides[guide_bc_pair])))
+            if self.args.use_misaligned:
+                for guide_bc_pair in wrongly_mapped_guides.keys():
+                    count = len(wrongly_mapped_guides[guide_bc_pair])
+                    barcode_to_guide[guide_bc_pair[1]].add((guide_bc_pair[0], count, tuple(wrongly_mapped_guides[guide_bc_pair])))
         #for k in sorted(barcode_to_guide.keys()):
         #    print(k, barcode_to_guide[k])
 

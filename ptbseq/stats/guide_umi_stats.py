@@ -97,7 +97,7 @@ def main():
     args = parse_args()
     barcode_dict = parse_barcode_table(args.guide_info, args.barcode2guide, args.guide_columns)
     umi_dict = read_barcodes(args.barcode_umi)
-    print(umi_dict)
+    print(len(umi_dict), len(barcode_dict))
     for i in range(3):
         umi_counts, bc_counts = compute_counts(barcode_dict, umi_dict, i)
         save_hist(umi_counts, 100, 100, args.output + ".UMI_hist.%d" % i + ".tsv")
