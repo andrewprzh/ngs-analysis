@@ -51,7 +51,7 @@ def parse_barcode_table(guides, barcodes, columns):
         v = l.strip().split('\t')
         barcode = v[0]
         guide = "_".join(v[1].split("_")[:3])
-        group = "CROPseq::" + "::".join(guide_dict[guide]) + "::" + guide + "::" + barcode
+        group = "CROPseq\t" + "\t".join(guide_dict[guide]) + "\t" + guide + "\t" + barcode
         barcode_dict[barcode] = group
 
     return barcode_dict
