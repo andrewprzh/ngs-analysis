@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument("--output", "-o", type=str, help="output prefix name", default="guides_output")
     parser.add_argument("--guide_ref", "-g", type=str, help="guides sequences in FASTA format", required=True)
     parser.add_argument("--read_bc_umi", "-r", type=str, help="Read-Barcode_UMI")
+    parser.add_argument("--barcode_whitelist", "-w", type=str, help="Barcode whitelist")
     parser.add_argument("--guide_start", type=int, help="guide starting position in the FASTA reference, 1-based", default=1610)
     parser.add_argument("--guide_len", type=int, help="guide length", default=20)
     parser.add_argument("--guide_tsv", type=str, help="guides sequences in TSV format")
@@ -162,6 +163,9 @@ class GuideCaller:
                     print("Read %s not found" % a.query_name)
                     continue
 
+            if self.barcode_whitelist and barcode not in self.barcode_whitelist:
+                continue
+
             if correct_alignment:
                 barcode_umis[barcode].add(umi)
             elif guide_seq and guide_seq in guide_dict.keys():
@@ -221,9 +225,13 @@ class GuideCaller:
         self.read_to_bc = {}
         if self.args.read_bc_umi:
             self.read_to_bc = self.load_read_barcodes()
+        self.barcode_whitelist = set()
+        if self.args.barcode_whitelist:
+            for l in open(self.args.barcode_whitelist):
+                self.barcode_whitelist.add(l.strip())
 
         full_ref_sequences, guide_dict = self.load_guides()
-        print(guide_dict)
+        #print(guide_dict)
 
         in_bam = pysam.AlignmentFile(self.args.bam, "rb")
 
