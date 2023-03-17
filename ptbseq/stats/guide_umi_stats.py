@@ -98,10 +98,11 @@ def main():
     barcode_dict = parse_barcode_table(args.guide_info, args.barcode2guide, args.guide_columns)
     umi_dict = read_barcodes(args.barcode_umi)
     print(len(umi_dict), len(barcode_dict))
+    bin_sizes = [1000, 1000, 100]
     for i in range(3):
         umi_counts, bc_counts = compute_counts(barcode_dict, umi_dict, i)
-        save_hist(umi_counts, 100, 100, args.output + ".UMI_hist.%d" % i + ".tsv")
-        save_hist(bc_counts, 4, 50, args.output + ".BC_hist.%d" % i + ".tsv")
+        save_hist(umi_counts, bin_sizes[i], 100, args.output + ".UMI_hist.%d" % i + ".tsv")
+        save_hist(bc_counts, 2, 30, args.output + ".BC_hist.%d" % i + ".tsv")
 
 
 if __name__ == "__main__":
