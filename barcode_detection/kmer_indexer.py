@@ -33,16 +33,18 @@ class KmerIndexer:
     # a list of pairs (string, numer of common k-mers) sorted descending by the number of shared k-mers
     def get_occurrences(self, sequence, max_hits=0, min_kmers=1):
         barcode_counts = defaultdict(int)
-        for kmer in self._get_kmers(sequence):
+        barcode_positions = defaultdict(list)
+        for pos, kmer in enumerate(self._get_kmers(sequence)):
             for i in self.index[kmer]:
                 barcode_counts[i] += 1
+                barcode_positions[i].append(pos)
 
         result = []
         for i in barcode_counts.keys():
             count = barcode_counts[i]
             if count < min_kmers:
                 continue
-            result.append((self.barcode_list[i], count))
+            result.append((self.barcode_list[i], count, barcode_positions[i]))
 
         result = sorted(result, reverse=True, key=lambda x: x[1])
         if max_hits == 0:
