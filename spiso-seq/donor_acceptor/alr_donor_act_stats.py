@@ -50,10 +50,15 @@ def detect_alt_introns(genedb, chrid):
                     exons.append((e.start, e.end))
 
             introns = junctions_from_blocks(exons)
-            for i in introns:
-                start_pos_map[i[0]].add((i[0], i[1], t.strand))
-                end_pos_map[i[1]].add((i[0], i[1], t.strand))
-                intron_to_gene_dict[(i[0], i[1], t.strand)] = g.id
+            for i in range(len(introns)):
+                intron = introns[i]
+                if i > 0:
+                    prev_intron = introns[i-1]
+                    end_pos_map[(intron[1], prev_intron[1])].add((intron[0], intron[1], t.strand))
+                if i < len(introns) - 1:
+                    next_intron = introns[i + 1]
+                    start_pos_map[(intron[0], next_intron[0])].add((intron[0], intron[1], t.strand))
+                intron_to_gene_dict[(intron[0], intron[1], t.strand)] = g.id
 
     alt_donor_dict = defaultdict(set)
     alt_acceptor_dict = defaultdict(set)
