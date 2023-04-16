@@ -48,6 +48,6 @@ class KmerIndexer:
 
         result = sorted(result, reverse=True, key=lambda x: x[1])
         if max_hits == 0:
-            return result
-        return result[:max_hits]
+            return {x[0]:x for x in result}
+        return {x[0]:x for x in result[:max_hits]}
 

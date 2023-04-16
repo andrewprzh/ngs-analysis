@@ -6,6 +6,7 @@
 
 from Bio import pairwise2
 from Bio import Seq
+from ssw import AlignmentMgr
 
 
 window_size = 16
@@ -42,11 +43,26 @@ def reverese_complement(my_seq):  ## obtain reverse complement of a sequence
     return ''.join(lms)
 
 
-def align_pattern(sequence, start, end, pattern):
+def align_pattern(sequence, start, end, pattern, min_score=0):
     seq1 = Seq.Seq(sequence[start:end])
-    alignments = pairwise2.align.localms(seq1, pattern, 2, -2, -3, -2)  # penalty for gaps
-    alignment = max(alignments, key=lambda i: (i.score, -i.start))
-    return start + alignment.start, start + alignment.end
+    alignments = pairwise2.align.localms(pattern, seq1, 1, -1, -1.5, -1)
+    print(alignments)
+    alignment = max(alignments, key=lambda i: (i[2], -i[3]))
+    if alignment[2] < min_score:
+        return None, None
+    return start + alignment[3], start + alignment[4] - 1
+
+
+def align_pattern_ssw(sequence, start, end, pattern, min_score=0):
+    seq = sequence[start:end]
+    align_mgr = AlignmentMgr(match_score=2, mismatch_penalty=2)
+    align_mgr.set_read(pattern)
+    align_mgr.set_reference(seq)
+    alignment = align_mgr.align(gap_open=3, gap_extension=2)
+    print(alignment)
+    if alignment.optimal_score < min_score * 2:
+        return None, None, None, None
+    return start + alignment.reference_start, start + alignment.reference_end, alignment.read_start, alignment.read_end
 
 
 def find_candidate_with_max_score(barcode_matches, read_sequence, min_score=10):
@@ -56,18 +72,43 @@ def find_candidate_with_max_score(barcode_matches, read_sequence, min_score=10):
     for barcode in barcode_matches.keys():
         barcode_seq = Seq.Seq(barcode)
         alignments = pairwise2.align.localms(read_seq, barcode_seq, 1, -1, -1.5, -1)
-        alignment = max(alignments, key=lambda i: (i.score, -i.start))
-        if alignment.score < min_score:
+        alignment = max(alignments, key=lambda i: (i[2], -i[3]))
+        if alignment[2] < min_score:
             continue
 
-        if alignment.score > best_match[0]:
+        if alignment[2] > best_match[0]:
             best_barcode = barcode
-            best_match[0] = alignment.score
-            best_match[1] = alignment.start
-            best_match[2] = alignment.end
-        elif alignment.score == best_match[0] and alignment.start < best_match[1]:
+            best_match[0] = alignment[2]
+            best_match[1] = alignment[3]
+            best_match[2] = alignment[4]
+        elif alignment[2] == best_match[0] and alignment[3] < best_match[1]:
             best_barcode = barcode
-            best_match[1] = alignment.start
-            best_match[2] = alignment.end
+            best_match[1] = alignment[3]
+            best_match[2] = alignment[4]
+
+    return best_barcode, best_match[1], best_match[2] - 1
+
+
+def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=10):
+    best_match = [0, 0, 0]
+    best_barcode = None
+    align_mgr = AlignmentMgr(match_score=2, mismatch_penalty=2)
+    align_mgr.set_reference(read_sequence)
+
+    for barcode in barcode_matches.keys():
+        align_mgr.set_read(barcode)
+        alignment = align_mgr.align(gap_open=3, gap_extension=2)
+        if alignment.optimal_score < min_score * 2:
+            continue
+
+        if alignment.optimal_score > best_match[0]:
+            best_barcode = barcode
+            best_match[0] = alignment.optimal_score
+            best_match[1] = alignment.reference_start
+            best_match[2] = alignment.reference_end
+        elif alignment.optimal_score  == best_match[0] and alignment.reference_start < best_match[1]:
+            best_barcode = barcode
+            best_match[1] = alignment.reference_start
+            best_match[2] = alignment.reference_end
 
     return best_barcode, best_match[1], best_match[2]
