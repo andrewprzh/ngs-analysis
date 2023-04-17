@@ -35,11 +35,12 @@ class DoubleBarcodeDetector:
     def __init__(self, joint_barcode_list, umi_list=None):
         self.pcr_primer_indexer = KmerIndexer([DoubleBarcodeDetector.PCR_PRIMER], kmer_size=6)
         self.linker_indexer = KmerIndexer([DoubleBarcodeDetector.LINKER], kmer_size=5)
-        logger.info("Barcodes %d" % len(joint_barcode_list))
+        logger.info("Loaded %d barcodes" % len(joint_barcode_list))
         self.barcode_indexer = KmerIndexer(joint_barcode_list, kmer_size=5)
         self.umi_set = None
         if umi_list:
             self.umi_set =  set(umi_list)
+            logger.info("Loaded %d UMIs" % len(umi_list))
             self.umi_indexer = KmerIndexer(umi_list, kmer_size=5)
 
     def find_barcode_umi(self, sequence):
@@ -54,8 +55,6 @@ class DoubleBarcodeDetector:
                                 min_score=0, start_delta=-1, end_delta=-1):
         if not pattern_occurrences:
             return None, None
-        logger.info(pattern)
-        logger.info(pattern_occurrences)
         potential_start = start + min(pattern_occurrences[pattern][2])
         potential_start = max(start, potential_start - kmer_size)
         potential_end = start + max(pattern_occurrences[pattern][2])
@@ -84,7 +83,7 @@ class DoubleBarcodeDetector:
                                                                 end_delta=self.TERMINAL_MATCH_DELTA)
         if primer_start is None:
             return None, None
-        logger.info("PRIMER: %d-%d" % (primer_start, primer_end))
+        logger.debug("PRIMER: %d-%d" % (primer_start, primer_end))
 
         linker_occurrences = self.linker_indexer.get_occurrences(sequence[primer_end + 1:polyt_start + 1])
         linker_start, linker_end = self._detect_exact_positions(sequence, primer_end + 1, polyt_start + 1,
@@ -94,28 +93,30 @@ class DoubleBarcodeDetector:
                                                                 end_delta=self.TERMINAL_MATCH_DELTA)
         if linker_start is None:
             return None, None
-        logger.info("LINKER: %d-%d" % (linker_start, linker_end))
+        logger.debug("LINKER: %d-%d" % (linker_start, linker_end))
 
         potential_barcode = sequence[primer_end + 1:linker_start] + \
                             sequence[linker_end + 1:linker_end + self.RIGHT_BC_LENGTH + 2]
-        logger.info("Barcode: %s" % (potential_barcode))
-        matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode, max_hits=10)
+        logger.debug("Barcode: %s" % (potential_barcode))
+        matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
         barcode, bc_start, bc_end = find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode)
         if barcode is None:
             return None, None
-        logger.info("Found: %s %d-%d" % (barcode, bc_start, bc_end))
+        logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
 
         potential_umi_start = primer_end + 1 + (linker_end - linker_start + 1) + bc_end + 1
         potential_umi_end = polyt_start - 1
-        logger.info("UMI coordinates: %d - %d" % (potential_umi_start, potential_umi_end))
+        logger.debug("UMI coordinates: %d - %d" % (potential_umi_start, potential_umi_end))
         potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
-        logger.info("Potential UMI: %s" % potential_umi)
+        logger.debug("Potential UMI: %s" % potential_umi)
         umi = None
         if self.umi_set:
             matching_umis = self.umi_indexer.get_occurrences(potential_umi)
             umi, umi_start, umi_end = find_candidate_with_max_score_ssw(matching_umis, potential_umi)
+            logger.debug("Found UMI %s %d-%d" % (umi, umi_start, umi_end))
         if not umi and len(potential_umi) == self.UMI_LENGTH:
             umi = potential_umi
+            logger.debug("Using potential UMI: %s" % potential_umi)
 
         return barcode, umi
 
@@ -162,7 +163,7 @@ class BarcodeCaller:
             self._process_read(read_id, seq)
 
     def _process_read(self, read_id, read_sequence):
-        logger.info("==== %s ====" % read_id)
+        logger.debug("==== %s ====" % read_id)
         barcode, umi = self.barcode_detector.find_barcode_umi(read_sequence)
         if barcode:
             self.output_file.write("%s\t%s\t%s\n" % (read_id, barcode, umi))
@@ -201,7 +202,8 @@ def main():
     args = parse_args()
     set_logger(logger)
     barcodes = load_barcodes(args.barcodes)
-    barcode_detector = DoubleBarcodeDetector(barcodes)
+    umis = load_barcodes(args.umi)
+    barcode_detector = DoubleBarcodeDetector(barcodes, umi_list=umis)
     barcode_caller = BarcodeCaller(args.output, barcode_detector)
     barcode_caller.process(args.input)
 

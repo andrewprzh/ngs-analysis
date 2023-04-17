@@ -46,7 +46,6 @@ def reverese_complement(my_seq):  ## obtain reverse complement of a sequence
 def align_pattern(sequence, start, end, pattern, min_score=0):
     seq1 = Seq.Seq(sequence[start:end])
     alignments = pairwise2.align.localms(pattern, seq1, 1, -1, -1.5, -1)
-    print(alignments)
     alignment = max(alignments, key=lambda i: (i[2], -i[3]))
     if alignment[2] < min_score:
         return None, None
@@ -58,8 +57,7 @@ def align_pattern_ssw(sequence, start, end, pattern, min_score=0):
     align_mgr = AlignmentMgr(match_score=2, mismatch_penalty=2)
     align_mgr.set_read(pattern)
     align_mgr.set_reference(seq)
-    alignment = align_mgr.align(gap_open=3, gap_extension=2)
-    print(alignment)
+    alignment = align_mgr.align(gap_open=2, gap_extension=2)
     if alignment.optimal_score < min_score * 2:
         return None, None, None, None
     return start + alignment.reference_start, start + alignment.reference_end, alignment.read_start, alignment.read_end
@@ -94,10 +92,9 @@ def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=
     best_barcode = None
     align_mgr = AlignmentMgr(match_score=2, mismatch_penalty=2)
     align_mgr.set_reference(read_sequence)
-
     for barcode in barcode_matches.keys():
         align_mgr.set_read(barcode)
-        alignment = align_mgr.align(gap_open=3, gap_extension=2)
+        alignment = align_mgr.align(gap_open=2, gap_extension=2)
         if alignment.optimal_score < min_score * 2:
             continue
 
