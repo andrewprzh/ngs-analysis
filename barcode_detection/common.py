@@ -17,7 +17,7 @@ def find_polyt_start(seq):
     if len(seq) < window_size:
         return -1
     i = 0
-    a_count = seq[0:window_size].count('A')
+    a_count = seq[0:window_size].count('T')
     while i < len(seq) - window_size:
         if a_count >= polyA_count:
             break
