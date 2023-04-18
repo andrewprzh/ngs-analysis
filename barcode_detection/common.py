@@ -54,11 +54,11 @@ def align_pattern(sequence, start, end, pattern, min_score=0):
 
 def align_pattern_ssw(sequence, start, end, pattern, min_score=0):
     seq = sequence[start:end]
-    align_mgr = AlignmentMgr(match_score=2, mismatch_penalty=2)
+    align_mgr = AlignmentMgr(match_score=1, mismatch_penalty=1)
     align_mgr.set_read(pattern)
     align_mgr.set_reference(seq)
-    alignment = align_mgr.align(gap_open=2, gap_extension=2)
-    if alignment.optimal_score < min_score * 2:
+    alignment = align_mgr.align(gap_open=1, gap_extension=1)
+    if alignment.optimal_score < min_score:
         return None, None, None, None
     return start + alignment.reference_start, start + alignment.reference_end, alignment.read_start, alignment.read_end
 
@@ -90,12 +90,12 @@ def find_candidate_with_max_score(barcode_matches, read_sequence, min_score=10):
 def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=10):
     best_match = [0, 0, 0]
     best_barcode = None
-    align_mgr = AlignmentMgr(match_score=2, mismatch_penalty=2)
+    align_mgr = AlignmentMgr(match_score=1, mismatch_penalty=1)
     align_mgr.set_reference(read_sequence)
     for barcode in barcode_matches.keys():
         align_mgr.set_read(barcode)
-        alignment = align_mgr.align(gap_open=2, gap_extension=2)
-        if alignment.optimal_score < min_score * 2:
+        alignment = align_mgr.align(gap_open=1, gap_extension=1)
+        if alignment.optimal_score < min_score:
             continue
 
         if alignment.optimal_score > best_match[0]:
@@ -108,4 +108,4 @@ def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=
             best_match[1] = alignment.reference_start
             best_match[2] = alignment.reference_end
 
-    return best_barcode, best_match[1], best_match[2]
+    return best_barcode, best_match[0], best_match[1], best_match[2]
