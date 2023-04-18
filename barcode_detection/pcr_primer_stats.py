@@ -9,43 +9,24 @@
 import os
 import sys
 import argparse
-import gzip
-from collections import defaultdict
-from collections import namedtuple
 from traceback import print_exc
-
-import pysam
-from Bio import SeqIO
 import logging
 
 from kmer_indexer import KmerIndexer
 from common import *
 from reports import *
+from detect_double_barcodes import BarcodeCaller
 
 logger = logging.getLogger('BarcodeCaller')
 
 
-class DoubleBarcodeDetector:
-    LINKER = "TCTTCAGCGTTCCCGAGA"
-    PCR_PRIMER = "TACACGACGCTCTTCCGATCT"
-    LEFT_BC_LENGTH = 8
-    RIGHT_BC_LENGTH = 6
-    BC_LENGTH = LEFT_BC_LENGTH + RIGHT_BC_LENGTH
-    UMI_LENGTH = 9
-    NON_T_UMI_BASES = 2
-    UMI_LEN_DELTA = 2
-    TERMINAL_MATCH_DELTA = 2
+class PRCDetector:
+    UPS_PRIMER = "AAGCAGTGGTATCAACGCAGAGT"
+    PCR_PRIMER = "CTACACGACGCTCTTCCGATCT"
 
-    def __init__(self, joint_barcode_list, umi_list=None):
-        self.pcr_primer_indexer = KmerIndexer([DoubleBarcodeDetector.PCR_PRIMER], kmer_size=6)
-        self.linker_indexer = KmerIndexer([DoubleBarcodeDetector.LINKER], kmer_size=5)
-        logger.info("Loaded %d barcodes" % len(joint_barcode_list))
-        self.barcode_indexer = KmerIndexer(joint_barcode_list, kmer_size=5)
-        self.umi_set = None
-        if umi_list:
-            self.umi_set =  set(umi_list)
-            logger.info("Loaded %d UMIs" % len(umi_list))
-            self.umi_indexer = KmerIndexer(umi_list, kmer_size=5)
+    def __init__(self):
+        self.pcr_primer_indexer = KmerIndexer([PRCDetector.PCR_PRIMER], kmer_size=6)
+        self.ups_primer_indexer = KmerIndexer([PRCDetector.UPS_PRIMER], kmer_size=6)
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
@@ -82,10 +63,6 @@ class DoubleBarcodeDetector:
         return start_pos, end_pos
 
     def _find_barcode_umi_fwd(self, read_id, sequence):
-        polyt_start = find_polyt_start(sequence)
-        if polyt_start == -1:
-            return BarcodeDetectionResult(read_id)
-
         primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence[:polyt_start + 1])
         primer_start, primer_end = self._detect_exact_positions(sequence, 0, polyt_start + 1,
                                                                 self.pcr_primer_indexer.k, self.PCR_PRIMER,
@@ -140,63 +117,6 @@ class DoubleBarcodeDetector:
                                       barcode, bc_score, umi, good_umi)
 
 
-class BarcodeCaller:
-    def __init__(self, output_table, barcode_detector):
-        self.barcode_detector = barcode_detector
-        self.output_file = open(output_table, "w")
-        self.read_stat = ReadStats()
-
-    def __del__(self):
-        logger.info("\n%s" % str(self.read_stat))
-        self.output_file.close()
-
-    def process(self, input_file):
-        logger.info("Processing " + input_file)
-        fname, outer_ext = os.path.splitext(os.path.basename(input_file))
-        low_ext = outer_ext.lower()
-
-        handle = input_file
-        if low_ext in ['.gz', '.gzip']:
-            handle = gzip.open(input_file, "rt")
-            input_file = fname
-            fname, outer_ext = os.path.splitext(os.path.basename(input_file))
-            low_ext = outer_ext.lower()
-
-        if low_ext in ['.fq', '.fastq']:
-            self._process_fastx(SeqIO.parse(handle, "fastq"))
-        elif low_ext in ['.fa', '.fasta']:
-            self._process_fastx(SeqIO.parse(handle, "fasta"))
-        elif low_ext in ['.bam', '.sam']:
-            self._process_bam(pysam.AlignmentFile(input_file, "rb"))
-        else:
-            logger.error("Unknown file format " + input_file)
-
-    def _process_fastx(self, read_handler):
-        for r in read_handler:
-            read_id = r.id
-            seq = str(r.seq)
-            self._process_read(read_id, seq)
-
-    def _process_bam(self, read_handler):
-        for r in read_handler:
-            read_id = r.query_name
-            seq = r.query_sequence
-            self._process_read(read_id, seq)
-
-    def _process_read(self, read_id, read_sequence):
-        logger.debug("==== %s ====" % read_id)
-        barcode_result = self.barcode_detector.find_barcode_umi(read_id, read_sequence)
-        self.output_file.write("%s\n" % str(barcode_result))
-        self.read_stat.add_read(barcode_result)
-
-
-def load_barcodes(inf):
-    barcode_list = []
-    for l in open(inf):
-        barcode_list.append(l.strip().split()[0])
-    return barcode_list
-
-
 def set_logger(logger_instance):
     logger_instance.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
@@ -209,9 +129,6 @@ def set_logger(logger_instance):
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--output", "-o", type=str, help="output prefix name", required=True)
-    parser.add_argument("--barcodes", "-b", type=str, help="barcode whitelist", required=True)
-    parser.add_argument("--umi", "-u", type=str, help="potential UMIs")
     parser.add_argument("--input", "-i", type=str, help="input reads in [gzipped] FASTA, FASTQ, BAM, SAM)", required=True)
 
     args = parser.parse_args()
@@ -222,9 +139,7 @@ def main():
     #set_logger(logger)
     args = parse_args()
     set_logger(logger)
-    barcodes = load_barcodes(args.barcodes)
-    umis = load_barcodes(args.umi) if args.umi else None
-    barcode_detector = DoubleBarcodeDetector(barcodes, umi_list=umis)
+    barcode_detector = PRCDetector()
     barcode_caller = BarcodeCaller(args.output, barcode_detector)
     barcode_caller.process(args.input)
 
