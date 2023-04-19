@@ -116,7 +116,7 @@ class DoubleBarcodeDetector:
         logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
 
         potential_umi_start = primer_end + 1 + (linker_end - linker_start + 1) + bc_end + 1
-        potential_umi_end = polyt_start - 1
+        potential_umi_end = max(polyt_start - 1, potential_umi_start + self.UMI_LENGTH)
         potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
         logger.debug("Potential UMI: %s" % potential_umi)
 
