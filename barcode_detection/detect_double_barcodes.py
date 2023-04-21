@@ -28,7 +28,7 @@ from reports import *
 logger = logging.getLogger('BarcodeCaller')
 
 
-READ_CHUNK_SIZE = 1000
+READ_CHUNK_SIZE = 10000
 
 
 class DoubleBarcodeDetector:
