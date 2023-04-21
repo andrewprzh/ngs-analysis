@@ -46,61 +46,32 @@ class PRCDetector:
 
         return read_result if read_result.more_informative_than(read_rev_result) else read_rev_result
 
-    def _detect_exact_positions(self, sequence, start, end, kmer_size, pattern, pattern_occurrences,
-                                min_score=0, start_delta=-1, end_delta=-1):
-        if not pattern_occurrences:
-            return None, None
-
-        start_pos, end_pos, pattern_start, pattern_end, score  = None, None, None, None, 0
-        last_potential_pos = -2*len(pattern)
-        for match_position in pattern_occurrences[pattern][2]:
-            if match_position - last_potential_pos < len(pattern):
-                continue
-
-            potential_start = start + match_position - len(pattern) + kmer_size
-            potential_start = max(start, potential_start)
-            potential_end = start + match_position + len(pattern) + 1
-            potential_end = min(end, potential_end)
-            alignment = \
-                align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
-            if alignment[4] and alignment[4] > score:
-                start_pos, end_pos, pattern_start, pattern_end, score = alignment
-
-        if start_pos is None:
-            return None, None
-
-        if start_delta > 0 and pattern_start > start_delta:
-            return None, None
-        if end_delta > 0 and len(pattern) - pattern_end - 1 > end_delta:
-            return None, None
-        return start_pos, end_pos
-
     def _find_barcode_umi_fwd(self, read_id, sequence):
         ups_occurrences = self.ups_primer_rev_indexer.get_occurrences(sequence)
-        ups_start, ups_end = self._detect_exact_positions(sequence, 0, len(sequence),
-                                                          self.ups_primer_rev_indexer.k, self.UPS_PRIMER_REV,
-                                                          ups_occurrences, min_score=15,
-                                                          start_delta=self.TERMINAL_MATCH_DELTA)
+        ups_start, ups_end = detect_exact_positions(sequence, 0, len(sequence),
+                                                    self.ups_primer_rev_indexer.k, self.UPS_PRIMER_REV,
+                                                    ups_occurrences, min_score=15,
+                                                    start_delta=self.TERMINAL_MATCH_DELTA)
 
         if not ups_start:
             ups_end = -1
             ups_start = len(sequence) - 1
 
         primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence)
-        primer_start, primer_end = self._detect_exact_positions(sequence, 0, ups_start,
-                                                                self.pcr_primer_indexer.k, self.PCR_PRIMER,
-                                                                primer_occurrences, min_score=15,
-                                                                end_delta=self.TERMINAL_MATCH_DELTA)
+        primer_start, primer_end = detect_exact_positions(sequence, 0, ups_start,
+                                                          self.pcr_primer_indexer.k, self.PCR_PRIMER,
+                                                          primer_occurrences, min_score=15,
+                                                          end_delta=self.TERMINAL_MATCH_DELTA)
         if not primer_start:
             primer_start = -1
 
         ups1_start = -1
         if primer_start == -1:
             ups1_occurrences = self.ups_primer_indexer.get_occurrences(sequence)
-            ups1_start, ups1_end = self._detect_exact_positions(sequence, 0, ups_start,
-                                                                self.ups_primer_indexer.k, self.UPS_PRIMER,
-                                                                ups1_occurrences, min_score=15,
-                                                                end_delta=self.TERMINAL_MATCH_DELTA)
+            ups1_start, ups1_end = detect_exact_positions(sequence, 0, ups_start,
+                                                          self.ups_primer_indexer.k, self.UPS_PRIMER,
+                                                          ups1_occurrences, min_score=15,
+                                                          end_delta=self.TERMINAL_MATCH_DELTA)
             if not ups1_start:
                 ups1_start = -1
 

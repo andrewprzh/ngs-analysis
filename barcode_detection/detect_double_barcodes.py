@@ -35,6 +35,7 @@ class DoubleBarcodeDetector:
     NON_T_UMI_BASES = 2
     UMI_LEN_DELTA = 2
     TERMINAL_MATCH_DELTA = 2
+    STRICT_TERMINAL_MATCH_DELTA = 1
 
     def __init__(self, joint_barcode_list, umi_list=None):
         self.pcr_primer_indexer = KmerIndexer([DoubleBarcodeDetector.PCR_PRIMER], kmer_size=6)
@@ -61,71 +62,66 @@ class DoubleBarcodeDetector:
 
         return read_result if read_result.more_informative_than(read_rev_result) else read_rev_result
 
-    def _detect_exact_positions(self, sequence, start, end, kmer_size, pattern, pattern_occurrences,
-                                min_score=0, start_delta=-1, end_delta=-1):
-        if not pattern_occurrences:
-            return None, None
-
-        start_pos, end_pos, pattern_start, pattern_end, score  = None, None, None, None, 0
-        last_potential_pos = -2*len(pattern)
-        for occ in pattern_occurrences[pattern]:
-            match_position = occ[2]
-            if match_position - last_potential_pos < len(pattern):
-                continue
-
-            potential_start = start + match_position - len(pattern) + kmer_size
-            potential_start = max(start, potential_start)
-            potential_end = start + match_position + len(pattern) + 1
-            potential_end = min(end, potential_end)
-            alignment = \
-                align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
-            if alignment[4] > score:
-                start_pos, end_pos, pattern_start, pattern_end, score = alignment
-
-        if start_pos is None:
-            return None, None
-
-        if start_delta > 0 and pattern_start > start_delta:
-            return None, None
-        if end_delta > 0 and len(pattern) - pattern_end - 1 > end_delta:
-            return None, None
-        return start_pos, end_pos
 
     def _find_barcode_umi_fwd(self, read_id, sequence):
         polyt_start = find_polyt_start(sequence)
-        if polyt_start == -1:
-            return BarcodeDetectionResult(read_id)
 
-        primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence[:polyt_start + 1])
-        primer_start, primer_end = self._detect_exact_positions(sequence, 0, polyt_start + 1,
-                                                                self.pcr_primer_indexer.k, self.PCR_PRIMER,
-                                                                primer_occurrences, min_score=5,
-                                                                end_delta=self.TERMINAL_MATCH_DELTA)
-        if primer_start is None:
-            return BarcodeDetectionResult(read_id, polyt_start)
-        logger.debug("PRIMER: %d-%d" % (primer_start, primer_end))
+        linker_start, linker_end = None, None
+        if polyt_start != -1:
+            # use relaxed parameters is polyA is found
+            linker_occurrences = self.linker_indexer.get_occurrences(sequence[0:polyt_start + 1])
+            linker_start, linker_end = detect_exact_positions(sequence, 0, polyt_start + 1,
+                                                              self.linker_indexer.k, self.LINKER,
+                                                              linker_occurrences, min_score=11,
+                                                              start_delta=self.TERMINAL_MATCH_DELTA,
+                                                              end_delta=self.TERMINAL_MATCH_DELTA)
 
-        linker_occurrences = self.linker_indexer.get_occurrences(sequence[primer_end + 1:polyt_start + 1])
-        linker_start, linker_end = self._detect_exact_positions(sequence, primer_end + 1, polyt_start + 1,
-                                                                self.linker_indexer.k, self.LINKER,
-                                                                linker_occurrences, min_score=11,
-                                                                start_delta=self.TERMINAL_MATCH_DELTA,
-                                                                end_delta=self.TERMINAL_MATCH_DELTA)
         if linker_start is None:
-            return BarcodeDetectionResult(read_id, polyt_start, primer_end)
+            # if polyT was not found, or linker was not found to the left of polyT, look for linker in the entire read
+            linker_occurrences = self.linker_indexer.get_occurrences(sequence)
+            linker_start, linker_end = detect_exact_positions(sequence, 0, len(sequence),
+                                                              self.linker_indexer.k, self.LINKER,
+                                                              linker_occurrences, min_score=14,
+                                                              start_delta=self.STRICT_TERMINAL_MATCH_DELTA,
+                                                              end_delta=self.STRICT_TERMINAL_MATCH_DELTA)
+
+        if linker_start is None:
+            return BarcodeDetectionResult(read_id, polyt_start)
         logger.debug("LINKER: %d-%d" % (linker_start, linker_end))
 
-        potential_barcode = sequence[primer_end + 1:linker_start] + \
-                            sequence[linker_end + 1:linker_end + self.RIGHT_BC_LENGTH + 2]
+        if polyt_start == -1:
+            # if polyT was not detected earlier, use relaxed parameters once the linker is found
+            presumable_polyt_start = linker_end + self.RIGHT_BC_LENGTH + self.UMI_LENGTH
+            polyt_start = find_polyt_start(sequence[presumable_polyt_start - 4:presumable_polyt_start + 10],
+                                           window_size=5, polya_fraction=1.0)
+
+        primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence[:linker_start])
+        primer_start, primer_end = detect_exact_positions(sequence, 0, linker_start,
+                                                          self.pcr_primer_indexer.k, self.PCR_PRIMER,
+                                                          primer_occurrences, min_score=5,
+                                                          end_delta=self.TERMINAL_MATCH_DELTA)
+        if primer_start is not None:
+            logger.debug("PRIMER: %d-%d" % (primer_start, primer_end))
+        else:
+            primer_start = -1
+            primer_end = -1
+
+        barcode_start = primer_end + 1 if primer_start != -1 else linker_start - self.LEFT_BC_LENGTH
+        barcode_end = linker_end + self.RIGHT_BC_LENGTH + 1
+        potential_barcode = sequence[barcode_start:linker_start] + \
+                            sequence[linker_end + 1:barcode_end + 1]
         logger.debug("Barcode: %s" % (potential_barcode))
         matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
         barcode, bc_score, bc_start, bc_end = \
             find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=12)
+
         if barcode is None:
             return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end)
         logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
+        # position of barcode end in the reference: end of potential barcode minus bases to the alignment end
+        read_barcode_end = linker_end + self.RIGHT_BC_LENGTH + 1 - (len(potential_barcode) - bc_end - 1)
 
-        potential_umi_start = primer_end + 1 + (linker_end - linker_start + 1) + bc_end + 1
+        potential_umi_start = read_barcode_end + 1
         potential_umi_end = max(polyt_start - 1, potential_umi_start + self.UMI_LENGTH)
         potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
         logger.debug("Potential UMI: %s" % potential_umi)
@@ -180,15 +176,24 @@ class BarcodeCaller:
             self._process_bam(pysam.AlignmentFile(input_file, "rb"))
         else:
             logger.error("Unknown file format " + input_file)
+        logger.info("Finished " + input_file)
 
     def _process_fastx(self, read_handler):
+        counter = 0
         for r in read_handler:
+            if counter % 100 == 0:
+                sys.stdout.write("Processed %d reads\r" % counter)
+            counter += 1
             read_id = r.id
             seq = str(r.seq)
             self._process_read(read_id, seq)
 
     def _process_bam(self, read_handler):
+        counter = 0
         for r in read_handler:
+            if counter % 100 == 0:
+                sys.stdout.write("Processed %d reads\r" % counter)
+            counter += 1
             read_id = r.query_name
             seq = r.query_sequence
             self._process_read(read_id, seq)

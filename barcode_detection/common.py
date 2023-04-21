@@ -9,11 +9,9 @@ from Bio import Seq
 from ssw import AlignmentMgr
 
 
-window_size = 16
-polyA_count = int(window_size * 0.75)
+def find_polyt_start(seq, window_size = 16, polya_fraction = 0.75):
+    polyA_count = int(window_size * polya_fraction)
 
-
-def find_polyt_start(seq):
     if len(seq) < window_size:
         return -1
     i = 0
@@ -32,7 +30,7 @@ def find_polyt_start(seq):
     if i >= len(seq) - window_size:
         return -1
 
-    return i + max(0, seq[i:].find('TT'))
+    return i + max(0, seq[i:].find('TTT'))
 
 
 base_comp = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', " ": " "}
@@ -110,3 +108,33 @@ def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=
             best_match[2] = alignment.reference_end
 
     return best_barcode, best_match[0], best_match[1], best_match[2]
+
+
+def detect_exact_positions(sequence, start, end, kmer_size, pattern, pattern_occurrences,
+                           min_score=0, start_delta=-1, end_delta=-1):
+    if not pattern_occurrences:
+        return None, None
+
+    start_pos, end_pos, pattern_start, pattern_end, score  = None, None, None, None, 0
+    last_potential_pos = -2*len(pattern)
+    for match_position in pattern_occurrences[pattern][2]:
+        if match_position - last_potential_pos < len(pattern):
+            continue
+
+        potential_start = start + match_position - len(pattern) + kmer_size
+        potential_start = max(start, potential_start)
+        potential_end = start + match_position + len(pattern) + 1
+        potential_end = min(end, potential_end)
+        alignment = \
+            align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
+        if alignment[4] is not None and alignment[4] > score:
+            start_pos, end_pos, pattern_start, pattern_end, score = alignment
+
+    if start_pos is None:
+        return None, None
+
+    if start_delta > 0 and pattern_start > start_delta:
+        return None, None
+    if end_delta > 0 and len(pattern) - pattern_end - 1 > end_delta:
+        return None, None
+    return start_pos, end_pos
