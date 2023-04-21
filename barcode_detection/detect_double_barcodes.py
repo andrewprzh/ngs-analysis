@@ -50,13 +50,15 @@ class DoubleBarcodeDetector:
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
-        read_result.set_strand("+")
+        if read_result.polyT != -1:
+            read_result.set_strand("+")
         if read_result.is_valid():
             return read_result
 
         rev_seq = reverese_complement(sequence)
         read_rev_result = self._find_barcode_umi_fwd(read_id, rev_seq)
-        read_rev_result.set_strand("-")
+        if read_rev_result.polyT != -1:
+            read_rev_result.set_strand("-")
         if read_rev_result.is_valid():
             return read_rev_result
 
@@ -89,7 +91,7 @@ class DoubleBarcodeDetector:
             return BarcodeDetectionResult(read_id, polyt_start)
         logger.debug("LINKER: %d-%d" % (linker_start, linker_end))
 
-        if polyt_start == -1:
+        if polyt_start == -1 or polyt_start - linker_end > self.RIGHT_BC_LENGTH + self.UMI_LENGTH + 10:
             # if polyT was not detected earlier, use relaxed parameters once the linker is found
             presumable_polyt_start = linker_end + self.RIGHT_BC_LENGTH + self.UMI_LENGTH
             polyt_start = find_polyt_start(sequence[presumable_polyt_start - 4:presumable_polyt_start + 10],
@@ -108,8 +110,7 @@ class DoubleBarcodeDetector:
 
         barcode_start = primer_end + 1 if primer_start != -1 else linker_start - self.LEFT_BC_LENGTH
         barcode_end = linker_end + self.RIGHT_BC_LENGTH + 1
-        potential_barcode = sequence[barcode_start:linker_start] + \
-                            sequence[linker_end + 1:barcode_end + 1]
+        potential_barcode = sequence[barcode_start:linker_start] + sequence[linker_end + 1:barcode_end + 1]
         logger.debug("Barcode: %s" % (potential_barcode))
         matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
         barcode, bc_score, bc_start, bc_end = \
@@ -122,7 +123,9 @@ class DoubleBarcodeDetector:
         read_barcode_end = linker_end + self.RIGHT_BC_LENGTH + 1 - (len(potential_barcode) - bc_end - 1)
 
         potential_umi_start = read_barcode_end + 1
-        potential_umi_end = max(polyt_start - 1, potential_umi_start + self.UMI_LENGTH)
+        potential_umi_end = polyt_start - 1
+        if potential_umi_end - potential_umi_start <= 5:
+            potential_umi_end = potential_umi_start + self.UMI_LENGTH - 1
         potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
         logger.debug("Potential UMI: %s" % potential_umi)
 
