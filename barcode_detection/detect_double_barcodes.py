@@ -65,12 +65,22 @@ class DoubleBarcodeDetector:
                                 min_score=0, start_delta=-1, end_delta=-1):
         if not pattern_occurrences:
             return None, None
-        potential_start = start + min(pattern_occurrences[pattern][2])
-        potential_start = max(start, potential_start - kmer_size)
-        potential_end = start + max(pattern_occurrences[pattern][2])
-        potential_end = min(end, potential_end + 2 * kmer_size)
-        start_pos, end_pos, pattern_start, pattern_end = \
-            align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
+
+        start_pos, end_pos, pattern_start, pattern_end, score  = None, None, None, None, 0
+        last_potential_pos = -2*len(pattern)
+        for occ in pattern_occurrences[pattern]:
+            match_position = occ[2]
+            if match_position - last_potential_pos < len(pattern):
+                continue
+
+            potential_start = start + match_position - len(pattern) + kmer_size
+            potential_start = max(start, potential_start)
+            potential_end = start + match_position + len(pattern) + 1
+            potential_end = min(end, potential_end)
+            alignment = \
+                align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
+            if alignment[4] > score:
+                start_pos, end_pos, pattern_start, pattern_end, score = alignment
 
         if start_pos is None:
             return None, None

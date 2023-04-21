@@ -59,8 +59,9 @@ def align_pattern_ssw(sequence, start, end, pattern, min_score=0):
     align_mgr.set_reference(seq)
     alignment = align_mgr.align(gap_open=1, gap_extension=1)
     if alignment.optimal_score < min_score:
-        return None, None, None, None
-    return start + alignment.reference_start, start + alignment.reference_end, alignment.read_start, alignment.read_end
+        return None, None, None, None, None
+    return start + alignment.reference_start, start + alignment.reference_end, \
+        alignment.read_start, alignment.read_end, alignment.optimal_score
 
 
 def find_candidate_with_max_score(barcode_matches, read_sequence, min_score=10):

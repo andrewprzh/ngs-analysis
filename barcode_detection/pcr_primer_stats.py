@@ -23,10 +23,14 @@ logger = logging.getLogger('BarcodeCaller')
 class PRCDetector:
     UPS_PRIMER = "AAGCAGTGGTATCAACGCAGAGT"
     PCR_PRIMER = "CTACACGACGCTCTTCCGATCT"
+    UPS_PRIMER_REV = reverese_complement(UPS_PRIMER)
+    TERMINAL_MATCH_DELTA = 3
 
     def __init__(self):
         self.pcr_primer_indexer = KmerIndexer([PRCDetector.PCR_PRIMER], kmer_size=6)
         self.ups_primer_indexer = KmerIndexer([PRCDetector.UPS_PRIMER], kmer_size=6)
+        self.ups_primer_rev_indexer = KmerIndexer([PRCDetector.UPS_PRIMER_REV], kmer_size=6)
+
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
@@ -46,12 +50,21 @@ class PRCDetector:
                                 min_score=0, start_delta=-1, end_delta=-1):
         if not pattern_occurrences:
             return None, None
-        potential_start = start + min(pattern_occurrences[pattern][2])
-        potential_start = max(start, potential_start - kmer_size)
-        potential_end = start + max(pattern_occurrences[pattern][2])
-        potential_end = min(end, potential_end + 2 * kmer_size)
-        start_pos, end_pos, pattern_start, pattern_end = \
-            align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
+
+        start_pos, end_pos, pattern_start, pattern_end, score  = None, None, None, None, 0
+        last_potential_pos = -2*len(pattern)
+        for match_position in pattern_occurrences[pattern][2]:
+            if match_position - last_potential_pos < len(pattern):
+                continue
+
+            potential_start = start + match_position - len(pattern) + kmer_size
+            potential_start = max(start, potential_start)
+            potential_end = start + match_position + len(pattern) + 1
+            potential_end = min(end, potential_end)
+            alignment = \
+                align_pattern_ssw(sequence, potential_start, potential_end, pattern, min_score)
+            if alignment[4] and alignment[4] > score:
+                start_pos, end_pos, pattern_start, pattern_end, score = alignment
 
         if start_pos is None:
             return None, None
@@ -63,58 +76,35 @@ class PRCDetector:
         return start_pos, end_pos
 
     def _find_barcode_umi_fwd(self, read_id, sequence):
-        primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence[:polyt_start + 1])
-        primer_start, primer_end = self._detect_exact_positions(sequence, 0, polyt_start + 1,
+        ups_occurrences = self.ups_primer_rev_indexer.get_occurrences(sequence)
+        ups_start, ups_end = self._detect_exact_positions(sequence, 0, len(sequence),
+                                                          self.ups_primer_rev_indexer.k, self.UPS_PRIMER_REV,
+                                                          ups_occurrences, min_score=15,
+                                                          start_delta=self.TERMINAL_MATCH_DELTA)
+
+        if not ups_start:
+            ups_end = -1
+            ups_start = len(sequence) - 1
+
+        primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence)
+        primer_start, primer_end = self._detect_exact_positions(sequence, 0, ups_start,
                                                                 self.pcr_primer_indexer.k, self.PCR_PRIMER,
-                                                                primer_occurrences, min_score=5,
+                                                                primer_occurrences, min_score=15,
                                                                 end_delta=self.TERMINAL_MATCH_DELTA)
-        if primer_start is None:
-            return BarcodeDetectionResult(read_id, polyt_start)
-        logger.debug("PRIMER: %d-%d" % (primer_start, primer_end))
+        if not primer_start:
+            primer_start = -1
 
-        linker_occurrences = self.linker_indexer.get_occurrences(sequence[primer_end + 1:polyt_start + 1])
-        linker_start, linker_end = self._detect_exact_positions(sequence, primer_end + 1, polyt_start + 1,
-                                                                self.linker_indexer.k, self.LINKER,
-                                                                linker_occurrences, min_score=11,
-                                                                start_delta=self.TERMINAL_MATCH_DELTA,
+        ups1_start = -1
+        if primer_start == -1:
+            ups1_occurrences = self.ups_primer_indexer.get_occurrences(sequence)
+            ups1_start, ups1_end = self._detect_exact_positions(sequence, 0, ups_start,
+                                                                self.ups_primer_indexer.k, self.UPS_PRIMER,
+                                                                ups1_occurrences, min_score=15,
                                                                 end_delta=self.TERMINAL_MATCH_DELTA)
-        if linker_start is None:
-            return BarcodeDetectionResult(read_id, polyt_start, primer_end)
-        logger.debug("LINKER: %d-%d" % (linker_start, linker_end))
+            if not ups1_start:
+                ups1_start = -1
 
-        potential_barcode = sequence[primer_end + 1:linker_start] + \
-                            sequence[linker_end + 1:linker_end + self.RIGHT_BC_LENGTH + 2]
-        logger.debug("Barcode: %s" % (potential_barcode))
-        matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
-        barcode, bc_score, bc_start, bc_end = \
-            find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=12)
-        if barcode is None:
-            return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end)
-        logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
-
-        potential_umi_start = primer_end + 1 + (linker_end - linker_start + 1) + bc_end + 1
-        potential_umi_end = polyt_start - 1
-        potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
-        logger.debug("Potential UMI: %s" % potential_umi)
-
-        umi = None
-        good_umi = False
-        if self.umi_set:
-            matching_umis = self.umi_indexer.get_occurrences(potential_umi)
-            umi, umi_score, umi_start, umi_end = \
-                find_candidate_with_max_score_ssw(matching_umis, potential_umi, min_score=7)
-            logger.debug("Found UMI %s %d-%d" % (umi, umi_start, umi_end))
-
-        if not umi :
-            umi = potential_umi
-            if self.UMI_LENGTH - self.UMI_LEN_DELTA <= len(umi) <= self.UMI_LENGTH + self.UMI_LEN_DELTA and \
-                    all(x != "T" for x in umi[-self.NON_T_UMI_BASES:]):
-                good_umi = True
-
-        if not umi:
-            return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end, barcode, bc_score)
-        return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end,
-                                      barcode, bc_score, umi, good_umi)
+        return BarcodeDetectionResult(read_id, ups_end, primer_start, ups1_start)
 
 
 def set_logger(logger_instance):
@@ -140,7 +130,7 @@ def main():
     args = parse_args()
     set_logger(logger)
     barcode_detector = PRCDetector()
-    barcode_caller = BarcodeCaller(args.output, barcode_detector)
+    barcode_caller = BarcodeCaller("prc_out.tsv", barcode_detector)
     barcode_caller.process(args.input)
 
 
