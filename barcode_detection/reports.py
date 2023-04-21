@@ -60,6 +60,6 @@ class ReadStats:
             self.umi_count += 1
 
     def __str__(self):
-        return "Total reads: %d\nPolyT found: %d\nPrimer found: %d\n" \
-               "Linker found: %d\nBarcode detected: %d\nReliable UMI: %d\n" % \
+        return "Total reads:\t%d\nPolyT found:\t%d\nPrimer found:\t%d\n" \
+               "Linker found:\t%d\nBarcode detected:\t%d\nReliable UMI:\t%d\n" % \
             (self.read_count, self.polyT_count, self.primer_count, self.linker_count, self.bc_count, self.umi_count)
