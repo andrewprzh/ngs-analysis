@@ -258,7 +258,7 @@ def process_single_thread(args):
 
 def process_in_parallel(args):
     barcodes = load_barcodes(args.barcodes)
-    logger.info("Loaded %d barcodes" % len(args.barcodes))
+    logger.info("Loaded %d barcodes" % len(barcodes))
 
     input_file = args.input
     logger.info("Processing " + input_file)
