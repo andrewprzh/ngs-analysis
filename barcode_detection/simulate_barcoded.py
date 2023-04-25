@@ -106,6 +106,7 @@ def main():
 
     template_fname = args.output + ".templates.fasta"
     output_fasta = open(template_fname, "w")
+    output_counts = open(args.output + ".template_counts.fasta", "w")
     for t_id in count_dict:
         transcript_seq = isoforms[t_id]
         template_list = []
@@ -114,9 +115,11 @@ def main():
             umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len)
             template = template_func(transcript_seq, bc, umi)
             seq_id = "READ_%d_%s_%s_%s" % (i, t_id, bc, umi)
+            output_counts.write("%s\t%d\t%.4f\n" % (seq_id, 1, scale_factor))
             template_list.append(SeqIO.SeqRecord(seq=Seq.Seq(template), id=seq_id,  description="", name=""))
         SeqIO.write(template_list, output_fasta, "fasta")
     output_fasta.close()
+    output_counts.close()
     print("Saved templates counts to %s" % template_fname)
 
 
