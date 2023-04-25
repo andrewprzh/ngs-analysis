@@ -17,7 +17,7 @@ def read_called_barcodes(inf):
         v = l.strip().split('\t')
         if len(v) < 7 or v[6] == "*":
             continue
-        read_set.add([0])
+        read_set.add(v[0])
     return read_set
 
 
