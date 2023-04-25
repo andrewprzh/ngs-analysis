@@ -55,4 +55,4 @@ if len(sys.argv) == 4:
     suffix = "." + sys.argv[3]
 else:
     suffix = ""
-filter_reads(sys.argv[1], os.path.splitext(sys.argv[1])[0] + ".filtered" + suffix + ".bam", read_reads(sys.argv[2]))
+filter_reads(sys.argv[1], os.path.splitext(sys.argv[1])[0] + ".filtered" + suffix + ".bam", read_called_barcodes(sys.argv[2]))
