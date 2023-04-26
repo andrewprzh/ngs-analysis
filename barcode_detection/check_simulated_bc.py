@@ -15,5 +15,5 @@ for l in open(sys.argv[1]):
     if true_bc == bc:
         correct += 1
 
-print("Total\t%d\nBarcoded\t%d\nCorrect\t%d" % (count, barcoded, correct))
+print("Total\t%d\nBarcode\t%d\nCorrect\t%d" % (count, barcoded, correct))
     

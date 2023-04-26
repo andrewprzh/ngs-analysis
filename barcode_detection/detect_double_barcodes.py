@@ -118,7 +118,7 @@ class DoubleBarcodeDetector:
         logger.debug("Barcode: %s" % (potential_barcode))
         matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
         barcode, bc_score, bc_start, bc_end = \
-            find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=12)
+            find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=13)
 
         if barcode is None:
             return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end)
