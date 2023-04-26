@@ -29,13 +29,17 @@ BARCODE_LEN_10X = 16
 UMI_LEN_10X = 12
 
 NUCLS = ['A', 'C', 'G', 'T']
+VNUCLS =  ['A', 'C', 'G']
 
 
-def get_random_seq(length):
+def get_random_seq(length, non_t_tail=0):
     seq = ""
-    for i in range(length):
+    for i in range(length-non_t_tail):
         index = random.randint(0, len(NUCLS) - 1)
         seq += NUCLS[index]
+    for i in range(non_t_tail):
+        index = random.randint(0, len(VNUCLS) - 1)
+        seq += VNUCLS[index]
     return seq
 
 
@@ -112,7 +116,7 @@ def main():
         template_list = []
         for i in range(count_dict[t_id]):
             bc = barcodes[random.randint(0, len(barcodes) - 1)] if barcodes else get_random_seq(bc_len)
-            umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len)
+            umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 2)
             template = template_func(transcript_seq, bc, umi)
             seq_id = "READ_%d_%s_%s_%s" % (i, t_id, bc, umi)
             output_counts.write("%s\t%d\t%.4f\n" % (seq_id, 1, scale_factor))
