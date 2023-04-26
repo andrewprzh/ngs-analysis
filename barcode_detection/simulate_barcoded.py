@@ -110,7 +110,7 @@ def main():
 
     template_fname = args.output + ".templates.fasta"
     output_fasta = open(template_fname, "w")
-    output_counts = open(args.output + ".template_counts.fasta", "w")
+    output_counts = open(args.output + ".template_counts.tsv", "w")
     for t_id in count_dict:
         transcript_seq = isoforms[t_id]
         template_list = []
