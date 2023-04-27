@@ -43,7 +43,7 @@ class DoubleBarcodeDetector:
     TERMINAL_MATCH_DELTA = 2
     STRICT_TERMINAL_MATCH_DELTA = 1
 
-    def __init__(self, joint_barcode_list, umi_list=None):
+    def __init__(self, joint_barcode_list, umi_list=None, min_score=12):
         self.pcr_primer_indexer = KmerIndexer([DoubleBarcodeDetector.PCR_PRIMER], kmer_size=6)
         self.linker_indexer = KmerIndexer([DoubleBarcodeDetector.LINKER], kmer_size=5)
         self.barcode_indexer = KmerIndexer(joint_barcode_list, kmer_size=5)
@@ -52,6 +52,7 @@ class DoubleBarcodeDetector:
             self.umi_set =  set(umi_list)
             logger.debug("Loaded %d UMIs" % len(umi_list))
             self.umi_indexer = KmerIndexer(umi_list, kmer_size=5)
+        self.min_score = min_score
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
@@ -118,7 +119,7 @@ class DoubleBarcodeDetector:
         logger.debug("Barcode: %s" % (potential_barcode))
         matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
         barcode, bc_score, bc_start, bc_end = \
-            find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=13)
+            find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=self.min_score)
 
         if barcode is None:
             return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end)
@@ -240,9 +241,9 @@ def bam_file_chunk_reader(handler):
     yield current_chunk
 
 
-def process_chunk(barcodes, read_chunk, output_file, num):
+def process_chunk(barcodes, read_chunk, output_file, num, min_score):
     output_file += "_" + str(num)
-    barcode_detector = DoubleBarcodeDetector(barcodes)
+    barcode_detector = DoubleBarcodeDetector(barcodes, min_score=min_score)
     barcode_caller = BarcodeCaller(output_file, barcode_detector)
     barcode_caller.process_chunk(read_chunk)
     return output_file
@@ -251,7 +252,7 @@ def process_chunk(barcodes, read_chunk, output_file, num):
 def process_single_thread(args):
     barcodes = load_barcodes(args.barcodes)
     umis = load_barcodes(args.umi) if args.umi else None
-    barcode_detector = DoubleBarcodeDetector(barcodes, umi_list=umis)
+    barcode_detector = DoubleBarcodeDetector(barcodes, umi_list=umis, min_score=args.min_score)
     barcode_caller = BarcodeCaller(args.output, barcode_detector)
     barcode_caller.process(args.input)
 
@@ -292,7 +293,8 @@ def process_in_parallel(args):
         itertools.repeat(barcodes),
         read_chunk_gen,
         itertools.repeat(os.path.join(tmp_dir, "bc")),
-        itertools.count(start=0, step=1)
+        itertools.count(start=0, step=1),
+        itertools.repeat(args.min_score)
     )
 
     with ProcessPoolExecutor(max_workers=args.threads) as proc:
@@ -336,6 +338,7 @@ def parse_args():
     parser.add_argument("--umi", "-u", type=str, help="potential UMIs")
     parser.add_argument("--input", "-i", type=str, help="input reads in [gzipped] FASTA, FASTQ, BAM, SAM)", required=True)
     parser.add_argument("--threads", "-t", type=int, help="threads to use", default=8)
+    parser.add_argument("--min_score", type=int, help="minimal barcode score", default=12)
 
     args = parser.parse_args()
     return args
