@@ -5,8 +5,8 @@ import editdistance
 count = 0
 barcoded = 0
 correct = 0
-umis_dists = [0] * 10
-true_umis_dists = [0] * 10
+umis_dists = [0] * 15
+true_umis_dists = [0] * 15
 
 for l in open(sys.argv[1]):
     count += 1
@@ -21,13 +21,16 @@ for l in open(sys.argv[1]):
     true_umi = readv[4]
     if true_bc == bc:
         correct += 1
+    if len(umi) > 12:
+        umi = umi[:13]
     umi_ed = editdistance.eval(true_umi, umi)
     umis_dists[umi_ed] += 1
     if v[9].startswith("T"):
         true_umis_dists[umi_ed] += 1
 
 print("Total\t%d\nBarcode\t%d\nCorrect\t%d" % (count, barcoded, correct))
-print("UMIs within 1%d\nUMIs within 2%d\nUMIs within 3%d\n" % (sum(umis_dists[:2]), sum(umis_dists[:3]), sum(umis_dists[:4])))
+print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(umis_dists[:2]), sum(umis_dists[:3]), sum(umis_dists[:4])))
 print(true_umis_dists)
-print("UMIs within 1%d\nUMIs within 2%d\nUMIs within 3%d\n" % (sum(true_umis_dists[:2]), sum(true_umis_dists[:3]), sum(true_umis_dists[:4])))
+print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(true_umis_dists[:2]), sum(true_umis_dists[:3]), sum(true_umis_dists[:4])))
 print(true_umis_dists)
+print()
