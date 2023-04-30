@@ -43,8 +43,9 @@ class UMIFilter:
         barcode_dict = {}
         for l in open(in_file):
             v = l.strip().split("\t")
+            if len(v) < 10: continue
             barcode = v[6]
-            if len(v) < 10 or barcode == "*":
+            if barcode == "*":
                 continue
             if trusted_umis and v[9] != "True":
                 continue
@@ -65,10 +66,10 @@ class UMIFilter:
             similar_umi = None
             best_dist = 100
             # choose the best UMI among checked
-            for occ in occurrences:
-                ed = editdistance.eval(occ[0], m.umi)
+            for occ in occurrences.keys():
+                ed = editdistance.eval(occ, m.umi)
                 if ed <= self.max_edit_distance and ed < best_dist:
-                    similar_umi = occ[0]
+                    similar_umi = occ
                     best_dist = ed
 
             if similar_umi is None:
