@@ -54,8 +54,8 @@ def main():
     barcode_counts = barcode_distribution(args.input)
     max_count = max(barcode_counts.values())
     bin_size = 100
-    bins = [i * bin_size for i in range(max_count / bin_size + 2)]
-    hist, b = histogram(barcode_counts.values(), bins)
+    bins = [i * 10 for i in range(21)] +  [i * bin_size for i in range(3, int(max_count / bin_size) + 2)]
+    hist, b = histogram(list(barcode_counts.values()), bins)
     for i, v in enumerate(hist):
         print("%d\t%d" % (b[i], hist[i]))
 
