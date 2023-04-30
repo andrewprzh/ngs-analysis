@@ -25,6 +25,12 @@ class KmerIndexer:
             for kmer in self._get_kmers(barcode):
                 self.index[kmer].append(i)
 
+    def append(self, barcode):
+        self.barcode_list.append(barcode)
+        index = len(self.barcode_list) - 1
+        for kmer in self._get_kmers(barcode):
+            self.index[kmer].append(index)
+
     # @params:
     # sequence: a string to be searched against known strings
     # max_hits: return at most max_hits candidates
