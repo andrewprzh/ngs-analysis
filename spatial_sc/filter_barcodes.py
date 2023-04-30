@@ -54,6 +54,8 @@ def main():
         fname, outer_ext = os.path.splitext(file_full_name)
         args.output = fname + ".filtered" + outer_ext
     whitelist = set() if not args.white_list else load_barcode_set(args.white_list)
+    if whitelist:
+        print("Loaded %d barcodes" % len(whitelist))
     filter_barcodes(args.input, args.output, args.trusted_umis, args.min_score, whitelist=whitelist)
 
 
