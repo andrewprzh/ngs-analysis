@@ -88,7 +88,8 @@ class GeneBarcodeStats:
                 if barcode_info[2] >= self.good_barcode_score:
                     assigned_good_barcoded += 1
 
-            if len(read_info) > 1:
+            all_genes = set([x[1] for x in read_info])
+            if len(all_genes) > 1:
                 continue
             unique += 1
             if barcode_info:
@@ -116,7 +117,7 @@ class GeneBarcodeStats:
                                                                        unique_spliced_barcoded,
                                                                        unique_spliced_good_barcoded))
         outf.close()
-        
+
 
 def set_logger(logger_instance):
     logger_instance.setLevel(logging.INFO)
