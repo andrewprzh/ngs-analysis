@@ -91,6 +91,7 @@ def set_logger(logger_instance):
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input", "-i", type=str, help="input reads in [gzipped] FASTA, FASTQ, BAM, SAM)", required=True)
+    parser.add_argument("--output", "-o", type=str, help="output file", required=True)
 
     args = parser.parse_args()
     return args
@@ -101,7 +102,7 @@ def main():
     args = parse_args()
     set_logger(logger)
     barcode_detector = PRCDetector()
-    barcode_caller = BarcodeCaller("prc_out.tsv", barcode_detector)
+    barcode_caller = BarcodeCaller(args.output, barcode_detector)
     barcode_caller.process(args.input)
 
 
