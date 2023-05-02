@@ -34,9 +34,9 @@ class MoleculeInfo:
 
 class UMIFilter:
     def __init__(self, args):
+        self.args = args
         self.max_edit_distance = args.min_distance
         self.barcode_dict = self.load_barcodes(args.barcodes)
-        self.args = args
         self.discarded = 0
         self.no_barcode = 0
         self.no_gene = 0
@@ -75,10 +75,10 @@ class UMIFilter:
             best_dist = 100
             # choose the best UMI among checked
             for occ in occurrences.keys():
-                ed = editdistance.eval(occ, m.umi)
-                if ed <= self.max_edit_distance and ed < best_dist:
+                #ed = editdistance.eval(occ, m.umi)
+                if occ == m.umi:  #ed <= self.max_edit_distance and ed < best_dist:
                     similar_umi = occ
-                    best_dist = ed
+                    best_dist = 0 #ed
 
             if similar_umi is None:
                 # in none is added, add to indexer
@@ -148,7 +148,7 @@ class UMIFilter:
                 continue
             if assignment_type == "ambiguous":
                 self.ambiguous += 1
-                if self.args.unique_only: continue
+                if self.args.only_unique: continue
             if read_id in read_to_gene and read_to_gene[read_id] != gene_id:
                 if assignment_type != "ambiguous":
                     self.ambiguous += 1
@@ -158,7 +158,7 @@ class UMIFilter:
             exon_blocks = list(map(lambda x: tuple(map(int, x.split('-'))), exon_blocks_str.split(',')))
             if len(exon_blocks) == 1:
                 self.monoexonic += 1
-                if self.args.only_splcied: continue
+                if self.args.only_spliced: continue
 
             read_interval = (exon_blocks[0][0], exon_blocks[-1][1])
             if current_chr != chr_id or not overlaps(current_interval, read_interval):
@@ -179,8 +179,8 @@ class UMIFilter:
         outf.close()
         logger.info("Saved %d reads to %s" % (read_count, output_file))
         logger.info("Total assignments processed %d" % self.total_reads)
-        logger.info("Unspliced %d %s" % (self.monoexonic, "(discarded)" if self.args.spliced_only else ""))
-        logger.info("Ambiguous %d %s" % (self.monoexonic, "(discarded)" if self.args.unique_only else ""))
+        logger.info("Unspliced %d %s" % (self.monoexonic, "(discarded)" if self.args.only_spliced else ""))
+        logger.info("Ambiguous %d %s" % (self.ambiguous, "(discarded)" if self.args.only_unique else ""))
         logger.info("No barcode detected %d" % self.no_barcode)
         logger.info("No gene assigned %d" % self.no_gene)
         logger.info("Discarded as duplicates %d" % self.discarded)
@@ -202,8 +202,8 @@ def parse_args():
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
     parser.add_argument("--min_distance", type=int, help="minimal edit distance for UMIs to be considered distinct", default=3)
     parser.add_argument("--untrusted_umis", action="store_true", help="keep only trusted UMIs", default=False)
-    parser.add_argument("--only_spliced", action="store_true", help="keep only trusted UMIs", default=False)
-    parser.add_argument("--only_unique", action="store_true", help="keep only trusted UMIs", default=False)
+    parser.add_argument("--only_spliced", action="store_true", help="keep only spliced reads", default=False)
+    parser.add_argument("--only_unique", action="store_true", help="keep only non-ambiguous reads", default=False)
 
     args = parser.parse_args()
     return args
