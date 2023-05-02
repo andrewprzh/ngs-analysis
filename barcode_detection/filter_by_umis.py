@@ -36,6 +36,8 @@ class UMIFilter:
     def __init__(self, args):
         self.max_edit_distance = args.min_distance
         self.barcode_dict = self.load_barcodes(args.barcodes, not args.untrusted_umis)
+        self.discarded = 0
+
 
     def load_barcodes(self, in_file, trusted_umis=False):
         # afaf0413-4dd7-491a-928b-39da40d68fb3    99      56      66      83      +       GCCGATACGCCAAT  CGACTGAAG       13      True
@@ -56,6 +58,7 @@ class UMIFilter:
 
     def _process_duplicates(self, molecule_list):
         if len(molecule_list) <= 1:
+            logger.debug("Unique " + molecule_list[0].read_id)
             return [x.read_id for x in molecule_list]
 
         resulting_reads = []
@@ -95,6 +98,7 @@ class UMIFilter:
                         best_read.exon_blocks[-1][1] - best_read.exon_blocks[0][0]:
                     best_read = m
             logger.debug("Selected %s %s" % (best_read.read_id, best_read.umi))
+            self.discarded += len(umi_dict[umi]) - 1
 
             resulting_reads.append(best_read.read_id)
 
@@ -155,6 +159,7 @@ class UMIFilter:
         read_count += self._process_chunk(gene_barcode_dict, outf)
         outf.close()
         logger.info("Saved %d reads to %s" % (read_count, output_file))
+        logger.info("Discarded %d" % self.discarded)
 
 
 def set_logger(logger_instance):
