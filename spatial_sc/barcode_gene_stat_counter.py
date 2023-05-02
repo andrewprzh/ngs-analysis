@@ -22,9 +22,8 @@ logger = logging.getLogger('GeneBarcodeStats')
 class GeneBarcodeStats:
     def __init__(self, args):
         self.args = args
-        self.max_edit_distance = args.min_distance
         self.barcode_dict = self.load_barcodes(args.barcodes)
-        self.read_to_gene_dict = self.load_assignments(args.read_assignmetns)
+        self.read_to_gene_dict = self.load_assignments(args.read_assignments)
         self.good_barcode_score = 13
 
     def load_barcodes(self, in_file):
@@ -59,7 +58,7 @@ class GeneBarcodeStats:
             exon_blocks = list(map(lambda x: tuple(map(int, x.split('-'))), exon_blocks_str.split(',')))
             assignment_count += 1
             read_to_gene_dict[read_id].append((assignment_type, gene_id, len(exon_blocks)))
-        logger.info("Loaded %d barcodes " % assignment_count)
+        logger.info("Loaded %d assignments " % assignment_count)
         return read_to_gene_dict
 
     def count_stats(self):
@@ -78,7 +77,7 @@ class GeneBarcodeStats:
         for read_id in self.read_to_gene_dict.keys():
             read_info = self.read_to_gene_dict[read_id]
             assignment_type = read_info[0][0]
-            if len(read_info[0][2]) > 1:
+            if read_info[0][2] > 1:
                 spliced += 1
             if assignment_type.startswith("noninformative"):
                 continue
@@ -96,7 +95,7 @@ class GeneBarcodeStats:
                 unique_barcoded += 1
                 if barcode_info[2] >= self.good_barcode_score:
                     unique_good_barcoded += 1
-            if len(read_info[0][2]) <= 1:
+            if read_info[0][2] <= 1:
                 continue
             unique_spliced += 1
             if barcode_info:
