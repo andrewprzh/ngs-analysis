@@ -109,11 +109,15 @@ class GeneBarcodeStats:
         logger.info("Uniquely assigned %d , of them barcoded %d %d" % (unique, unique_barcoded, unique_good_barcoded))
         logger.info("Uniquely assigned and spliced %d , of them barcoded %d %d" %
                     (unique_spliced, unique_spliced_barcoded, unique_spliced_good_barcoded))
-        print("\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d" % (total_reads, spliced, assigned, assigned_barcoded,
-                                                                assigned_good_barcoded, unique, unique_barcoded,
-                                                                unique_good_barcoded, unique_spliced,
-                                                                unique_spliced_barcoded, unique_spliced_good_barcoded))
 
+        outf = open(self.args.output, "w")
+        outf.write("\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n" % (total_reads, spliced, assigned, assigned_barcoded,
+                                                                       assigned_good_barcoded, unique, unique_barcoded,
+                                                                       unique_good_barcoded, unique_spliced,
+                                                                       unique_spliced_barcoded,
+                                                                       unique_spliced_good_barcoded))
+        outf.close()
+        
 
 def set_logger(logger_instance):
     logger_instance.setLevel(logging.INFO)
