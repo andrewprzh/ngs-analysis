@@ -35,11 +35,16 @@ class MoleculeInfo:
 class UMIFilter:
     def __init__(self, args):
         self.max_edit_distance = args.min_distance
-        self.barcode_dict = self.load_barcodes(args.barcodes, not args.untrusted_umis)
+        self.barcode_dict = self.load_barcodes(args.barcodes)
+        self.args = args
         self.discarded = 0
+        self.no_barcode = 0
+        self.no_gene = 0
+        self.total_reads = 0
+        self.ambiguous = 0
+        self.monoexonic = 0
 
-
-    def load_barcodes(self, in_file, trusted_umis=False):
+    def load_barcodes(self, in_file):
         # afaf0413-4dd7-491a-928b-39da40d68fb3    99      56      66      83      +       GCCGATACGCCAAT  CGACTGAAG       13      True
         logger.info("Loading barcodes from " + in_file)
         barcode_dict = {}
@@ -49,7 +54,7 @@ class UMIFilter:
             barcode = v[6]
             if barcode == "*":
                 continue
-            if trusted_umis and v[9] != "True":
+            if not self.args.untrusted_umis and v[9] != "True":
                 continue
             umi = v[7]
             barcode_dict[v[0]] = (barcode, umi)
@@ -133,13 +138,27 @@ class UMIFilter:
             read_id = v[0]
             chr_id = v[1]
             gene_id = v[4]
-            if gene_id == "." or read_id not in self.barcode_dict:
+            assignment_type = v[5]
+            self.total_reads += 1
+            if gene_id == ".":
+                self.no_gene += 1
                 continue
+            if read_id not in self.barcode_dict:
+                self.no_barcode += 1
+                continue
+            if assignment_type == "ambiguous":
+                self.ambiguous += 1
+                if self.args.unique_only: continue
             if read_id in read_to_gene and read_to_gene[read_id] != gene_id:
+                if assignment_type != "ambiguous":
+                    self.ambiguous += 1
                 # ignore ambiguous gene assignments
                 continue
             exon_blocks_str = v[7]
             exon_blocks = list(map(lambda x: tuple(map(int, x.split('-'))), exon_blocks_str.split(',')))
+            if len(exon_blocks) == 1:
+                self.monoexonic += 1
+                if self.args.only_splcied: continue
 
             read_interval = (exon_blocks[0][0], exon_blocks[-1][1])
             if current_chr != chr_id or not overlaps(current_interval, read_interval):
@@ -159,14 +178,18 @@ class UMIFilter:
         read_count += self._process_chunk(gene_barcode_dict, outf)
         outf.close()
         logger.info("Saved %d reads to %s" % (read_count, output_file))
-        logger.info("Discarded %d" % self.discarded)
+        logger.info("Total assignments processed %d" % self.total_reads)
+        logger.info("Unspliced %d %s" % (self.monoexonic, "(discarded)" if self.args.spliced_only else ""))
+        logger.info("Ambiguous %d %s" % (self.monoexonic, "(discarded)" if self.args.unique_only else ""))
+        logger.info("No barcode detected %d" % self.no_barcode)
+        logger.info("No gene assigned %d" % self.no_gene)
+        logger.info("Discarded as duplicates %d" % self.discarded)
 
 
 def set_logger(logger_instance):
     logger_instance.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
-
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     logger_instance.addHandler(ch)
@@ -179,6 +202,8 @@ def parse_args():
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
     parser.add_argument("--min_distance", type=int, help="minimal edit distance for UMIs to be considered distinct", default=3)
     parser.add_argument("--untrusted_umis", action="store_true", help="keep only trusted UMIs", default=False)
+    parser.add_argument("--only_spliced", action="store_true", help="keep only trusted UMIs", default=False)
+    parser.add_argument("--only_unique", action="store_true", help="keep only trusted UMIs", default=False)
 
     args = parser.parse_args()
     return args
