@@ -74,6 +74,8 @@ class GeneBarcodeStats:
         unique_spliced_barcoded = 0
         unique_spliced_good_barcoded = 0
         barcode_gene_pairs = set()
+        hq_barcode_gene_pairs = set()
+
 
         for read_id in self.read_to_gene_dict.keys():
             read_info = self.read_to_gene_dict[read_id]
@@ -92,11 +94,13 @@ class GeneBarcodeStats:
             all_genes = set([x[1] for x in read_info])
             if len(all_genes) > 1:
                 continue
-            barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
+
             unique += 1
             if barcode_info:
+                barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
                 unique_barcoded += 1
                 if barcode_info[2] >= self.good_barcode_score:
+                    hq_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
                     unique_good_barcoded += 1
             if read_info[0][2] <= 1:
                 continue
@@ -111,7 +115,7 @@ class GeneBarcodeStats:
         logger.info("Uniquely assigned %d , of them barcoded %d %d" % (unique, unique_barcoded, unique_good_barcoded))
         logger.info("Uniquely assigned and spliced %d , of them barcoded %d %d" %
                     (unique_spliced, unique_spliced_barcoded, unique_spliced_good_barcoded))
-        logger.info("Gene barcode pairs %d" % len(barcode_gene_pairs))
+        logger.info("Gene barcode pairs %d %d " % (len(barcode_gene_pairs), len(hq_barcode_gene_pairs)))
 
         outf = open(self.args.output, "w")
         outf.write("\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n" % (total_reads, spliced, assigned, assigned_barcoded,
