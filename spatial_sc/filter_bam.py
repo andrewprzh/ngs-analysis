@@ -15,9 +15,10 @@ def read_called_barcodes(inf):
     read_set = set()
     for l in open(inf):
         v = l.strip().split('\t')
-        if len(v) < 7 or v[6] == "*":
+        if len(v) >= 7 and v[6] == "*":
             continue
         read_set.add(v[0])
+    print("Loaded %d read ids" % len(read_set))
     return read_set
 
 
