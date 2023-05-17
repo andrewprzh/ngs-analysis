@@ -20,10 +20,9 @@ logger = logging.getLogger('GeneBarcodeStats')
 
 
 class GeneBarcodeStats:
-    def __init__(self, args):
-        self.args = args
-        self.barcode_dict = self.load_barcodes(args.barcodes)
-        self.read_to_gene_dict = self.load_assignments(args.read_assignments)
+    def __init__(self, barcodes, read_assignments):
+        self.barcode_dict = self.load_barcodes(barcodes)
+        self.read_to_gene_dict = self.load_assignments(read_assignments)
         self.good_barcode_score = 13
 
     def load_barcodes(self, in_file):
@@ -61,7 +60,7 @@ class GeneBarcodeStats:
         logger.info("Loaded %d assignments " % assignment_count)
         return read_to_gene_dict
 
-    def count_stats(self):
+    def count_stats(self, outf):
         total_reads = len(self.read_to_gene_dict.keys())
         spliced = 0
         assigned = 0
@@ -73,10 +72,10 @@ class GeneBarcodeStats:
         unique_spliced = 0
         unique_spliced_barcoded = 0
         unique_spliced_good_barcoded = 0
-        barcode_gene_pairs = set()
-        hq_barcode_gene_pairs = set()
-        spliced_barcode_gene_pairs = set()
-        spliced_hq_barcode_gene_pairs = set()
+        self.barcode_gene_pairs = set()
+        self.hq_barcode_gene_pairs = set()
+        self.spliced_barcode_gene_pairs = set()
+        self.spliced_hq_barcode_gene_pairs = set()
 
         for read_id in self.read_to_gene_dict.keys():
             read_info = self.read_to_gene_dict[read_id]
@@ -98,35 +97,39 @@ class GeneBarcodeStats:
 
             unique += 1
             if barcode_info:
-                barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
+                self.barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
                 unique_barcoded += 1
                 if barcode_info[2] >= self.good_barcode_score:
-                    hq_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
+                    self.hq_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
                     unique_good_barcoded += 1
             if read_info[0][2] <= 1:
                 continue
             unique_spliced += 1
             if barcode_info:
-                spliced_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
+                self.spliced_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
                 unique_spliced_barcoded += 1
                 if barcode_info[2] >= self.good_barcode_score:
                     unique_spliced_good_barcoded += 1
-                    spliced_hq_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
+                    self.spliced_hq_barcode_gene_pairs.add((list(all_genes)[0], barcode_info[0]))
 
         logger.info("Total reads %d , of them spliced %s" % (total_reads, spliced))
         logger.info("Assigned to any gene %d , of them barcoded %d %d" % (assigned, assigned_barcoded, assigned_good_barcoded))
         logger.info("Uniquely assigned %d , of them barcoded %d %d" % (unique, unique_barcoded, unique_good_barcoded))
         logger.info("Uniquely assigned and spliced %d , of them barcoded %d %d" %
                     (unique_spliced, unique_spliced_barcoded, unique_spliced_good_barcoded))
-        logger.info("Gene barcode pairs %d %d " % (len(barcode_gene_pairs), len(hq_barcode_gene_pairs)))
-        logger.info("Spliced gene barcode pairs %d %d " % (len(spliced_barcode_gene_pairs), len(spliced_hq_barcode_gene_pairs)))
+        logger.info("Gene barcode pairs %d %d " % (len(self.barcode_gene_pairs), len(self.hq_barcode_gene_pairs)))
+        logger.info("Spliced gene barcode pairs %d %d " % (len(self.spliced_barcode_gene_pairs), len(self.spliced_hq_barcode_gene_pairs)))
 
-        outf = open(self.args.output, "w")
+        outf = open(outf + ".stats.tsv", "w")
         outf.write("\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n" % (total_reads, spliced, assigned, assigned_barcoded,
                                                                        assigned_good_barcoded, unique, unique_barcoded,
                                                                        unique_good_barcoded, unique_spliced,
                                                                        unique_spliced_barcoded,
                                                                        unique_spliced_good_barcoded))
+
+        outf.write("\nUnique barcode gene pairs\n%d\n%d\n%d\n%d\n" %
+                   (len(self.barcode_gene_pairs), len(self.hq_barcode_gene_pairs),
+                    len(self.spliced_barcode_gene_pairs), len(self.spliced_hq_barcode_gene_pairs)))
         outf.close()
 
 
@@ -143,7 +146,9 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output prefix name", required=True)
     parser.add_argument("--barcodes", "-b", type=str, help="read - barcode - UMI table", required=True)
+    parser.add_argument("--barcodes2", type=str, help="read - barcode - UMI table")
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
+    parser.add_argument("--read_assignments2", "-r", type=str, help="IsoQuant read assignments")
 
     args = parser.parse_args()
     return args
@@ -153,8 +158,19 @@ def main():
     args = parse_args()
     set_logger(logger)
 
-    stat_counter = GeneBarcodeStats(args)
-    stat_counter.count_stats()
+    stat_counter1 = GeneBarcodeStats(args.barcodes, args.read_assignments)
+    stat_counter1.count_stats(args.output + "_1")
+    if args.barcodes2:
+        stat_counter2 = GeneBarcodeStats(args.barcodes2, args.read_assignments2)
+        stat_counter2.count_stats(args.output + "_2")
+        logger.info("Overlap between BD-gene pairs: %d" %
+                    len(stat_counter1.barcode_gene_pairs.intersection(stat_counter2.barcode_gene_pairs)))
+        logger.info("Overlap between HQ BD-gene pairs: %d" %
+                    len(stat_counter1.hq_barcode_gene_pairs.intersection(stat_counter2.hq_barcode_gene_pairs)))
+        logger.info("Overlap between spliced BD-gene pairs: %d" %
+                    len(stat_counter1.spliced_barcode_gene_pairs.intersection(stat_counter2.spliced_barcode_gene_pairs)))
+        logger.info("Overlap between spliced HQ BD-gene pairs: %d" %
+                    len(stat_counter1.spliced_hq_barcode_gene_pairs.intersection(stat_counter2.spliced_hq_barcode_gene_pairs)))
 
 
 if __name__ == "__main__":
