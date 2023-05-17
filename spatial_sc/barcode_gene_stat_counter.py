@@ -148,7 +148,7 @@ def parse_args():
     parser.add_argument("--barcodes", "-b", type=str, help="read - barcode - UMI table", required=True)
     parser.add_argument("--barcodes2", type=str, help="read - barcode - UMI table")
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
-    parser.add_argument("--read_assignments2", "-r", type=str, help="IsoQuant read assignments")
+    parser.add_argument("--read_assignments2", type=str, help="IsoQuant read assignments")
 
     args = parser.parse_args()
     return args
