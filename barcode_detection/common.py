@@ -86,9 +86,11 @@ def find_candidate_with_max_score(barcode_matches, read_sequence, min_score=10):
     return best_barcode, best_match[1], best_match[2] - 1
 
 
-def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=10):
+def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=10, score_diff=0):
     best_match = [0, 0, 0]
     best_barcode = None
+    second_best_score = 0
+
     align_mgr = AlignmentMgr(match_score=1, mismatch_penalty=1)
     align_mgr.set_reference(read_sequence)
     for barcode in barcode_matches.keys():
@@ -99,13 +101,18 @@ def find_candidate_with_max_score_ssw(barcode_matches, read_sequence, min_score=
 
         if alignment.optimal_score > best_match[0]:
             best_barcode = barcode
+            second_best_score = best_match[0]
             best_match[0] = alignment.optimal_score
             best_match[1] = alignment.reference_start
             best_match[2] = alignment.reference_end
         elif alignment.optimal_score  == best_match[0] and alignment.reference_start < best_match[1]:
             best_barcode = barcode
+            second_best_score = best_match[0]
             best_match[1] = alignment.reference_start
             best_match[2] = alignment.reference_end
+
+    if best_match[0] - second_best_score < score_diff:
+        return None, 0, 0, 0
 
     return best_barcode, best_match[0], best_match[1], best_match[2]
 
