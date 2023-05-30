@@ -1,5 +1,6 @@
 import sys
 import editdistance
+from collections import defaultdict
 # READ_1_ENST00000294189.11_TGACAATCTCCGTA_TACAATAGG_0_aligned_25_R_65_816_74     128     86      95      112     -       TGACAATCTCCGTA  TACAATAGG       14      True
 
 count = 0
@@ -7,6 +8,17 @@ barcoded = 0
 correct = 0
 umis_dists = [0] * 15
 true_umis_dists = [0] * 15
+
+
+def print_dict(d):
+    l = [(x, d[x]) for x in d.keys()]
+    l = sorted(l, key=lambda x:x[1], reverse=True)
+    for k,v in l:
+        print("%s\t%d" % (k, v))
+
+
+incorrectly_called = defaultdict(int)
+incorrectly_detected = defaultdict(int)
 
 for l in open(sys.argv[1]):
     count += 1
@@ -21,6 +33,9 @@ for l in open(sys.argv[1]):
     true_umi = readv[4]
     if true_bc == bc:
         correct += 1
+    else:
+        incorrectly_called[bc] += 1
+        incorrectly_detected[true_bc] += 1
     if len(umi) > 12:
         umi = umi[:13]
     umi_ed = editdistance.eval(true_umi, umi)
@@ -33,4 +48,8 @@ print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(umis_dist
 print(true_umis_dists)
 print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(true_umis_dists[:2]), sum(true_umis_dists[:3]), sum(true_umis_dists[:4])))
 print(true_umis_dists)
+print()
+print_dict(incorrectly_called)
+print()
+print_dict(incorrectly_detected)
 print()
