@@ -23,9 +23,12 @@ def filter_reads(in_file_name, out_file_prefix, barcoded_reads, min_reads = 100)
     barcode_to_reads = defaultdict(list)
     count = 0
     passed = 0
+    unaligned = 0
+    unbarcoded = 0
 
     for read in inf:
         if read.reference_id == -1:
+            unaligned += 1
             continue
 
         count += 1
@@ -33,13 +36,14 @@ def filter_reads(in_file_name, out_file_prefix, barcoded_reads, min_reads = 100)
             sys.stdout.write("Processed " + str(count) + " reads\r")
 
         if read.query_name not in barcoded_reads:
+            unbarcoded += 1
             continue
 
         barcode_to_reads[barcoded_reads[read.query_name]].append(read)
         passed += 1
 
-    print("Processed " + str(count) + " reads, collected " + str(passed))
-    inf.close()
+    print("Processed %d reads, unaligned %d" % (count, unaligned))
+    print("Among aligned reads, %d are not barcoded, %d were collected" % (unbarcoded, passed))
 
     bc_count = 0
     for bc in barcode_to_reads.keys():
@@ -53,6 +57,8 @@ def filter_reads(in_file_name, out_file_prefix, barcoded_reads, min_reads = 100)
 
         outf.close()
         pysam.index(out_file_name)
+    print("Created " + str(bc_count) + " files")
+    inf.close()
 
 
 if len(sys.argv) < 3:
