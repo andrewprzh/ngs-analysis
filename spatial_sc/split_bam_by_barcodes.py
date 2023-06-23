@@ -47,10 +47,10 @@ def filter_reads(in_file_name, out_file_prefix, barcoded_reads, min_reads = 100)
 
     bc_count = 0
     for bc in barcode_to_reads.keys():
-        out_file_name = out_file_prefix + bc + ".bam"
-        outf = pysam.AlignmentFile(out_file_name, "wb", template=inf)
         if len(barcode_to_reads[bc]) < min_reads:
             continue
+        out_file_name = out_file_prefix + bc + ".bam"
+        outf = pysam.AlignmentFile(out_file_name, "wb", template=inf)
         bc_count += 1
         for read in barcode_to_reads[bc]:
             outf.write(read)
@@ -66,7 +66,7 @@ if len(sys.argv) < 3:
     exit(0)
 
 if len(sys.argv) == 4:
-    prefix = "." + sys.argv[3]
+    prefix = sys.argv[3]
 else:
     prefix = ""
 
