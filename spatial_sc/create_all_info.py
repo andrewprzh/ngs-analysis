@@ -52,6 +52,7 @@ class AllInfoGenerator:
     def convert_to_allinfo(self, assignment_file, output_file):
         outf = open(output_file, "w")
         logger.info("Converting " + assignment_file)
+        processed_reads = set()
         assignment_count = 0
         # 1251f521-d4c2-4dcc-96d7-85070cc44e12    chr1    -       ENST00000477740.5       ENSG00000238009.6       ambiguous       ism_internal    112699-112804,120721-120759     PolyA=False
         for l in open(assignment_file):
@@ -62,6 +63,10 @@ class AllInfoGenerator:
             strand = v[1]
             gene_id = v[4]
             assignment_type = v[5]
+            if not assignment_type.startswith("unique"):
+                if read_id in processed_reads:
+                    continue
+                processed_reads.add(read_id)
             exon_blocks_str = v[7]
             exon_blocks = list(map(lambda x: tuple(map(int, x.split('-'))), exon_blocks_str.split(',')))
             intron_blocks = junctions_from_blocks(exon_blocks)
@@ -108,8 +113,8 @@ def main():
     args = parse_args()
     set_logger(logger)
     convertor = AllInfoGenerator(args.barcodes)
-    convertor.good_barcode_score = 13
-    convertor.convert_to_allinfo(args.read_assignmendt, args.output + ".score13.tsv")
+    # convertor.good_barcode_score = 13
+    # convertor.convert_to_allinfo(args.read_assignmendt, args.output + ".score13.tsv")
     convertor.good_barcode_score = 14
     convertor.convert_to_allinfo(args.read_assignmendt, args.output + ".score14.tsv")
 
