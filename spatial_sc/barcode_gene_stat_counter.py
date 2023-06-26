@@ -15,7 +15,6 @@ from collections import defaultdict
 import logging
 
 
-
 logger = logging.getLogger('GeneBarcodeStats')
 
 
