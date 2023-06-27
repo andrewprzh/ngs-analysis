@@ -60,7 +60,7 @@ class AllInfoGenerator:
             v = l.strip().split("\t")
             read_id = v[0]
             chr_id = v[1]
-            strand = v[1]
+            strand = v[2]
             gene_id = v[4]
             assignment_type = v[5]
             if not assignment_type.startswith("unique"):
@@ -72,6 +72,7 @@ class AllInfoGenerator:
             intron_blocks = junctions_from_blocks(exon_blocks)
             exons_str = ";%;" + ";%;".join(["%s_%d_%d_%s" % (chr_id, e[0], e[1], strand) for e in exon_blocks])
             introns_str = ";%;" + ";%;".join(["%s_%d_%d_%s" % (chr_id, e[0], e[1], strand) for e in intron_blocks])
+
             barcode = "*"
             umi = "*"
             if read_id in self.barcode_dict:
@@ -81,8 +82,19 @@ class AllInfoGenerator:
                     umi = self.barcode_dict[read_id][1]
             cell_type = "None"
             read_type = "known" if assignment_type.startswith("unique") else "novel"
-            outf.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n" % (read_id, gene_id, cell_type, barcode, umi, exons_str,
-                                                                 introns_str, read_type, len(intron_blocks)))
+
+            polyA = "NoPolyA"
+            TSS = "NoTSS"
+            matching_events = v[6]
+            if "tss_match" in matching_events:
+                tss_pos = exon_blocks[-1][1] if strand == "-" else exon_blocks[0][0]
+                TSS = "%s_%d_%d_%s" % (chr_id, tss_pos, tss_pos, strand)
+            if "correct_polya" in matching_events:
+                polyA_pos = exon_blocks[-1][1] if strand == "+" else exon_blocks[0][0]
+                polyA = "%s_%d_%d_%s" % (chr_id, polyA_pos, polyA_pos, strand)
+            outf.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n" % (read_id, gene_id, cell_type, barcode, umi,
+                                                                         introns_str, TSS, polyA, exons_str, read_type,
+                                                                         len(intron_blocks)))
             assignment_count += 1
 
         logger.info("Converted %d assignments " % assignment_count)
