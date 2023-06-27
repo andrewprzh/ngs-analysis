@@ -127,8 +127,8 @@ def main():
     convertor = AllInfoGenerator(args.barcodes)
     # convertor.good_barcode_score = 13
     # convertor.convert_to_allinfo(args.read_assignmendt, args.output + ".score13.tsv")
-    convertor.good_barcode_score = 14
-    convertor.convert_to_allinfo(args.read_assignments, args.output + ".score14.tsv")
+    convertor.good_barcode_score = 13
+    convertor.convert_to_allinfo(args.read_assignments, args.output + ".tsv")
 
 
 if __name__ == "__main__":
