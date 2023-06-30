@@ -36,6 +36,7 @@ class UMIFilter:
     def __init__(self, args):
         self.args = args
         self.max_edit_distance = args.min_distance
+        self.disregard_length_diff = args.disregard_length_diff
         self.barcode_dict = self.load_barcodes(args.barcodes)
         self.discarded = 0
         self.no_barcode = 0
@@ -61,6 +62,22 @@ class UMIFilter:
         logger.info("Loaded %d barcodes " % len(barcode_dict))
         return barcode_dict
 
+    def _compare_umis(self, umi1, umi2):
+        if self.max_edit_distance == -1:
+            return True, 0
+        elif self.max_edit_distance == 0:
+            if self.disregard_length_diff:
+                return umi1 == umi2, 0
+            if len(umi1) < len(umi2):
+                return umi1 in umi2, abs(len(umi1) - len(umi2))
+            else:
+                return umi2 in umi1, abs(len(umi1) - len(umi2))
+        else:
+            ed = editdistance.eval(umi1, umi2)
+            if not self.disregard_length_diff:
+                ed -= abs(len(umi1) - len(umi2))
+            return ed <= self.max_edit_distance, ed
+
     def _process_duplicates(self, molecule_list):
         if len(molecule_list) <= 1:
             logger.debug("Unique " + molecule_list[0].read_id)
@@ -75,10 +92,10 @@ class UMIFilter:
             best_dist = 100
             # choose the best UMI among checked
             for occ in occurrences.keys():
-                #ed = editdistance.eval(occ, m.umi)
-                if occ == m.umi:  #ed <= self.max_edit_distance and ed < best_dist:
+                similar, ed = self._compare_umis(occ, m.umi)
+                if similar and ed < best_dist:
                     similar_umi = occ
-                    best_dist = 0 #ed
+                    best_dist = ed
 
             if similar_umi is None:
                 # in none is added, add to indexer
@@ -200,10 +217,16 @@ def parse_args():
     parser.add_argument("--output", "-o", type=str, help="output prefix name", required=True)
     parser.add_argument("--barcodes", "-b", type=str, help="read - barcode - UMI table", required=True)
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
-    parser.add_argument("--min_distance", type=int, help="minimal edit distance for UMIs to be considered distinct", default=3)
+    parser.add_argument("--min_distance", type=int, help="minimal edit distance for UMIs to be considered distinct;"
+                                                         "length difference is added to this values by default;"
+                                                         "0 for equal UMIs, -1 for keeping only a single gene-barcode "
+                                                         "read", default=2)
     parser.add_argument("--untrusted_umis", action="store_true", help="keep only trusted UMIs", default=False)
     parser.add_argument("--only_spliced", action="store_true", help="keep only spliced reads", default=False)
     parser.add_argument("--only_unique", action="store_true", help="keep only non-ambiguous reads", default=False)
+    parser.add_argument("--disregard_length_diff", action="store_true", help="do not account for length difference "
+                                                                             "when comapring UMIs", default=False)
+
 
     args = parser.parse_args()
     return args
