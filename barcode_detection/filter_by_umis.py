@@ -44,6 +44,7 @@ class UMIFilter:
         self.total_reads = 0
         self.ambiguous = 0
         self.monoexonic = 0
+        self.duplicated_molecule_counts = defaultdict(int)
 
     def load_barcodes(self, in_file):
         # afaf0413-4dd7-491a-928b-39da40d68fb3    99      56      66      83      +       GCCGATACGCCAAT  CGACTGAAG       13      True
@@ -80,6 +81,7 @@ class UMIFilter:
 
     def _process_duplicates(self, molecule_list):
         if len(molecule_list) <= 1:
+            self.duplicated_molecule_counts[1] += 1
             logger.debug("Unique " + molecule_list[0].read_id)
             return [x.read_id for x in molecule_list]
 
@@ -98,14 +100,16 @@ class UMIFilter:
                     best_dist = ed
 
             if similar_umi is None:
-                # in none is added, add to indexer
+                # if none is added, add to indexer
                 umi_dict[m.umi].append(m)
                 umi_indexer.append(m.umi)
             else:
                 umi_dict[similar_umi].append(m)
 
         for umi in umi_dict.keys():
-            if len(umi_dict[umi]) == 1:
+            duplicate_count = len(umi_dict[umi])
+            self.duplicated_molecule_counts[duplicate_count] += 1
+            if duplicate_count == 1:
                 resulting_reads.append(umi_dict[umi][0].read_id)
                 continue
 
@@ -201,6 +205,8 @@ class UMIFilter:
         logger.info("No barcode detected %d" % self.no_barcode)
         logger.info("No gene assigned %d" % self.no_gene)
         logger.info("Discarded as duplicates %d" % self.discarded)
+        logger.info("Duplicate count histogram:")
+        logger.info(str(self.duplicated_molecule_counts))
 
 
 def set_logger(logger_instance):
