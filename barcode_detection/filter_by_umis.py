@@ -206,7 +206,11 @@ class UMIFilter:
         logger.info("No gene assigned %d" % self.no_gene)
         logger.info("Discarded as duplicates %d" % self.discarded)
         logger.info("Duplicate count histogram:")
-        logger.info(str(self.duplicated_molecule_counts))
+
+        outf = self.args.output + ".counts"
+        with open(outf, "w") as count_hist_file:
+            for k in sorted(self.duplicated_molecule_counts.keys()):
+                count_hist_file.write("%d\t%d\n" % (k, self.duplicated_molecule_counts[k]))
 
 
 def set_logger(logger_instance):
