@@ -59,7 +59,7 @@ def create_template_spatial(sequence, barcode, umi):
 # polyt="TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
 # tso="CCCATGTACTCTGCGTTGATACCACTGCTT"
 def create_template_10x(sequence, barcode, umi):
-    assert len(barcode) == BC_LENGTH
+    assert len(barcode) == BARCODE_LEN_10X
     barcoded_part = TRUSEQREAD + barcode + umi
     return barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO
 
