@@ -24,7 +24,7 @@ BC_LENGTH = LEFT_BC_LENGTH + RIGHT_BC_LENGTH
 UMI_LENGTH = 9
 
 TSO = "CCCATGTACTCTGCGTTGATACCACTGCTT"
-TRUSEQREAD = "ACACTCTTTCCCTACACGACGCTCTTCCGATCT" # R1
+R1 = "CTACACGACGCTCTTCCGATCT" # R1
 BARCODE_LEN_10X = 16
 UMI_LEN_10X = 12
 
@@ -60,7 +60,7 @@ def create_template_spatial(sequence, barcode, umi):
 # tso="CCCATGTACTCTGCGTTGATACCACTGCTT"
 def create_template_10x(sequence, barcode, umi):
     assert len(barcode) == BARCODE_LEN_10X
-    barcoded_part = TRUSEQREAD + barcode + umi
+    barcoded_part = R1 + barcode + umi
     return barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO
 
 
