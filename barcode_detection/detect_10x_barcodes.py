@@ -53,6 +53,7 @@ class TenXBarcodeDetector:
         self.min_score = 14
         if len(barcode_list) > 100000:
             self.min_score = 16
+        logger.info("Min score set to" % self.min_score)
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
@@ -141,6 +142,70 @@ class TenXBarcodeDetector:
             return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end, barcode, bc_score)
         return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end,
                                       barcode, bc_score, umi, good_umi)
+    def find_barcode_umi_no_polya(self, read_id, sequence):
+        read_result = self._find_barcode_umi_fwd_no_polya(read_id, sequence)
+        if read_result.polyT != -1:
+            read_result.set_strand("+")
+        if read_result.is_valid():
+            return read_result
+
+        rev_seq = reverese_complement(sequence)
+        read_rev_result = self._find_barcode_umi_fwd_no_polya(read_id, rev_seq)
+        if read_rev_result.polyT != -1:
+            read_rev_result.set_strand("-")
+        if read_rev_result.is_valid():
+            return read_rev_result
+
+        return read_result if read_result.more_informative_than(read_rev_result) else read_rev_result
+
+    def _find_barcode_umi_fwd_no_polya(self, read_id, sequence):
+        polyt_start = -1
+        r1_occurrences = self.r1_indexer.get_occurrences(sequence)
+        r1_start, r1_end = detect_exact_positions(sequence, 0, len(sequence),
+                                                  self.r1_indexer.k, self.R1,
+                                                  r1_occurrences, min_score=18,
+                                                  start_delta=self.STRICT_TERMINAL_MATCH_DELTA,
+                                                  end_delta=self.STRICT_TERMINAL_MATCH_DELTA)
+
+        if r1_start is None:
+            return BarcodeDetectionResult(read_id, polyt_start)
+        logger.debug("LINKER: %d-%d" % (r1_start, r1_end))
+
+        barcode_start = r1_end + 1
+        barcode_end = r1_end + self.BARCODE_LEN_10X + 1
+        potential_barcode = sequence[barcode_start:barcode_end + 1]
+        logger.debug("Barcode: %s" % (potential_barcode))
+        matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
+        barcode, bc_score, bc_start, bc_end = \
+            find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=self.min_score)
+
+        if barcode is None:
+            return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end)
+        logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
+        # position of barcode end in the reference: end of potential barcode minus bases to the alignment end
+        read_barcode_end = r1_end + self.BARCODE_LEN_10X + 1 - (len(potential_barcode) - bc_end - 1)
+        potential_umi_start = read_barcode_end + 1
+        potential_umi_end = potential_umi_start + self.UMI_LEN_10X - 1
+        potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
+        logger.debug("Potential UMI: %s" % potential_umi)
+
+        umi = None
+        good_umi = False
+        if self.umi_set:
+            matching_umis = self.umi_indexer.get_occurrences(potential_umi)
+            umi, umi_score, umi_start, umi_end = \
+                find_candidate_with_max_score_ssw(matching_umis, potential_umi, min_score=7)
+            logger.debug("Found UMI %s %d-%d" % (umi, umi_start, umi_end))
+
+        if not umi :
+            umi = potential_umi
+            if self.UMI_LEN_10X - self.UMI_LEN_DELTA <= len(umi) <= self.UMI_LEN_10X + self.UMI_LEN_DELTA:
+                good_umi = True
+
+        if not umi:
+            return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end, barcode, bc_score)
+        return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end,
+                                      barcode, bc_score, umi, good_umi)
 
 
 class BarcodeCaller:
@@ -201,7 +266,7 @@ class BarcodeCaller:
 
     def _process_read(self, read_id, read_sequence):
         logger.debug("==== %s ====" % read_id)
-        barcode_result = self.barcode_detector.find_barcode_umi(read_id, read_sequence)
+        barcode_result = self.barcode_detector.find_barcode_umi_no_polya(read_id, read_sequence)
         self.output_file.write("%s\n" % str(barcode_result))
         self.read_stat.add_read(barcode_result)
 
