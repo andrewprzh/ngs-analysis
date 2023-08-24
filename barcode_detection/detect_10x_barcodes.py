@@ -31,7 +31,7 @@ logger = logging.getLogger('BarcodeCaller')
 READ_CHUNK_SIZE = 10000
 
 
-class DoubleBarcodeDetector:
+class TenXBarcodeDetector:
     TSO = "CCCATGTACTCTGCGTTGATACCACTGCTT"
     # R1 = "ACACTCTTTCCCTACACGACGCTCTTCCGATCT"  #
     R1 = "CTACACGACGCTCTTCCGATCT" # 10x 3'
@@ -43,7 +43,7 @@ class DoubleBarcodeDetector:
     STRICT_TERMINAL_MATCH_DELTA = 1
 
     def __init__(self, barcode_list, umi_list=None):
-        self.r1_indexer = KmerIndexer([DoubleBarcodeDetector.R1], kmer_size=7)
+        self.r1_indexer = KmerIndexer([TenXBarcodeDetector.R1], kmer_size=7)
         self.barcode_indexer = KmerIndexer(barcode_list, kmer_size=6)
         self.umi_set = None
         if umi_list:
@@ -232,7 +232,7 @@ def bam_file_chunk_reader(handler):
 
 def process_chunk(barcodes, read_chunk, output_file, num, min_score):
     output_file += "_" + str(num)
-    barcode_detector = DoubleBarcodeDetector(barcodes, min_score=min_score)
+    barcode_detector = Ten(barcodes, min_score=min_score)
     barcode_caller = BarcodeCaller(output_file, barcode_detector)
     barcode_caller.process_chunk(read_chunk)
     return output_file
@@ -241,7 +241,7 @@ def process_chunk(barcodes, read_chunk, output_file, num, min_score):
 def process_single_thread(args):
     barcodes = load_barcodes(args.barcodes)
     umis = load_barcodes(args.umi) if args.umi else None
-    barcode_detector = DoubleBarcodeDetector(barcodes, umi_list=umis, min_score=args.min_score)
+    barcode_detector = TenXBarcodeDetector(barcodes, umi_list=umis)
     barcode_caller = BarcodeCaller(args.output, barcode_detector)
     barcode_caller.process(args.input)
 
