@@ -53,7 +53,7 @@ class TenXBarcodeDetector:
         self.min_score = 14
         if len(barcode_list) > 100000:
             self.min_score = 16
-        logger.info("Min score set to %d" % self.min_score)
+        logger.debug("Min score set to %d" % self.min_score)
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
