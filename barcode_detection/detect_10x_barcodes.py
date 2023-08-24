@@ -33,24 +33,26 @@ READ_CHUNK_SIZE = 10000
 
 class DoubleBarcodeDetector:
     TSO = "CCCATGTACTCTGCGTTGATACCACTGCTT"
-    TRUSEQREAD = "ACACTCTTTCCCTACACGACGCTCTTCCGATCT"  # R1
+    # R1 = "ACACTCTTTCCCTACACGACGCTCTTCCGATCT"  #
+    R1 = "CTACACGACGCTCTTCCGATCT" # 10x 3'
     BARCODE_LEN_10X = 16
     UMI_LEN_10X = 12
-    NON_T_UMI_BASES = 2 # ??
+
     UMI_LEN_DELTA = 2
     TERMINAL_MATCH_DELTA = 2
     STRICT_TERMINAL_MATCH_DELTA = 1
 
-    def __init__(self, joint_barcode_list, umi_list=None, min_score=12):
-        self.pcr_primer_indexer = KmerIndexer([DoubleBarcodeDetector.PCR_PRIMER], kmer_size=6)
-        self.linker_indexer = KmerIndexer([DoubleBarcodeDetector.LINKER], kmer_size=5)
-        self.barcode_indexer = KmerIndexer(joint_barcode_list, kmer_size=5)
+    def __init__(self, barcode_list, umi_list=None):
+        self.r1_indexer = KmerIndexer([DoubleBarcodeDetector.R1], kmer_size=7)
+        self.barcode_indexer = KmerIndexer(barcode_list, kmer_size=6)
         self.umi_set = None
         if umi_list:
             self.umi_set =  set(umi_list)
             logger.debug("Loaded %d UMIs" % len(umi_list))
             self.umi_indexer = KmerIndexer(umi_list, kmer_size=5)
-        self.min_score = min_score
+        self.min_score = 14
+        if len(barcode_list) > 100000:
+            self.min_score = 16
 
     def find_barcode_umi(self, read_id, sequence):
         read_result = self._find_barcode_umi_fwd(read_id, sequence)
@@ -71,67 +73,54 @@ class DoubleBarcodeDetector:
     def _find_barcode_umi_fwd(self, read_id, sequence):
         polyt_start = find_polyt_start(sequence)
 
-        linker_start, linker_end = None, None
+        r1_start, r1_end = None, None
         if polyt_start != -1:
             # use relaxed parameters is polyA is found
-            linker_occurrences = self.linker_indexer.get_occurrences(sequence[0:polyt_start + 1])
-            linker_start, linker_end = detect_exact_positions(sequence, 0, polyt_start + 1,
-                                                              self.linker_indexer.k, self.LINKER,
-                                                              linker_occurrences, min_score=11,
-                                                              start_delta=self.TERMINAL_MATCH_DELTA,
-                                                              end_delta=self.TERMINAL_MATCH_DELTA)
+            r1_occurrences = self.r1_indexer.get_occurrences(sequence[0:polyt_start + 1])
+            r1_start, r1_end = detect_exact_positions(sequence, 0, polyt_start + 1,
+                                                      self.r1_indexer.k, self.R1,
+                                                      r1_occurrences, min_score=11,
+                                                      end_delta=self.TERMINAL_MATCH_DELTA)
 
-        if linker_start is None:
+        if r1_start is None:
             # if polyT was not found, or linker was not found to the left of polyT, look for linker in the entire read
-            linker_occurrences = self.linker_indexer.get_occurrences(sequence)
-            linker_start, linker_end = detect_exact_positions(sequence, 0, len(sequence),
-                                                              self.linker_indexer.k, self.LINKER,
-                                                              linker_occurrences, min_score=14,
-                                                              start_delta=self.STRICT_TERMINAL_MATCH_DELTA,
-                                                              end_delta=self.STRICT_TERMINAL_MATCH_DELTA)
+            r1_occurrences = self.r1_indexer.get_occurrences(sequence)
+            r1_start, r1_end = detect_exact_positions(sequence, 0, len(sequence),
+                                                      self.r1_indexer.k, self.R1,
+                                                      r1_occurrences, min_score=18,
+                                                      start_delta=self.STRICT_TERMINAL_MATCH_DELTA,
+                                                      end_delta=self.STRICT_TERMINAL_MATCH_DELTA)
 
-        if linker_start is None:
+        if r1_start is None:
             return BarcodeDetectionResult(read_id, polyt_start)
-        logger.debug("LINKER: %d-%d" % (linker_start, linker_end))
+        logger.debug("LINKER: %d-%d" % (r1_start, r1_end))
 
-        if polyt_start == -1 or polyt_start - linker_end > self.RIGHT_BC_LENGTH + self.UMI_LENGTH + 10:
+        if polyt_start == -1 or polyt_start - r1_end > self.BARCODE_LEN_10X + self.UMI_LEN_10X + 10:
             # if polyT was not detected earlier, use relaxed parameters once the linker is found
-            presumable_polyt_start = linker_end + self.RIGHT_BC_LENGTH + self.UMI_LENGTH
+            presumable_polyt_start = r1_end + self.BARCODE_LEN_10X + self.UMI_LEN_10X
             search_start = presumable_polyt_start - 4
             search_end = min(len(sequence), presumable_polyt_start + 10)
             polyt_start = find_polyt_start(sequence[search_start:search_end], window_size=5, polya_fraction=1.0)
             if polyt_start != -1:
                 polyt_start += search_start
 
-        primer_occurrences = self.pcr_primer_indexer.get_occurrences(sequence[:linker_start])
-        primer_start, primer_end = detect_exact_positions(sequence, 0, linker_start,
-                                                          self.pcr_primer_indexer.k, self.PCR_PRIMER,
-                                                          primer_occurrences, min_score=5,
-                                                          end_delta=self.TERMINAL_MATCH_DELTA)
-        if primer_start is not None:
-            logger.debug("PRIMER: %d-%d" % (primer_start, primer_end))
-        else:
-            primer_start = -1
-            primer_end = -1
-
-        barcode_start = primer_end + 1 if primer_start != -1 else linker_start - self.LEFT_BC_LENGTH
-        barcode_end = linker_end + self.RIGHT_BC_LENGTH + 1
-        potential_barcode = sequence[barcode_start:linker_start] + sequence[linker_end + 1:barcode_end + 1]
+        barcode_start = r1_end + 1
+        barcode_end = r1_end + self.BARCODE_LEN_10X + 1
+        potential_barcode = sequence[barcode_start:barcode_end + 1]
         logger.debug("Barcode: %s" % (potential_barcode))
         matching_barcodes = self.barcode_indexer.get_occurrences(potential_barcode)
         barcode, bc_score, bc_start, bc_end = \
             find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=self.min_score)
 
         if barcode is None:
-            return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end)
+            return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end)
         logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
         # position of barcode end in the reference: end of potential barcode minus bases to the alignment end
-        read_barcode_end = linker_end + self.RIGHT_BC_LENGTH + 1 - (len(potential_barcode) - bc_end - 1)
-
+        read_barcode_end = r1_end + self.BARCODE_LEN_10X + 1 - (len(potential_barcode) - bc_end - 1)
         potential_umi_start = read_barcode_end + 1
         potential_umi_end = polyt_start - 1
         if potential_umi_end - potential_umi_start <= 5:
-            potential_umi_end = potential_umi_start + self.UMI_LENGTH - 1
+            potential_umi_end = potential_umi_start + self.UMI_LEN_10X - 1
         potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
         logger.debug("Potential UMI: %s" % potential_umi)
 
@@ -145,13 +134,12 @@ class DoubleBarcodeDetector:
 
         if not umi :
             umi = potential_umi
-            if self.UMI_LENGTH - self.UMI_LEN_DELTA <= len(umi) <= self.UMI_LENGTH + self.UMI_LEN_DELTA and \
-                    all(x != "T" for x in umi[-self.NON_T_UMI_BASES:]):
+            if self.UMI_LEN_10X - self.UMI_LEN_DELTA <= len(umi) <= self.UMI_LEN_10X + self.UMI_LEN_DELTA:
                 good_umi = True
 
         if not umi:
-            return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end, barcode, bc_score)
-        return BarcodeDetectionResult(read_id, polyt_start, primer_end, linker_start, linker_end,
+            return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end, barcode, bc_score)
+        return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end,
                                       barcode, bc_score, umi, good_umi)
 
 
