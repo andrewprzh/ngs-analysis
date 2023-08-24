@@ -232,7 +232,7 @@ def bam_file_chunk_reader(handler):
 
 def process_chunk(barcodes, read_chunk, output_file, num, min_score):
     output_file += "_" + str(num)
-    barcode_detector = TenXBarcodeDetector(barcodes, min_score=min_score)
+    barcode_detector = TenXBarcodeDetector(barcodes)
     barcode_caller = BarcodeCaller(output_file, barcode_detector)
     barcode_caller.process_chunk(read_chunk)
     return output_file
