@@ -37,6 +37,30 @@ class BarcodeDetectionResult:
                                                            self.barcode, self.UMI, self.BC_score, self.UMI_good)
 
 
+class BarcodeDetectionResultShort:
+    def __init__(self, polyT=-1, r1=-1, barcode=NOSEQ, BC_score=-1):
+        self.polyT = polyT
+        self.r1 = r1
+        self.barcode = barcode
+        self.BC_score = BC_score
+
+    def is_valid(self):
+        return self.barcode != NOSEQ
+
+    def more_informative_than(self, that):
+        if self.polyT != that.polyT:
+            return self.polyT > that.polyT
+        if self.r1 != that.r1:
+            return self.r1 > that.r1
+        return self.BC_score > that.BC_score
+
+    def set_strand(self, strand):
+        self.strand = strand
+
+    def __str__(self):
+        return "%d\t%d\t%s\t%d\t" % (self.polyT, self.r1, self.barcode, self.BC_score)
+
+
 class ReadStats:
     def __init__(self):
         self.read_count = 0
