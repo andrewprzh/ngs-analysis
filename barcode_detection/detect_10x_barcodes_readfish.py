@@ -122,37 +122,22 @@ class TenXBarcodeDetectorReadfish:
     def _find_barcode_polya_r1_3(self, read_id, sequence):
         POLYT_WINDOW_SIZE = 10
         TS_FRACTION = 0.7
+        MIN_R1_SCORE = 7
+
         polyt_start = find_polyt_start(sequence, window_size=POLYT_WINDOW_SIZE, polya_fraction=TS_FRACTION)
+        if polyt_start == -1:
+            # if polyT was not detected earlier, use relaxed parameters once the linker is found
+            return BarcodeDetectionResultShort()
 
-        if polyt_start != -1:
-            # use relaxed parameters is polyA is found
-            r1_occurrences = self.r1_indexer.get_occurrences(sequence[0:polyt_start + 1])
-            r1_start, r1_end = detect_exact_positions(sequence, 0, polyt_start + 1,
-                                                      self.r1_indexer.k, self.R1,
-                                                      r1_occurrences, min_score=11,
-                                                      end_delta=self.TERMINAL_MATCH_DELTA)
-
-        if r1_start is None:
-            # if polyT was not found, or linker was not found to the left of polyT, look for linker in the entire read
-            r1_occurrences = self.r1_indexer.get_occurrences(sequence)
-            r1_start, r1_end = detect_exact_positions(sequence, 0, len(sequence),
-                                                      self.r1_indexer.k, self.R1,
-                                                      r1_occurrences, min_score=18,
-                                                      start_delta=self.STRICT_TERMINAL_MATCH_DELTA,
-                                                      end_delta=self.STRICT_TERMINAL_MATCH_DELTA)
+        r1_occurrences = self.r1_indexer.get_occurrences(sequence[0:polyt_start + 1])
+        r1_start, r1_end = detect_exact_positions(sequence, 0, polyt_start + 1,
+                                                  self.r1_indexer.k, self.R1,
+                                                  r1_occurrences, min_score=MIN_R1_SCORE,
+                                                  end_delta=self.STRICT_TERMINAL_MATCH_DELTA)
 
         if r1_start is None:
             return BarcodeDetectionResult(read_id, polyt_start)
-        logger.debug("LINKER: %d-%d" % (r1_start, r1_end))
-
-        if polyt_start == -1 or polyt_start - r1_end > self.BARCODE_LEN_10X + self.UMI_LEN_10X + 10:
-            # if polyT was not detected earlier, use relaxed parameters once the linker is found
-            presumable_polyt_start = r1_end + self.BARCODE_LEN_10X + self.UMI_LEN_10X
-            search_start = presumable_polyt_start - 4
-            search_end = min(len(sequence), presumable_polyt_start + 10)
-            polyt_start = find_polyt_start(sequence[search_start:search_end], window_size=5, polya_fraction=1.0)
-            if polyt_start != -1:
-                polyt_start += search_start
+        logger.debug("R1: %d-%d" % (r1_start, r1_end))
 
         barcode_start = r1_end + 1
         barcode_end = r1_end + self.BARCODE_LEN_10X + 1
@@ -163,34 +148,11 @@ class TenXBarcodeDetectorReadfish:
             find_candidate_with_max_score_ssw(matching_barcodes, potential_barcode, min_score=self.min_score)
 
         if barcode is None:
-            return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end)
+            return BarcodeDetectionResultShort(polyt_start, r1_start)
         logger.debug("Found: %s %d-%d" % (barcode, bc_start, bc_end))
         # position of barcode end in the reference: end of potential barcode minus bases to the alignment end
-        read_barcode_end = r1_end + self.BARCODE_LEN_10X + 1 - (len(potential_barcode) - bc_end - 1)
-        potential_umi_start = read_barcode_end + 1
-        potential_umi_end = polyt_start - 1
-        if potential_umi_end - potential_umi_start <= 5:
-            potential_umi_end = potential_umi_start + self.UMI_LEN_10X - 1
-        potential_umi = sequence[potential_umi_start:potential_umi_end + 1]
-        logger.debug("Potential UMI: %s" % potential_umi)
+        return BarcodeDetectionResult(polyt_start, r1_start, barcode, bc_score)
 
-        umi = None
-        good_umi = False
-        if self.umi_set:
-            matching_umis = self.umi_indexer.get_occurrences(potential_umi)
-            umi, umi_score, umi_start, umi_end = \
-                find_candidate_with_max_score_ssw(matching_umis, potential_umi, min_score=7)
-            logger.debug("Found UMI %s %d-%d" % (umi, umi_start, umi_end))
-
-        if not umi :
-            umi = potential_umi
-            if self.UMI_LEN_10X - self.UMI_LEN_DELTA <= len(umi) <= self.UMI_LEN_10X + self.UMI_LEN_DELTA:
-                good_umi = True
-
-        if not umi:
-            return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end, barcode, bc_score)
-        return BarcodeDetectionResult(read_id, polyt_start, -1, r1_start, r1_end,
-                                      barcode, bc_score, umi, good_umi)
 
 class BarcodeCaller:
     def __init__(self, output_table, barcode_detector):
