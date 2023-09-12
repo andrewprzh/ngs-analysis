@@ -1,4 +1,3 @@
-
 NOSEQ = "*"
 
 
@@ -63,6 +62,7 @@ class BarcodeDetectionResultShort:
 
 class ReadStats:
     def __init__(self):
+        self.all_attributes = set()
         self.read_count = 0
         self.polyT_count = 0
         self.primer_count = 0
@@ -71,16 +71,23 @@ class ReadStats:
         self.umi_count = 0
 
     def add_read(self, barcode_detection_result):
+        if not self.all_attributes:
+            self.all_attributes = set([attr for attr in dir(barcode_detection_result)
+                                       if not attr.startswith('__') and
+                                       not callable(getattr(barcode_detection_result, attr))])
+
         self.read_count += 1
         if barcode_detection_result.polyT != -1:
             self.polyT_count += 1
-        if barcode_detection_result.primer != -1:
+        if "primer" in self.all_attributes and  barcode_detection_result.primer != -1:
             self.primer_count += 1
-        if barcode_detection_result.linker_start != -1:
+        if "linker_start" in self.all_attributes and barcode_detection_result.linker_start != -1:
             self.linker_count += 1
+        if "r1" in self.all_attributes and barcode_detection_result.r1 != -1:
+            self.primer_count += 1
         if barcode_detection_result.barcode != NOSEQ:
             self.bc_count += 1
-        if barcode_detection_result.UMI_good:
+        if "UMI_good" in self.all_attributes and barcode_detection_result.UMI_good:
             self.umi_count += 1
 
     def __str__(self):
