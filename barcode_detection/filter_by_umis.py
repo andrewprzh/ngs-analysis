@@ -106,6 +106,16 @@ class UMIFilter:
             else:
                 umi_dict[similar_umi].append(m)
 
+        if len(umi_dict) > 1 and random.random() < 0.001:
+            for umi in umi_dict.keys():
+                logger.info(umi)
+                for m in umi_dict[umi]:
+                    umi2 = m.umi
+                    ed = editdistance.eval(umi, umi2)
+                    if not self.disregard_length_diff:
+                        ed -= abs(len(umi) - len(umi2))
+                    logger.info("  %s: %d" % (umi2, ed))
+
         for umi in umi_dict.keys():
             duplicate_count = len(umi_dict[umi])
             self.duplicated_molecule_counts[duplicate_count] += 1
@@ -133,12 +143,14 @@ class UMIFilter:
     def _process_gene(self, gene_dict):
         resulting_reads = []
         for barcode in gene_dict:
+            logger.info("+ Checking barcode %s +" % barcode)
             resulting_reads += self._process_duplicates(gene_dict[barcode])
         return resulting_reads
 
     def _process_chunk(self, gene_barcode_dict, outf):
         read_count = 0
         for gene_id in gene_barcode_dict:
+            logger.info("== Processing gene %s ==" % gene_id)
             read_list = self._process_gene(gene_barcode_dict[gene_id])
             read_count += len(read_list)
             for read_id in read_list:
