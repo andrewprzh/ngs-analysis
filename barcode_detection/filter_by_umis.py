@@ -63,21 +63,32 @@ class UMIFilter:
         logger.info("Loaded %d barcodes " % len(barcode_dict))
         return barcode_dict
 
-    def _compare_umis(self, umi1, umi2):
+    def _find_similar_umi(self, umi, umi_indexer):
         if self.max_edit_distance == -1:
-            return True, 0
-        elif self.max_edit_distance == 0:
-            if self.disregard_length_diff:
-                return umi1 == umi2, 0
-            if len(umi1) < len(umi2):
-                return umi1 in umi2, abs(len(umi1) - len(umi2))
+            return None if umi_indexer.empty() else umi_indexer.seq_list[0]
+        occurrences = umi_indexer.get_occurrences(umi, hits_delta=1)
+        similar_umi = None
+        best_dist = 100
+        # choose the best UMI among checked
+        for occ in occurrences.keys():
+            if self.max_edit_distance == 0:
+                if self.disregard_length_diff:
+                    similar, ed = occ == umi, 0
+                elif len(occ) < len(umi):
+                    similar, ed = occ in umi, abs(len(occ) - len(umi))
+                else:
+                    similar, ed =  umi in occ, abs(len(occ) - len(umi))
             else:
-                return umi2 in umi1, abs(len(umi1) - len(umi2))
-        else:
-            ed = editdistance.eval(umi1, umi2)
-            if not self.disregard_length_diff:
-                ed -= abs(len(umi1) - len(umi2))
-            return ed <= self.max_edit_distance, ed
+                ed = editdistance.eval(occ, umi)
+                if not self.disregard_length_diff:
+                    ed -= abs(len(occ) - len(umi))
+                similar, ed = ed <= self.max_edit_distance, ed
+
+            if similar and ed < best_dist:
+                similar_umi = occ
+                best_dist = ed
+
+        return similar_umi
 
     def _process_duplicates(self, molecule_list):
         if len(molecule_list) <= 1:
@@ -89,16 +100,7 @@ class UMIFilter:
         umi_dict = defaultdict(list)
         umi_indexer = KmerIndexer([], kmer_size=3)
         for m in molecule_list:
-            occurrences = umi_indexer.get_occurrences(m.umi, hits_delta=1)
-            similar_umi = None
-            best_dist = 100
-            # choose the best UMI among checked
-            for occ in occurrences.keys():
-                similar, ed = self._compare_umis(occ, m.umi)
-                if similar and ed < best_dist:
-                    similar_umi = occ
-                    best_dist = ed
-
+            similar_umi = self._find_similar_umi(m.umi, umi_indexer)
             if similar_umi is None:
                 # if none is added, add to indexer
                 umi_dict[m.umi].append(m)
