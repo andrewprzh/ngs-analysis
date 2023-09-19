@@ -6,7 +6,7 @@ class KmerIndexer:
     # known_strings: collection of strings (barcodes or UMI)
     # kmer_size: K to use for indexing
     def __init__(self, known_strings, kmer_size=6):
-        self.barcode_list = list(known_strings)
+        self.seq_list = list(known_strings)
         self.k = kmer_size
         self.index = defaultdict(list)
         self._index()
@@ -21,15 +21,18 @@ class KmerIndexer:
             yield kmer
 
     def _index(self):
-        for i, barcode in enumerate(self.barcode_list):
+        for i, barcode in enumerate(self.seq_list):
             for kmer in self._get_kmers(barcode):
                 self.index[kmer].append(i)
 
     def append(self, barcode):
-        self.barcode_list.append(barcode)
-        index = len(self.barcode_list) - 1
+        self.seq_list.append(barcode)
+        index = len(self.seq_list) - 1
         for kmer in self._get_kmers(barcode):
             self.index[kmer].append(index)
+
+    def empty(self):
+        return len(self.seq_list) == 0
 
     # @params:
     # sequence: a string to be searched against known strings
@@ -50,9 +53,9 @@ class KmerIndexer:
             count = barcode_counts[i]
             if count < min_kmers:
                 continue
-            if ignore_equal and self.barcode_list[i] == sequence:
+            if ignore_equal and self.seq_list[i] == sequence:
                 continue
-            result.append((self.barcode_list[i], count, barcode_positions[i]))
+            result.append((self.seq_list[i], count, barcode_positions[i]))
 
         if not result:
             return {}
