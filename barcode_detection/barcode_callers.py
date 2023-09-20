@@ -88,7 +88,7 @@ class DoubleBarcodeDetectionResult(BarcodeDetectionResult):
 
     @staticmethod
     def header():
-        return BarcodeDetectionResult.header() + "polyT_start\tprimer_end\tlinker_start\tlinker_end"
+        return BarcodeDetectionResult.header() + "\tpolyT_start\tprimer_end\tlinker_start\tlinker_end"
 
 
 class TenXBarcodeDetectionResult(BarcodeDetectionResult):
@@ -126,7 +126,7 @@ class TenXBarcodeDetectionResult(BarcodeDetectionResult):
 
     @staticmethod
     def header():
-        return BarcodeDetectionResult.header() + "polyT_start\tR1_end"
+        return BarcodeDetectionResult.header() + "\tpolyT_start\tR1_end"
 
 
 class ReadStats:
