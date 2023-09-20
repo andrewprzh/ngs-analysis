@@ -66,11 +66,11 @@ class UMIFilter:
     def _find_similar_umi(self, umi, umi_indexer):
         if self.max_edit_distance == -1:
             return None if umi_indexer.empty() else umi_indexer.seq_list[0]
-        occurrences = umi_indexer.get_occurrences(umi, hits_delta=1)
+        occurrences = umi_indexer.seq_list
         similar_umi = None
         best_dist = 100
         # choose the best UMI among checked
-        for occ in occurrences.keys():
+        for occ in occurrences:
             if self.max_edit_distance == 0:
                 if self.disregard_length_diff:
                     similar, ed = occ == umi, 0
