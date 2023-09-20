@@ -20,9 +20,7 @@ from collections import defaultdict
 import pysam
 from Bio import SeqIO
 import logging
-
 from barcode_callers import *
-from reports import *
 
 logger = logging.getLogger('BarcodeCaller')
 
