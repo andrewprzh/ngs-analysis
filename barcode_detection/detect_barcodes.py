@@ -37,6 +37,7 @@ class BarcodeCaller:
         self.barcode_detector = barcode_detector
         self.output_table = output_table
         self.output_file = open(output_table, "w")
+        self.output_file.write(barcode_detector.result_type().header() + "\n")
         self.read_stat = ReadStats()
 
     def __del__(self):
@@ -185,9 +186,10 @@ def process_in_parallel(args):
                 continue
             stat_dict[v[0]] += int(v[1])
 
-    logger.info(stat_dict)
+    for k, v in stat_dict.items():
+        logger.info("%s: %d" % (k, v))
     shutil.rmtree(tmp_dir)
-    logger.info("Done")
+    logger.info("Finished barcode calling")
 
 
 def load_barcodes(inf):

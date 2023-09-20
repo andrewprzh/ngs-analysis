@@ -39,8 +39,12 @@ class BarcodeDetectionResult:
         self.strand = strand
 
     def __str__(self):
-        return "%s\t%s\t%s\t%s\t%d\t%s" % (self.read_id, self.strand, self.barcode,
-                                           self.UMI, self.BC_score, self.UMI_good)
+        return "%s\t%s\t%s\t%d\t%s\t%s" % (self.read_id, self.barcode, self.UMI,
+                                           self.BC_score, self.UMI_good, self.strand)
+
+    @staticmethod
+    def header():
+        return "#read_id\tbarcode\tUMI\tBC_score\tvalid_UMI\tstrand"
 
 
 class DoubleBarcodeDetectionResult(BarcodeDetectionResult):
@@ -82,6 +86,10 @@ class DoubleBarcodeDetectionResult(BarcodeDetectionResult):
         return (BarcodeDetectionResult.__str__(self) +
                 "\t%d\t%d\t%d\t%d" % (self.polyT, self.primer, self.linker_start, self.linker_end))
 
+    @staticmethod
+    def header():
+        return BarcodeDetectionResult.header() + "polyT_start\tprimer_end\tlinker_start\tlinker_end"
+
 
 class TenXBarcodeDetectionResult(BarcodeDetectionResult):
     def __init__(self, read_id, barcode=BarcodeDetectionResult.NOSEQ, UMI=BarcodeDetectionResult.NOSEQ,
@@ -115,6 +123,10 @@ class TenXBarcodeDetectionResult(BarcodeDetectionResult):
     def __str__(self):
         return (BarcodeDetectionResult.__str__(self) +
                 "\t%d\t%d" % (self.polyT, self.r1))
+
+    @staticmethod
+    def header():
+        return BarcodeDetectionResult.header() + "polyT_start\tR1_end"
 
 
 class ReadStats:
@@ -270,6 +282,10 @@ class DoubleBarcodeDetector:
                                             polyT=polyt_start, primer=primer_end,
                                             linker_start=linker_start, linker_end=linker_end)
 
+    @staticmethod
+    def result_type():
+        return DoubleBarcodeDetectionResult
+
 
 class BruteForceDoubleBarcodeDetector:
     LINKER = "TCTTCAGCGTTCCCGAGA"
@@ -301,6 +317,10 @@ class BruteForceDoubleBarcodeDetector:
         if len(barcode) != self.BC_LENGTH or barcode not in self.barcode_set:
             return DoubleBarcodeDetectionResult(read_id, linker_start=pos)
         return DoubleBarcodeDetectionResult(read_id, barcode, BC_score=len(barcode), linker_start=pos)
+
+    @staticmethod
+    def result_type():
+        return DoubleBarcodeDetectionResult
 
 
 class IlluminaDoubleBarcodeDetector:
@@ -418,6 +438,10 @@ class IlluminaDoubleBarcodeDetector:
         return DoubleBarcodeDetectionResult(read_id, barcode, umi, bc_score, good_umi,
                                             polyT=polyt_start, primer=primer_end,
                                             linker_start=linker_start, linker_end=linker_end)
+
+    @staticmethod
+    def result_type():
+        return DoubleBarcodeDetectionResult
 
 
 class TenXBarcodeDetector:
@@ -546,3 +570,7 @@ class TenXBarcodeDetector:
             return read_rev_result
 
         return read_result if read_result.more_informative_than(read_rev_result) else read_rev_result
+
+    @staticmethod
+    def result_type():
+        return TenXBarcodeDetectionResult
