@@ -129,7 +129,7 @@ class UMIFilter:
         if len(molecule_list) <= 1:
             self.duplicated_molecule_counts[1] += 1
             logger.debug("Unique " + molecule_list[0].read_id)
-            return [x.read_id for x in molecule_list]
+            return molecule_list
 
         resulting_reads = []
         umi_dict = defaultdict(list)
