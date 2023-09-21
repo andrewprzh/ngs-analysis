@@ -6,8 +6,7 @@
 # See file LICENSE for details.
 ############################################################################
 
-import os
-import random
+import pysam
 import sys
 import argparse
 from traceback import print_exc
@@ -25,11 +24,46 @@ def overlaps(range1, range2):
     return not (range1[1] < range2[0] or range1[0] > range2[1])
 
 
-class MoleculeInfo:
-    def __init__(self, read_id, umi, exon_blocks):
+def junctions_from_blocks(sorted_blocks):
+    junctions = []
+    if len(sorted_blocks) >= 2:
+        for i in range(0, len(sorted_blocks) - 1):
+            if sorted_blocks[i][1] + 1 < sorted_blocks[i + 1][0]:
+                junctions.append((sorted_blocks[i][1] + 1, sorted_blocks[i + 1][0] - 1))
+    return junctions
+
+
+class ReadAssignmentInfo:
+    def __init__(self, read_id, chr_id, gene_id, strand, exon_blocks, assignment_type, matching_events, barcode, umi):
         self.read_id = read_id
-        self.umi = umi
+        self.chr_id = chr_id
+        self.gene_id = gene_id
+        self.strand = strand
         self.exon_blocks = exon_blocks
+        self.assignment_type = assignment_type
+        self.matching_events = matching_events
+        self.barcode = barcode
+        self.umi = umi
+
+    def to_allinfo_str(self):
+        intron_blocks = junctions_from_blocks(self.exon_blocks)
+        exons_str = ";%;" + ";%;".join(["%s_%d_%d_%s" % (self.chr_id, e[0], e[1], self.strand) for e in self.exon_blocks])
+        introns_str = ";%;" + ";%;".join(["%s_%d_%d_%s" % (self.chr_id, e[0], e[1], self.strand) for e in intron_blocks])
+
+        cell_type = "None"
+        read_type = "known" if self.assignment_type.startswith("unique") else "novel"
+
+        polyA = "NoPolyA"
+        TSS = "NoTSS"
+        if "tss_match" in self.matching_events:
+            tss_pos = self.exon_blocks[-1][1] if self.strand == "-" else self.exon_blocks[0][0]
+            TSS = "%s_%d_%d_%s" % (self.chr_id, tss_pos, tss_pos, self.strand)
+        if "correct_polya" in self.matching_events:
+            polyA_pos = self.exon_blocks[-1][1] if self.strand == "+" else self.exon_blocks[0][0]
+            polyA = "%s_%d_%d_%s" % (self.chr_id, polyA_pos, polyA_pos, self.strand)
+        return  "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d" % (self.read_id, self.gene_id, cell_type, self.barcode,
+                                                                self.umi, introns_str, TSS, polyA, exons_str,
+                                                                read_type, len(intron_blocks))
 
 
 class UMIFilter:
@@ -38,6 +72,7 @@ class UMIFilter:
         self.max_edit_distance = args.min_distance
         self.disregard_length_diff = args.disregard_length_diff
         self.barcode_dict = self.load_barcodes(args.barcodes)
+        self.selected_reads = set()
         self.discarded = 0
         self.no_barcode = 0
         self.no_gene = 0
@@ -112,7 +147,7 @@ class UMIFilter:
             duplicate_count = len(umi_dict[umi])
             self.duplicated_molecule_counts[duplicate_count] += 1
             if duplicate_count == 1:
-                resulting_reads.append(umi_dict[umi][0].read_id)
+                resulting_reads.append(umi_dict[umi][0])
                 continue
 
             best_read = umi_dict[umi][0]
@@ -128,7 +163,7 @@ class UMIFilter:
             logger.debug("Selected %s %s" % (best_read.read_id, best_read.umi))
             self.discarded += len(umi_dict[umi]) - 1
 
-            resulting_reads.append(best_read.read_id)
+            resulting_reads.append(best_read)
 
         return resulting_reads
 
@@ -138,17 +173,25 @@ class UMIFilter:
             resulting_reads += self._process_duplicates(gene_dict[barcode])
         return resulting_reads
 
-    def _process_chunk(self, gene_barcode_dict, outf):
+    def _process_chunk(self, gene_barcode_dict, outf, allinfo_outf=None):
         read_count = 0
         for gene_id in gene_barcode_dict:
-            read_list = self._process_gene(gene_barcode_dict[gene_id])
-            read_count += len(read_list)
-            for read_id in read_list:
-                outf.write(read_id + "\n")
+            assignment_list = self._process_gene(gene_barcode_dict[gene_id])
+            read_count += len(assignment_list)
+            for read_assignment in assignment_list:
+                outf.write(read_assignment.read_id + "\n")
+                if (not read_assignment.assignment_type.startswith("unique") and
+                        read_assignment.read_id in self.selected_reads):
+                    continue
+                self.selected_reads.add(read_assignment.read_id)
+                if allinfo_outf:
+                    allinfo_outf.write(read_assignment.to_allinfo_str() + "\n")
         return read_count
 
-    def process(self, assignment_file, output_file):
-        outf = open(output_file, "w")
+    def process(self, assignment_file, output_prefix):
+        outf = open(output_prefix + ".UMI_filtered.reads.tsv", "w")
+        allinfo_outf = open(output_prefix + ".UMI_filtered.allinfo", "w")
+
         # 1251f521-d4c2-4dcc-96d7-85070cc44e12    chr1    -       ENST00000477740.5       ENSG00000238009.6       ambiguous       ism_internal    112699-112804,120721-120759     PolyA=False
         gene_barcode_dict = defaultdict(lambda: defaultdict(list))
         read_to_gene = {}
@@ -194,25 +237,57 @@ class UMIFilter:
                 read_to_gene.clear()
 
             barcode, umi = self.barcode_dict[read_id]
-            gene_barcode_dict[gene_id][barcode].append(MoleculeInfo(read_id, umi, exon_blocks))
+            strand = v[2]
+            assignment_type = v[5]
+            matching_events = v[6]
+
+            gene_barcode_dict[gene_id][barcode].append(ReadAssignmentInfo(read_id, chr_id, gene_id, strand, exon_blocks,
+                                                                          assignment_type, matching_events, barcode, umi))
             read_to_gene[read_id] = gene_id
             current_interval = (current_interval[0], max(current_interval[1], read_interval[1]))
 
         read_count += self._process_chunk(gene_barcode_dict, outf)
         outf.close()
-        logger.info("Saved %d reads to %s" % (read_count, output_file))
+        allinfo_outf.close()
+
+        logger.info("Saved %d reads to %s" % (read_count, output_prefix))
         logger.info("Total assignments processed %d" % self.total_reads)
         logger.info("Unspliced %d %s" % (self.monoexonic, "(discarded)" if self.args.only_spliced else ""))
         logger.info("Ambiguous %d %s" % (self.ambiguous, "(discarded)" if self.args.only_unique else ""))
         logger.info("No barcode detected %d" % self.no_barcode)
         logger.info("No gene assigned %d" % self.no_gene)
         logger.info("Discarded as duplicates %d" % self.discarded)
-        logger.info("Duplicate count histogram:")
 
-        outf = self.args.output + ".counts"
-        with open(outf, "w") as count_hist_file:
+        counts_output = self.args.output + ".counts"
+        logger.info("Duplicate count histogram is written to %s" % counts_output)
+        with open(counts_output, "w") as count_hist_file:
             for k in sorted(self.duplicated_molecule_counts.keys()):
                 count_hist_file.write("%d\t%d\n" % (k, self.duplicated_molecule_counts[k]))
+
+
+def filter_bam(in_file_name, out_file_name, read_set):
+    inf = pysam.AlignmentFile(in_file_name, "rb")
+    outf = pysam.AlignmentFile(out_file_name, "wb", template=inf)
+
+    count = 0
+    passed = 0
+
+    for read in inf:
+        if read.reference_id == -1 or read.is_secondary:
+            continue
+
+        count += 1
+        if count % 10000 == 0:
+            sys.stdout.write("Processed " + str(count) + " reads\r")
+
+        if read.query_name in read_set:
+            outf.write(read)
+            passed += 1
+
+    print("Processed " + str(count) + " reads, written " + str(passed))
+    inf.close()
+    outf.close()
+    pysam.index(out_file_name)
 
 
 def set_logger(logger_instance):
@@ -232,12 +307,12 @@ def parse_args():
     parser.add_argument("--min_distance", type=int, help="minimal edit distance for UMIs to be considered distinct;"
                                                          "length difference is added to this values by default;"
                                                          "0 for equal UMIs, -1 for keeping only a single gene-barcode "
-                                                         "read", default=2)
-    parser.add_argument("--untrusted_umis", action="store_true", help="keep only trusted UMIs", default=False)
+                                                         "read (default: 3)", default=3)
+    parser.add_argument("--untrusted_umis", action="store_true", help="allow untrusted UMIs to be used", default=False)
     parser.add_argument("--only_spliced", action="store_true", help="keep only spliced reads", default=False)
     parser.add_argument("--only_unique", action="store_true", help="keep only non-ambiguous reads", default=False)
     parser.add_argument("--disregard_length_diff", action="store_true", help="do not account for length difference "
-                                                                             "when comapring UMIs", default=False)
+                                                                             "when comparing UMIs", default=False)
 
 
     args = parser.parse_args()
