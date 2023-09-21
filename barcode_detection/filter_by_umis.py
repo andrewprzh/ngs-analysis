@@ -228,7 +228,7 @@ class UMIFilter:
 
             read_interval = (exon_blocks[0][0], exon_blocks[-1][1])
             if current_chr != chr_id or not overlaps(current_interval, read_interval):
-                read_count += self._process_chunk(gene_barcode_dict, outf)
+                read_count += self._process_chunk(gene_barcode_dict, outf, allinfo_outf)
                 if current_chr != chr_id:
                     logger.info("Processing chromosome " + chr_id)
                 current_chr = chr_id
@@ -246,7 +246,7 @@ class UMIFilter:
             read_to_gene[read_id] = gene_id
             current_interval = (current_interval[0], max(current_interval[1], read_interval[1]))
 
-        read_count += self._process_chunk(gene_barcode_dict, outf)
+        read_count += self._process_chunk(gene_barcode_dict, outf, allinfo_outf)
         outf.close()
         allinfo_outf.close()
 
