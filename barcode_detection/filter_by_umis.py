@@ -304,6 +304,9 @@ def parse_args():
     parser.add_argument("--output", "-o", type=str, help="output prefix name", required=True)
     parser.add_argument("--barcodes", "-b", type=str, help="read - barcode - UMI table", required=True)
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
+    parser.add_argument("--bam", type=str, help="original BAM file, provide only if you need a BAM file"
+                                                " with UMI-filtered alignments")
+
     parser.add_argument("--min_distance", type=int, help="minimal edit distance for UMIs to be considered distinct;"
                                                          "length difference is added to this values by default;"
                                                          "0 for equal UMIs, -1 for keeping only a single gene-barcode "
@@ -313,7 +316,6 @@ def parse_args():
     parser.add_argument("--only_unique", action="store_true", help="keep only non-ambiguous reads", default=False)
     parser.add_argument("--disregard_length_diff", action="store_true", help="do not account for length difference "
                                                                              "when comparing UMIs", default=False)
-
 
     args = parser.parse_args()
     return args
@@ -325,6 +327,8 @@ def main():
 
     umi_filter = UMIFilter(args)
     umi_filter.process(args.read_assignments, args.output)
+    if args.bam:
+        filter_bam(args.bam, args.output  + ".UMI_filtered.reads.bam", umi_filter.selected_reads)
 
 
 if __name__ == "__main__":
