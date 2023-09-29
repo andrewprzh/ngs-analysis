@@ -14,8 +14,6 @@ from collections import defaultdict
 import logging
 import editdistance
 
-from kmer_indexer import KmerIndexer
-
 
 logger = logging.getLogger('UMIFilter')
 
@@ -98,14 +96,13 @@ class UMIFilter:
         logger.info("Loaded %d barcodes " % len(barcode_dict))
         return barcode_dict
 
-    def _find_similar_umi(self, umi, umi_indexer):
+    def _find_similar_umi(self, umi, trusted_umi_list):
         if self.max_edit_distance == -1:
-            return None if umi_indexer.empty() else umi_indexer.seq_list[0]
-        occurrences = umi_indexer.get_occurrences(umi, hits_delta=1)
+            return None if not trusted_umi_list else trusted_umi_list[0]
         similar_umi = None
         best_dist = 100
         # choose the best UMI among checked
-        for occ in occurrences.keys():
+        for occ in trusted_umi_list:
             if self.max_edit_distance == 0:
                 if self.disregard_length_diff:
                     similar, ed = occ == umi, 0
@@ -133,13 +130,13 @@ class UMIFilter:
 
         resulting_reads = []
         umi_dict = defaultdict(list)
-        umi_indexer = KmerIndexer([], kmer_size=3)
+        trusted_umi_list = []
         for m in molecule_list:
-            similar_umi = self._find_similar_umi(m.umi, umi_indexer)
+            similar_umi = self._find_similar_umi(m.umi, trusted_umi_list)
             if similar_umi is None:
                 # if none is added, add to indexer
                 umi_dict[m.umi].append(m)
-                umi_indexer.append(m.umi)
+                trusted_umi_list.append(m.umi)
             else:
                 umi_dict[similar_umi].append(m)
 
