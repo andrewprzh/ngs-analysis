@@ -19,26 +19,50 @@ logger = logging.getLogger('GeneBarcodeStats')
 
 
 class GeneBarcodeStats:
-    def __init__(self, barcodes, read_assignments):
-        self.barcode_dict = self.load_barcodes(barcodes)
+    def __init__(self, barcodes, read_assignments, old_barcode_format=False):
+        if old_barcode_format:
+            barcode_umi_dict = self.load_barcodes(barcodes, False, 6, 7, 8, 9)
+        else:
+            barcode_umi_dict = self.load_barcodes(barcodes, False)
         self.read_to_gene_dict = self.load_assignments(read_assignments)
         self.good_barcode_score = 13
 
-    def load_barcodes(self, in_file):
+    def load_barcodes(self, in_file, use_untrusted_umis=False, barcode_column=1, umi_column=2,
+                      barcode_score_column=3, umi_property_column=4, min_score=13):
+        # Old format:
         # afaf0413-4dd7-491a-928b-39da40d68fb3    99      56      66      83      +       GCCGATACGCCAAT  CGACTGAAG       13      True
         logger.info("Loading barcodes from " + in_file)
         barcode_dict = {}
+        read_count = 0
+        barcoded = 0
+        hq_barcoded = 0
+        trusted_umi = 0
         for l in open(in_file):
+            if l.startswith("#"):continue
+            read_count += 1
             v = l.strip().split("\t")
             if len(v) < 10: continue
-            barcode = v[6]
-            if barcode == "*":
+            barcode = v[barcode_column]
+            score = int(v[barcode_score_column])
+            if barcode == "*": continue
+            barcoded += 1
+            if score < min_score:
                 continue
-            umi = v[7]
-            score = int(v[8])
-            trusted_umi = v[9]
-            barcode_dict[v[0]] = (barcode, umi, score, trusted_umi)
+            hq_barcoded += 1
+            if v[umi_property_column] != "True":
+                if not use_untrusted_umis:
+                    continue
+            else:
+                trusted_umi += 1
+
+            umi = v[umi_column]
+            barcode_dict[v[0]] = (barcode, umi)
+        logger.info("Total reads: %d" % read_count)
+        logger.info("Barcoded: %d" % barcoded)
+        logger.info("Barcoded with score >= %d: %d" % (min_score, hq_barcoded))
+        logger.info("Barcoded with trusted UMI: %d" % trusted_umi)
         logger.info("Loaded %d barcodes " % len(barcode_dict))
+
         return barcode_dict
 
     def load_assignments(self, assignment_file):
@@ -148,6 +172,8 @@ def parse_args():
     parser.add_argument("--barcodes2", type=str, help="read - barcode - UMI table")
     parser.add_argument("--read_assignments", "-r", type=str, help="IsoQuant read assignments", required=True)
     parser.add_argument("--read_assignments2", type=str, help="IsoQuant read assignments")
+    parser.add_argument("--old_barcode_format", action="store_true",
+                        help="use previous barcode formate (barcode column = 6)", default=False)
 
     args = parser.parse_args()
     return args
@@ -157,10 +183,10 @@ def main():
     args = parse_args()
     set_logger(logger)
 
-    stat_counter1 = GeneBarcodeStats(args.barcodes, args.read_assignments)
+    stat_counter1 = GeneBarcodeStats(args.barcodes, args.read_assignments, args.old_barcode_format)
     stat_counter1.count_stats(args.output + "_1")
     if args.barcodes2:
-        stat_counter2 = GeneBarcodeStats(args.barcodes2, args.read_assignments2)
+        stat_counter2 = GeneBarcodeStats(args.barcodes2, args.read_assignments2, args.old_barcode_format)
         stat_counter2.count_stats(args.output + "_2")
         logger.info("Overlap between BD-gene pairs: %d" %
                     len(stat_counter1.barcode_gene_pairs.intersection(stat_counter2.barcode_gene_pairs)))
