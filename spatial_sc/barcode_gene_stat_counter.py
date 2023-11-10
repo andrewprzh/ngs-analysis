@@ -21,9 +21,9 @@ logger = logging.getLogger('GeneBarcodeStats')
 class GeneBarcodeStats:
     def __init__(self, barcodes, read_assignments, old_barcode_format=False):
         if old_barcode_format:
-            barcode_umi_dict = self.load_barcodes(barcodes, False, 6, 7, 8, 9)
+            self.barcode_dict = self.load_barcodes(barcodes, False, 6, 7, 8, 9)
         else:
-            barcode_umi_dict = self.load_barcodes(barcodes, False)
+            self.barcode_dict = self.load_barcodes(barcodes, False)
         self.read_to_gene_dict = self.load_assignments(read_assignments)
         self.good_barcode_score = 13
 
@@ -56,7 +56,7 @@ class GeneBarcodeStats:
                 trusted_umi += 1
 
             umi = v[umi_column]
-            barcode_dict[v[0]] = (barcode, umi)
+            barcode_dict[v[0]] = (barcode, umi, score, trusted_umi)
         logger.info("Total reads: %d" % read_count)
         logger.info("Barcoded: %d" % barcoded)
         logger.info("Barcoded with score >= %d: %d" % (min_score, hq_barcoded))
