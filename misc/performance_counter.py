@@ -115,8 +115,12 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description="A tiny util for measuring RAM, CPU and disk consumption. "
                                                  "All children processes will be taken into account and summed up.")
-    parser.add_argument("--cmd", "-c", required=True, help="command line to execute (from current dir); "
-                                                           "~ alias for $HOME is not supported", type=str)
+    input_args = parser.add_mutually_exclusive_group()
+    input_args.add_argument("--cmd", "-c", help="command line to execute (from current dir); "
+                                                "~ alias for $HOME is not supported", type=str)
+    input_args.add_argument("--cmd_file", help="file with command line to execute (from current dir); "
+                                               "~ alias for $HOME is not supported", type=str)
+
     parser.add_argument("--interval", "-i", help="time interval between measurements (seconds)", type=int, default=2)
     parser.add_argument("--out_dir", help="command line output folder to monitor disk usage; "
                                           "will not be monitored if not set; "
@@ -130,8 +134,17 @@ def parse_args():
 
 def main():
     args = parse_args()
-    print("Running %s" % args.cmd)
     cmd = args.cmd.split()
+
+    if args.cmd:
+        cmd = args.cmd.split()
+    elif args.cmd_file:
+        cmd = open(args.cmd_fie).readline().strip().split()
+    else:
+        sys.stderr.write("Provide command line to run with --cmd or --cmd_file")
+        exit(-1)
+    print("Running %s" % " ".join(cmd))
+
     if not args.output:
         args.output = "performance_stats/" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
