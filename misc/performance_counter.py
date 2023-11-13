@@ -130,6 +130,7 @@ def parse_args():
 
 def main():
     args = parse_args()
+    print("Running %s" % args.cmd)
     cmd = args.cmd.split()
     if not args.output:
         args.output = "performance_stats/" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
