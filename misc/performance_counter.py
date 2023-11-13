@@ -138,7 +138,7 @@ def main():
     if args.cmd:
         cmd = args.cmd.split()
     elif args.cmd_file:
-        cmd = open(args.cmd_fie).readline().strip().split()
+        cmd = open(args.cmd_file).readline().strip().split()
     else:
         sys.stderr.write("Provide command line to run with --cmd or --cmd_file")
         exit(-1)
@@ -151,7 +151,7 @@ def main():
         os.makedirs(args.output)
 
     with open(os.path.join(args.output, "command.txt"), "w") as cmd_file:
-        cmd_file.write(args.cmd + "\n")
+        cmd_file.write(" ".join(cmd) + "\n")
 
     thread = None
     disk_stats = ""
