@@ -134,7 +134,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    cmd = args.cmd.split()
 
     if args.cmd:
         cmd = args.cmd.split()
