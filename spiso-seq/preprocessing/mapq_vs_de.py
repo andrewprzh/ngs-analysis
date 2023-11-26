@@ -7,9 +7,9 @@ from collections import defaultdict
 mapq_to_de_dict = defaultdict(list)
 for a in pysam.AlignmentFile(sys.argv[1], "rb"):
     if a.is_secondary: continue
-    try:
+    try:    
         de = a.get_tag("de")
-    except:
+    except KeyError:
         continue
     mapq_to_de_dict[a.mapping_quality].append(de)
 
