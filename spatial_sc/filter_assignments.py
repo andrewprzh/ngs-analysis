@@ -24,7 +24,7 @@ def filter_assignments(inf, outf, whitelist):
 def load_readid_set(inf):
     barcodes = set()
     for l in open(inf):
-        barcodes.add(l.strip())
+        barcodes.add(l.strip().split('\t')[0])
     return barcodes
 
 
