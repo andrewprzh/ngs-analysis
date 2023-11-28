@@ -30,6 +30,9 @@ print("Exon count histogram:")
 for k in sorted(exon_counts.keys()):
     print("%d\t%d" % (k, exon_counts[k]))
 
+print("Spliced exon counts")
+print(" ".join(list(map(str, spliced_exon_counts))))
+
 gene_counts = list(gene_count_dict.values())
 for cutoff in [20, 50, 100]:
     print("Genes with >= %d spliced reads: %d" %(cutoff, len(list(filter(lambda x: x>=cutoff, gene_counts)))))
