@@ -28,11 +28,11 @@ print("Exon count histogram:")
 for k in sorted(exon_counts.keys()):
     print("%d\t%d" % (k, exon_counts[k]))
 
-gene_counts = gene_count_dict.values()
+gene_counts = list(gene_count_dict.values())
 for cutoff in [20, 50, 100]:
     print("Genes with >= %d spliced reads: %d" %(cutoff, len(list(filter(lambda x: x>=cutoff, gene_counts)))))
 
-bins = [i * 10 for i in range(500)] + [100000]
+bins = [i * 10 for i in range(50)] + [100000]
 h, b = numpy.histogram(gene_counts, bins)
 print(h)
 
