@@ -6,6 +6,7 @@ exon_counts = defaultdict(int)
 total_exons = 0
 total_exons_in_spliced = 0
 gene_count_dict = defaultdict(int)
+spliced_exon_counts = []
 
 
 for l in open(sys.argv[1]):
@@ -14,6 +15,7 @@ for l in open(sys.argv[1]):
     total_exons += exon_count
     exon_counts[exon_count] += 1
     if exon_count > 1:
+        spliced_exon_counts.append(exon_count)
         total_exons_in_spliced += exon_count
         gene_id = v[1]
         gene_count_dict[gene_id] += 1
