@@ -16,14 +16,14 @@ import glob
 
 
 class GeneInfo:
-    def __init__(self, gene_name, gene_len, spliced):
+    def __init__(self, gene_name, gene_len, spliced, sample_count):
         self.gene_name = gene_name
         self.gene_len = gene_len
         self.spliced = spliced
-        self.tpms = []
+        self.tpms = [0.0] * sample_count
 
 
-def collect_genes(db):
+def collect_genes(db, sample_counts):
     gene_dict = {}
     for gene in db.features_of_type('gene'):
         transcript_lengths = []
@@ -48,11 +48,10 @@ def add_tpms_from_tpm_file(tpm_file, sample_num, gene_dict):
         v = l.strip().split("\t")
         gene_id = v[0]
         tpm = float(v[1])
-        assert sample_num == len(gene_dict[gene_id].tpms)
-        gene_dict[gene_id].tpms.append(tpm)
+        gene_dict[gene_id].tpms[sample_num] = tpm
 
 
-def add_tpms_from_assignment_file(assignment_file, gene_dict):
+def add_tpms_from_assignment_file(assignment_file, sample_num, gene_dict):
     gene_counts = defaultdict(float)
     for l in open(assignment_file):
         if l.startswith("#"):
@@ -61,11 +60,11 @@ def add_tpms_from_assignment_file(assignment_file, gene_dict):
         gene_id = v[4]
         assignment = v[5]
         if assignment.startswith("unique"):
-            gene_counts[gene_id] += 1.0
+            gene_counts[gene_id] += 1
 
     scale_factor = 1000000.0 / sum(gene_counts.values())
     for gene_id in gene_counts.keys():
-        gene_dict[gene_id].tpms.append(gene_counts[gene_id] * scale_factor)
+        gene_dict[gene_id].tpms[sample_num] = gene_counts[gene_id] * scale_factor
 
 
 def get_output_dir_and_sample_name(dir, sample_name):
@@ -114,7 +113,7 @@ def main():
     args = parse_args()
     gffutils_db = gffutils.FeatureDB(args.genedb)
     print("Loading gene db " + args.genedb)
-    gene_dict = collect_genes(gffutils_db)
+    gene_dict = collect_genes(gffutils_db, len(args.sample_list))
 
     sample_names = []
     for i, sample in enumerate(args.sample_list):
@@ -126,7 +125,7 @@ def main():
 
         if args.use_assignments:
             assignment_file = os.path.join(sample_dir, sample_id + ".read_assignments.tsv")
-            add_tpms_from_assignment_file(assignment_file, gene_dict)
+            add_tpms_from_assignment_file(assignment_file, i, gene_dict)
         else:
             tpm_file = os.path.join(sample_dir, sample_id + ".gene_tpm.tsv")
             add_tpms_from_tpm_file(tpm_file, i, gene_dict)
@@ -154,7 +153,7 @@ def main():
         all_tpm_outf.write(gene_str)
         if gene_info.spliced:
             spliced_outf.write(gene_str)
-        bin_outf_list[bin].write(gene_str)
+            bin_outf_list[bin].write(gene_str)
 
     all_tpm_outf.close()
     spliced_outf.close()
