@@ -12,6 +12,7 @@ import argparse
 import gffutils
 from traceback import print_exc
 from collections import defaultdict
+import glob
 
 
 class GeneInfo:
@@ -64,8 +65,37 @@ def add_tpms_from_assignment_file(assignment_file, gene_dict):
 
     scale_factor = 1000000.0 / sum(gene_counts.values())
     for gene_id in gene_counts.keys():
-        gene_dict[gene_id].tpms.append(scale_factor)
+        gene_dict[gene_id].tpms.append(gene_counts[gene_id] * scale_factor)
 
+
+def get_output_dir_and_sample_name(dir, sample_name):
+    dirs = []
+    all_files = glob.glob(os.path.join(dir, "*"))
+    for f in all_files:
+        if os.path.isdir(f):
+            dirs.append(os.path.basename(f))
+
+    if len(dirs) == 0:
+        print("No output was found for %s, check you output" % sample_name)
+
+    out_dir = ""
+    if len(dirs) == 1:
+        out_dir = dirs[0]
+    else:
+        for d in dirs:
+            if d.startswith("OUT"):
+                out_dir = d
+                break
+            elif d.lower().startswith("curio"):
+                out_dir = d
+
+    if out_dir == "":
+        print("No proper output dir was found for %s, check you output" % sample_name)
+        out_dir = dirs[0]
+
+    if out_dir.startswith("OUT"):
+        return out_dir, sample_name
+    return out_dir, out_dir
 
 
 def parse_args():
@@ -86,22 +116,33 @@ def main():
     print("Loading gene db " + args.genedb)
     gene_dict = collect_genes(gffutils_db)
 
+    sample_names = []
     for i, sample in enumerate(args.sample_list):
+        print("Processing sample " + sample)
         out_dir = str(os.path.join(args.isoquant_folder, sample))
+        sample_id, sample_name = get_output_dir_and_sample_name(out_dir, sample)
+        sample_names.append(sample_name)
+        sample_dir = os.path.join(out_dir, sample_id)
+
         if args.use_assignments:
-            assignment_file = os.path.join(out_dir, sample + ".read_assignments.tsv")
+            assignment_file = os.path.join(sample_dir, sample_id + ".read_assignments.tsv")
             add_tpms_from_assignment_file(assignment_file, gene_dict)
         else:
-            tpm_file = os.path.join(out_dir, sample + ".gene_tpm.tsv")
+            tpm_file = os.path.join(sample_dir, sample_id + ".gene_tpm.tsv")
             add_tpms_from_tpm_file(tpm_file, i, gene_dict)
 
-    all_tpm_outf = open(args.output_prefix + ".all_genes.tsv", "w")
-    spliced_outf = open(args.output_prefix + ".spliced_genes.tsv", "w")
+    print("Dumping output to " + args.output)
+    all_tpm_outf = open(args.output + ".all_genes.tsv", "w")
+    all_tpm_outf.write("#geneid\tlength\t" + "\t".join(sample_names) + "\n")
+    spliced_outf = open(args.output + ".spliced_genes.tsv", "w")
+    spliced_outf.write("#geneid\tlength\t" + "\t".join(sample_names) + "\n")
+
     max_bin = 5
     max_bin_cutoff = max_bin * 1000
     bin_outf_list = []
     for i in range(max_bin + 1):
-        bin_outf_list.append(open(args.output_prefix + ".ceil_len_%dkb.tsv" % i, "w"))
+        bin_outf_list.append(open(args.output + ".ceil_len_%dkb.tsv" % i, "w"))
+        bin_outf_list[-1].write("#geneid\tlength\t" + "\t".join(sample_names) + "\n")
 
     for geneid in gene_dict.keys():
         gene_info = gene_dict[geneid]
@@ -109,7 +150,7 @@ def main():
             bin = max_bin
         else:
             bin = gene_info.gene_len // 1000
-        gene_str = "%s\t%d\t" + "\t".join(map(lambda x: "%.6f" % x, gene_info.tpms)) + "\n"
+        gene_str = "%s\t%d\t" % (geneid, gene_info.gene_len) + "\t".join(map(lambda x: "%.6f" % x, gene_info.tpms)) + "\n"
         all_tpm_outf.write(gene_str)
         if gene_info.spliced:
             spliced_outf.write(gene_str)
@@ -119,6 +160,7 @@ def main():
     spliced_outf.close()
     for f in bin_outf_list:
         f.close()
+    print("Done")
 
 
 if __name__ == "__main__":
