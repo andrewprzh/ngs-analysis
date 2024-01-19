@@ -37,7 +37,7 @@ def collect_genes(db, sample_counts):
                     exon_count += 1
             transcript_lengths.append(tlen)
             if exon_count > 1: spliced = True
-        gene_dict[gene.id] = GeneInfo(gene.id, max(transcript_lengths), spliced)
+        gene_dict[gene.id] = GeneInfo(gene.id, max(transcript_lengths), spliced, sample_counts)
     return gene_dict
 
 
