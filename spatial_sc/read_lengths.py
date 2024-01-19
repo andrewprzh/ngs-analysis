@@ -94,6 +94,7 @@ def main():
 
     outf =  open(out_fname, "w")
     outf.write(fname + args.delim + args.delim.join(map(str, lengths)))
+    outf.close()
 
 
 if __name__ == "__main__":
