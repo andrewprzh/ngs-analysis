@@ -15,10 +15,11 @@ TEST_SEQ = [
 
 
 
-for i in range(1000000):
+for i in range(5000000):
     s = TEST_SEQ[i % 8]
     slen = len(s)
-    rc = ctypes.create_unicode_buffer(slen)
-    lib.rev_comp(s, rc, slen)
-    if i == 1:
-        print(rc.value)
+    rc = ctypes.create_string_buffer(slen)
+    lib.rev_comp(s.encode(), rc, slen)
+#    if i == 1:
+#        print(rc.value.decode())
+
