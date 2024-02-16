@@ -35,6 +35,7 @@ def subsample(input_bam, output_bam, fraction):
     print("Reading " + input_bam)
 
     count = 0
+    subsample_count = 0
     for read in inf:
         count += 1
         if count % 100000 == 0:
@@ -43,8 +44,9 @@ def subsample(input_bam, output_bam, fraction):
         val = random.random()
         if val < fraction:
             outf.write(read)
+            subsample_count += 1
     outf.close()
-    print("Saved to " + output_bam)
+    print("Saved %d reads to %s" % (subsample_count, output_bam))
 
 
 def main(argv):
