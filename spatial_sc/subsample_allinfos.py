@@ -49,10 +49,11 @@ def subsample(gene_buckets1, gene_buckets2, common_genes, subsample_genes_count,
 
 
 def dump_allinfo(gene_buckets, iteration, output_prefix, output_suffix):
-    with open(os.path.join(output_prefix), "%d_%s.allinfo" % (iteration, output_suffix)) as outf:
-        for gene_id in gene_buckets.keys():
-            for l in gene_buckets[gene_id]:
-                outf.write(l)
+    outf = open(os.path.join(output_prefix, "%d_%s.allinfo" % (iteration, output_suffix)), "w")
+    for gene_id in gene_buckets.keys():
+        for l in gene_buckets[gene_id]:
+            outf.write(l)
+    outf.close()
 
 
 def parse_args(argv):
@@ -75,6 +76,8 @@ def main(argv):
         random.seed(time.time())
     else:
         random.seed(args.seed)
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
 
     gene_buckets1 = load_allinfo(args.input[0])
     genes1 = select_high_count_genes(gene_buckets1, args.min_read_count)
@@ -100,7 +103,7 @@ def main(argv):
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
     try:
-        main(sys.argv)
+        main(sys.argv[1:])
     except SystemExit:
         raise
     except:
