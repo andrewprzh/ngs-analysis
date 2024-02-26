@@ -46,7 +46,8 @@ def get_random_seq(length, non_t_tail=0):
 def create_template_spatial(sequence, barcode, umi):
     assert len(barcode) == BC_LENGTH
     barcoded_part = PCR_PRIMER + barcode[:LEFT_BC_LENGTH] + LINKER + barcode[LEFT_BC_LENGTH:] + umi
-    return barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + UPS_PRIMER_REV
+    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + UPS_PRIMER_REV
+    return reverese_complement(template_seq)
 
 
 #AATGATACGGCGACCACCGAGATCTACACNNNNNNNNNNACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT—--DNA------CCCATGTACTCTGCGTTGATACCACTGCTT
@@ -61,7 +62,8 @@ def create_template_spatial(sequence, barcode, umi):
 def create_template_10x(sequence, barcode, umi):
     assert len(barcode) == BARCODE_LEN_10X
     barcoded_part = R1 + barcode + umi
-    return barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO
+    template_seq =  barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO
+    return reverese_complement(template_seq)
 
 
 def load_counts(inf, total_count):
