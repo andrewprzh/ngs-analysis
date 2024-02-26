@@ -72,6 +72,7 @@ def track_ram_and_cpu(task_subprocess, interval, outfile):
     start_time = time()
     max_rss = 0
     cpu_times = defaultdict(float)
+    flush_interval = 0
 
     while task_process_obj.status() != 'zombie':
         children_pids = get_children(task_pid)
@@ -82,18 +83,22 @@ def track_ram_and_cpu(task_subprocess, interval, outfile):
         max_rss = max(max_rss, total_rss)
         current_time = time() - start_time
         outf.write("%d\t%d\t%d\t%.1f\n" % (current_time, total_rss, total_vms, total_cpu))
+        if flush_interval > 60:
+            flush_interval = 0
+            outf.flush()
         for p in all_pids.keys():
             try:
                 cpu_times[p] = max(cpu_times[p], all_pids[p].cpu_times().user)
             except psutil.NoSuchProcess:
                 pass
         sleep(interval)
+        flush_interval += interval
 
     outf.close()
     cpu_time = sum(cpu_times.values())
-    return "Max RSS: %.3f GB\n CPU time: %s\n Wall clock time: %s" % (to_gb(max_rss),
-                                                                      human_readable_time(cpu_time),
-                                                                      human_readable_time(time() - start_time))
+    return "  Max RSS: %.3f GB\n  CPU time: %s\n  Wall clock time: %s" % (to_gb(max_rss),
+                                                                          human_readable_time(cpu_time),
+                                                                          human_readable_time(time() - start_time))
 
 
 def track_disk_usage(folder, interval, outfile, res_stats):
