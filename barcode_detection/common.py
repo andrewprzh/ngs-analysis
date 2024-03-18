@@ -43,7 +43,7 @@ def reverese_complement(my_seq):  ## obtain reverse complement of a sequence
 
 def align_pattern(sequence, start, end, pattern, min_score=0):
     seq1 = Seq.Seq(sequence[start:end])
-    alignments = pairwise2.align.localms(pattern, seq1, 1, -1, -1.5, -1)
+    alignments = pairwise2.align.localms(pattern, seq1, 1, -1, -1, -1)
     alignment = max(alignments, key=lambda i: (i[2], -i[3]))
     if alignment[2] < min_score:
         return None, None
@@ -68,7 +68,7 @@ def find_candidate_with_max_score(barcode_matches, read_sequence, min_score=10):
     read_seq = Seq.Seq(read_sequence)
     for barcode in barcode_matches.keys():
         barcode_seq = Seq.Seq(barcode)
-        alignments = pairwise2.align.localms(read_seq, barcode_seq, 1, -1, -1.5, -1)
+        alignments = pairwise2.align.localms(read_seq, barcode_seq, 1, -1, -1, -1)
         alignment = max(alignments, key=lambda i: (i[2], -i[3]))
         if alignment[2] < min_score:
             continue
