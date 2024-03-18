@@ -9,7 +9,7 @@ handle = open(sys.argv[2], "a")
 buffer = []
 processed_ids = set()
 
-for a in pysam.AlignmentFile(sys.argv[1], "r"):
+for a in pysam.AlignmentFile(sys.argv[1], "r", check_sq=False):
     seq = a.get_forward_sequence()
     if not seq:
         continue
