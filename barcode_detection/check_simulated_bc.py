@@ -21,6 +21,7 @@ incorrectly_called = defaultdict(int)
 incorrectly_detected = defaultdict(int)
 
 for l in open(sys.argv[1]):
+    if l.startswith("#"): continue
     count += 1
     v = l.split("\t")
     bc = v[1]
@@ -48,6 +49,7 @@ print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(umis_dist
 print(true_umis_dists)
 print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(true_umis_dists[:2]), sum(true_umis_dists[:3]), sum(true_umis_dists[:4])))
 print(true_umis_dists)
+print("Incorrect calls: %d" % sum(incorrectly_called.values()))
 print()
 print_dict(incorrectly_called)
 print()
