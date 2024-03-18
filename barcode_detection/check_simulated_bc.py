@@ -23,8 +23,8 @@ incorrectly_detected = defaultdict(int)
 for l in open(sys.argv[1]):
     count += 1
     v = l.split("\t")
-    bc = v[6]
-    umi = v[7]
+    bc = v[1]
+    umi = v[2]
     if bc == "*": continue
     barcoded += 1
 
