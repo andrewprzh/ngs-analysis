@@ -14,9 +14,9 @@ from traceback import print_exc
 from collections import OrderedDict
 
 
-def contains_any_feature(exon, ordered_feature_list):
+def contains_any_feature(exon, ordered_feature_list, delta=0):
     for f in ordered_feature_list:
-        if exon[0] <= f[0] and f[1] <= exon[1]:
+        if exon[0] - delta <= f[0] and f[1] + delta <= exon[1]:
             return True
     return False
 
@@ -38,7 +38,7 @@ def overlaps_any_feature(exon, ordered_feature_list):
 class ExonInfo:
     def __init__(self, exon, gene_id, is_cds, contains_start, contains_stop, cds_overlap=0.0):
         self.exon = exon
-        self.gene_ids = [gene_id]
+        self.gene_ids = {gene_id}
         self.is_cds = is_cds
         self.contains_start = contains_start
         self.contains_stop = contains_stop
@@ -49,7 +49,7 @@ class ExonInfo:
         self.whole_codon_count = ((self.exon[1] - self.exon[0] + 1) % 3) == 0
 
     def merge(self, other):
-        self.gene_ids += other.gene_ids
+        self.gene_ids.update(other.gene_ids)
         self.is_cds = self.is_cds or other.is_cds
         self.contains_start = self.contains_start or other.contains_start
         self.contains_stop = self.contains_stop or other.contains_stop
@@ -58,26 +58,30 @@ class ExonInfo:
 
 def process_gene(gene_db, g):
     exon_dict = {}
-    cds = []
-    start_codons = []
-    stop_codons = []
 
-    for s in gene_db.children(g, featuretype='start_codon', order_by='start'):
-        start_codons.append((s.start, s.end))
-    for s in gene_db.children(g, featuretype='stop_codon', order_by='start'):
-        stop_codons.append((s.start, s.end))
-    for c in gene_db.children(g, featuretype='CDS', order_by='start'):
-        cds.append((c.start, c.end))
+    for t in gene_db.children(g, featuretype=('transcript', 'mRNA')):
+        cds = []
+        start_codons = []
+        stop_codons = []
+        for s in gene_db.children(t, featuretype='start_codon', order_by='start'):
+            start_codons.append((s.start, s.end))
+        for s in gene_db.children(t, featuretype='stop_codon', order_by='start'):
+            stop_codons.append((s.start, s.end))
+        for c in gene_db.children(t, featuretype='CDS', order_by='start'):
+            cds.append((c.start, c.end))
 
-    for e in gene_db.children(g, featuretype='exon', order_by='start'):
-        exon = (e.start, e.end)
-        is_cds = equals_any_feature(exon, cds)
-        has_start = contains_any_feature(exon, start_codons)
-        has_stop = contains_any_feature(exon, stop_codons)
-        cds_overlap = overlaps_any_feature(exon, cds) if not is_cds else 1.0
+        for e in gene_db.children(t, featuretype='exon', order_by='start'):
+            exon = (e.start, e.end)
+            is_cds = equals_any_feature(exon, cds)
+            has_start = contains_any_feature(exon, start_codons)
+            has_stop = contains_any_feature(exon, stop_codons)
+            cds_overlap = overlaps_any_feature(exon, cds) if not is_cds else 1.0
 
-        exon_id = "%s_%d_%d_%s" % (e.seqid, e.start, e.end, e.strand)
-        exon_dict[exon_id] = ExonInfo(exon, g.id, is_cds, has_start, has_stop, cds_overlap)
+            exon_id = "%s_%d_%d_%s" % (e.seqid, e.start, e.end, e.strand)
+            if exon_id not in exon_dict:
+                exon_dict[exon_id] = ExonInfo(exon, g.id, is_cds, has_start, has_stop, cds_overlap)
+            else:
+                exon_dict[exon_id].merge(ExonInfo(exon, g.id, is_cds, has_start, has_stop, cds_overlap))
 
     return exon_dict
 
