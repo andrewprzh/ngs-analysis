@@ -169,7 +169,7 @@ def main():
         outf.write("#name\texons\tcds\toverlaps_cds\t3Xbp\t3Xbp_CDS\tstart_codons\tstop_codons\tavg_cds_overlap\n")
         for inf in args.input:
             if os.path.isdir(inf):
-                for f in glob.glob(inf):
+                for f in glob.glob(os.path.join(inf, "*")):
                     if os.path.isfile(f):
                         name = os.path.basename(f)
                         exon_info_dict = process_exons(load_exon_pairs(f), gene_db, gene_dicts)
@@ -178,6 +178,7 @@ def main():
                 name = os.path.basename(inf)
                 exon_info_dict = process_exons(load_exon_pairs(inf), gene_db, gene_dicts)
                 outf.write("%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.2f\n" % (name, *count_stats(exon_info_dict)))
+
 
 
 
