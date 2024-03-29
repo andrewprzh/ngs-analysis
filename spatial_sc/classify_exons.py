@@ -111,7 +111,7 @@ def print_exon_info(dict_list, out_file_name):
         outf.write("#exon\tCDS\tstart\tstop\tCDS_overlap\twhole_codon_count\n")
         for d in dict_list:
             for e, info in d.items():
-                outf.write("%s\t%s\t%s\t%s\t%.4f\t%s\n" %
+                outf.write("%s\t%d\t%d\t%d\t%.4f\t%d\n" %
                            (e, info.is_cds, info.contains_start, info.contains_stop,
                             info.cds_overlap, info.whole_codon_count))
 
