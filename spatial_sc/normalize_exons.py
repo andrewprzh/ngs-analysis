@@ -32,7 +32,6 @@ def overlaps_any_feature(exon, feature_list):
     return best_feature
 
 
-
 def process_gene(gene_db, gene):
     exons = set()
     if isinstance(gene, str):
@@ -83,6 +82,10 @@ def process_exons(exon_gene_pairs, gene_db, gene_dicts):
             continue
 
         overlapping_exon = overlaps_any_feature(exon, exons)
+        if overlapping_exon is None:
+            print("No matches found yet %d-%d" % (exon[0], exon[1]))
+            exon_dict[exon_id] = (gene_id, "None")
+
         if overlapping_exon[0] != exon[0] and overlapping_exon[1] != exon[1]:
             print("Unequal splice junctions for %d-%d and %d-%d" % (exon[0], exon[1], overlapping_exon[0], overlapping_exon[1]))
         exon_dict[exon_id] = (gene_id, "_".join([exon_data[0], str(overlapping_exon[0]),
