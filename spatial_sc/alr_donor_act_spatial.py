@@ -199,6 +199,7 @@ def main():
     genedb = gffutils.FeatureDB(args.genedb)
     print("Detecting distinct sample names")
     sample_dict = get_sample_dict(args.isoquant_output)
+    print(sample_dict)
 
     it = IntronCountIterator(args.isoquant_output)
     current_chrid = it.next()[0]
