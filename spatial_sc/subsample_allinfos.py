@@ -52,7 +52,7 @@ def pre_sample_reads(gene_bucket, max_from_single_sample):
     for sample in gene_bucket.keys():
         reads = gene_bucket[sample]
         if len(reads) > max_from_single_sample:
-            pre_samples_reads += list(numpy.random.choice(reads, max_from_single_sample))
+            pre_samples_reads += list(numpy.random.choice(reads, max_from_single_sample, replace=False))
         else:
             pre_samples_reads += reads
     return pre_samples_reads
