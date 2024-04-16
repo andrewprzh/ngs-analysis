@@ -47,23 +47,31 @@ def get_counts(input_bam, isoform_col):
         isoform_id = read.query_name.split("_")[isoform_col]
         isoform_counts[isoform_id] += 1
 
+    print("Loaded %d isoforms" % len(isoform_counts))
     return isoform_counts
 
 
 def get_isoform_dict(genedb):
+    print("Loading %s" % genedb)
     db = gffutils.FeatureDB(genedb)
     isoform_dict = {}
     for t in db.features_of_type(featuretype=('transcript', 'mRNA')):
         isoform_dict[t.id.split('.')[0]] = t.id
+    print("Loaded %d isoforms" % len(isoform_dict))
     return isoform_dict
 
 
 def dump_counts(count_dict, out_fname, isoform_dict):
     scale_factor = sum(count_dict.values()) / 1000000.0
+    print("Saving counts to %s" % out_fname)
+    total_tpm = 0
     with open(out_fname, "w") as outf:
         for tid in sorted(count_dict.keys()):
             isofrom_id = isoform_dict[tid] if tid in isoform_dict else tid
-            outf.write("%s\t%.2f\t%.6f\n" % (isofrom_id, count_dict[tid], count_dict[tid] / scale_factor))
+            tpm = count_dict[tid] / scale_factor
+            total_tpm += tpm
+            outf.write("%s\t%.2f\t%.6f\n" % (isofrom_id, count_dict[tid], tpm))
+    print("Done. Total counts: %d; total TPM: %.2f" % (sum(count_dict.values()), total_tpm))
 
 
 def main(argv):
