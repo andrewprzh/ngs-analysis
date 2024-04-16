@@ -85,6 +85,7 @@ def process_exons(exon_gene_pairs, gene_db, gene_dicts):
         if overlapping_exon is None:
             print("No matches found yet %d-%d" % (exon[0], exon[1]))
             exon_dict[exon_id] = (gene_id, "None")
+            continue
 
         if overlapping_exon[0] != exon[0] and overlapping_exon[1] != exon[1]:
             print("Unequal splice junctions for %d-%d and %d-%d" % (exon[0], exon[1], overlapping_exon[0], overlapping_exon[1]))
