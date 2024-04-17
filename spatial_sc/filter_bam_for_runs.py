@@ -55,7 +55,7 @@ if len(sys.argv) < 4:
 if len(sys.argv) == 5:
     max_iter = int(sys.argv[4])
 else:
-    max_iter = ""
+    max_iter = 100
 
 if not os.path.exists(sys.argv[3]):
     os.makedirs(sys.argv[3])
