@@ -42,8 +42,6 @@ def convert_counts(transcript_counts_file_name, transcript2gene, gene_counts_fil
         print("Done. Total counts: %d; total TPM: %.2f" % (sum(gene_counts.values()), total_tpm))
 
 
-
-
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output file with gene counts", required=True)
@@ -58,7 +56,7 @@ def main():
     args = parse_args()
     transcript2gene_dict = transcript2gene(args.genedb)
     convert_counts(args.input, transcript2gene_dict, args.output)
-    
+
 
 if __name__ == "__main__":
     try:
