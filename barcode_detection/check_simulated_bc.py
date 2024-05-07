@@ -14,9 +14,13 @@ score_barcoded = defaultdict(int)
 score_correct = defaultdict(int)
 
 SCORES = [11, 12, 13, 14]
+MIN_SCORE = 13
 
 barcode_barcoded = defaultdict(int)
 barcode_correct = defaultdict(int)
+
+true_barcodes = set()
+all_barcodes = set()
 
 
 def print_dict(d):
@@ -40,16 +44,21 @@ for l in open(sys.argv[1]):
     count += 1
     if bc == "*": continue
     barcoded += 1
+    all_barcodes.add(bc)
     score_barcoded[score] += 1
-    barcode_barcoded[bc] += 1
+    if score >= MIN_SCORE:
+        barcode_barcoded[bc] += 1
 
     readv = v[0].split("_")
     true_bc = readv[3]
     true_umi = readv[4]
+    true_barcodes.add(true_bc)
+
     if true_bc == bc:
         correct += 1
         score_correct[score] += 1
-        barcode_correct[bc] += 1
+        if score >= MIN_SCORE:
+            barcode_correct[bc] += 1
     else:
         incorrectly_called[bc] += 1
         incorrectly_detected[true_bc] += 1
@@ -59,6 +68,8 @@ for l in open(sys.argv[1]):
     umis_dists[umi_ed] += 1
     if v[9].startswith("T"):
         true_umis_dists[umi_ed] += 1
+
+print("All barcodes %d, true barcodes %d" % (len(all_barcodes), len(true_barcodes)))
 
 print("Total\t%d\nBarcode\t%d\nCorrect\t%d" % (count, barcoded, correct))
 
@@ -77,6 +88,8 @@ print()
 
 per_barcode_precision_values = []
 for bc in barcode_barcoded:
+    if bc not in true_barcodes:
+        continue
     correct = barcode_correct[bc] if bc in barcode_correct else 0
     precision = 100 * correct / barcode_barcoded[bc]
     per_barcode_precision_values.append((bc, precision))
@@ -85,7 +98,7 @@ precision_arr = [x[1] for x in per_barcode_precision_values]
 h = histogram(precision_arr, [5 * x for x in range(21)])
 print(h)
 
-low_prec_barcodes = list(filter(lambda x: x[1] <= 80, per_barcode_precision_values))
+low_prec_barcodes = list(sorted(filter(lambda x: x[1] <= 80, per_barcode_precision_values), key=lambda x: x[1]))
 
 print(low_prec_barcodes)
 
