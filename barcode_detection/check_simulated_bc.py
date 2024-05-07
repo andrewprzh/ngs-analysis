@@ -82,10 +82,10 @@ for bc in barcode_barcoded:
     per_barcode_precision_values.append((bc, precision))
 
 precision_arr = [x[1] for x in per_barcode_precision_values]
-h = histogram(precision_arr, [0.05 * x for x in range(21)])
+h = histogram(precision_arr, [5 * x for x in range(21)])
 print(h)
 
-low_prec_barcodes = list(filter(lambda x: x[1] <= 0.8, per_barcode_precision_values))
+low_prec_barcodes = list(filter(lambda x: x[1] <= 80, per_barcode_precision_values))
 
 print(low_prec_barcodes)
 
