@@ -76,7 +76,7 @@ def load_exons(tab_file, min_fdr=0.0, max_fdr=1.0):
         exon_start = int(exon_v[1])
         exon_end = int(exon_v[2])
         strand = exon_v[3]
-        exon_chr_dict[chr_id].append((exon_start, exon_end, strand, gene_id, dpsi))
+        exon_chr_dict[chr_id].append((exon_start, exon_end, strand, gene_id, dpsi, fdr))
 
     print("Loaded %d exons" % sum([len(x) for x in exon_chr_dict.values()]))
     return exon_chr_dict
@@ -102,18 +102,18 @@ def overlap_snps(snp_chr_dict, exon_chr_dict):
 
 def dump_overlapped_snps(overlapped_snps, snp_description, out_fname):
     print("Saving %d SNPs to %s" % (len(overlapped_snps), out_fname))
-    # chr_id exon_start exon_end strand gene_id dpsi snp_position snp_id snp_rs_id snp_description
+    # chr_id exon_start exon_end strand gene_id dpsi FDR snp_position snp_id snp_rs_id snp_description
     with open(out_fname, "w") as outf:
-        outf.write("#chr_id\texon_start\texon_end\tstrand\tgene_id\tdpsi\tsnp_position\tsnp_id\tsnp_rs_id\tsnp_description\n")
+        outf.write("#chr_id\texon_start\texon_end\tstrand\tgene_id\tdpsi\tFDR\tsnp_position\tsnp_id\tsnp_rs_id\tsnp_description\n")
         for record in overlapped_snps:
             chr_id = record[0]
             snp = record[1]
             exon = record[2]
-            (exon_start, exon_end, strand, gene_id, dpsi) = exon
+            (exon_start, exon_end, strand, gene_id, dpsi, fdr) = exon
             (snp_name, pos, snp_id) = snp
             description = snp_description[snp_id] if snp_id in snp_description else []
-            outf.write("%s\t%d\t%d\t%s\t%s\t%.3f\t%d\t%s\t%s\t%s\n" %
-                       (chr_id, exon_start, exon_end, strand, gene_id, dpsi, pos, snp_name, snp_id, " ".join(description)))
+            outf.write("%s\t%d\t%d\t%s\t%s\t%.3f\t%.3f\t%d\t%s\t%s\t%s\n" %
+                       (chr_id, exon_start, exon_end, strand, gene_id, dpsi, fdr, pos, snp_name, snp_id, " ".join(description)))
 
 
 def parse_args():
