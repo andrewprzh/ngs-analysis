@@ -20,6 +20,7 @@ def load_snps(infile, skip_no_id=True):
     snp_dict = defaultdict(list)
     print("Loading SNPs from %s" % infile)
     for l in open(infile):
+        if l.startswith("#") or l.startswith("variant_id"): continue
         v = l.strip().split('\t')
         id = v[0]
         chr_ids = v[1]
@@ -38,6 +39,7 @@ def load_snp_descriptions(infile):
     print("Loading SNP descriptions from %s" % infile)
     snp_description = {}
     for l in open(infile):
+        if l.startswith("#") or l.startswith("REPORTED"): continue
         v = l.strip().split('\t')
         snp_description[v[0]] = v[1:]
     print("Loaded %d SNPs" % len(snp_description))
