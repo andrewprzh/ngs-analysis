@@ -82,8 +82,8 @@ class TranscriptCollector:
             if intron not in self.canonical_info:
                 intron_left_pos = intron[0]
                 intron_right_pos = intron[1]
-                left_site = fasta_record[intron_left_pos:intron_left_pos+2]
-                right_site = fasta_record[intron_right_pos - 1:intron_right_pos + 1]
+                left_site = str(fasta_record[intron_left_pos:intron_left_pos+2])
+                right_site = str(fasta_record[intron_right_pos - 1:intron_right_pos + 1])
                 if strand == '+':
                     self.canonical_info[intron] = (left_site, right_site) in CANONICAL_FWD_SITES
                 else:
@@ -113,7 +113,7 @@ def load_allinfo(inf):
         gene_id = v[1]
         transcript_id = v[11]
         exons = v[8].split(";%;")
-        exon1 = exons[0].split("_")
+        exon1 = exons[1].split("_")
         chr_id = exon1[0]
         strand = exon1[3]
         read_dict[v[0]] = (chr_id, strand, gene_id, transcript_id)
