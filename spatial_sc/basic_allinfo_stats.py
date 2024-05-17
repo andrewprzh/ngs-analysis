@@ -13,6 +13,7 @@ import argparse
 from traceback import print_exc
 from collections import defaultdict
 import gffutils
+import numpy
 from pyfaidx import Fasta
 
 
@@ -163,6 +164,8 @@ def parse_args():
 
 MIN_FRAC = 0.1
 ITERATIONS = 20
+EXON_BINS = [20 * i for i in range(20)] + [10000]
+INTRON_BINS = [100 * i for i in range(50)] + [1000000]
 
 
 def main():
@@ -185,11 +188,20 @@ def main():
 
         with open(args.output + name + ".general_stats.tsv", "w") as outf:
             outf.write("Internal exons:\n")
-            outf.write("\t".join(map(str, internal_exons_lengths)) + "\n")
+            internal_hist = numpy.histogram(internal_exons_lengths, bins=EXON_BINS)
+            outf.write("\t".join(map(str, internal_hist[0])) + "\n")
+            outf.write("\t".join(map(str, internal_hist[1])) + "\n")
+
+            terminal_hist = numpy.histogram(terminal_exons_lengths, bins=EXON_BINS)
             outf.write("Terminal exons:\n")
-            outf.write("\t".join(map(str, terminal_exons_lengths)) + "\n")
+            outf.write("\t".join(map(str, terminal_hist[0])) + "\n")
+            outf.write("\t".join(map(str, terminal_hist[1])) + "\n")
+
+            intron_hist = numpy.histogram(introns_lengths, bins=INTRON_BINS)
             outf.write("Introns:\n")
-            outf.write("\t".join(map(str, introns_lengths)) + "\n")
+            outf.write("\t".join(map(str, intron_hist[0])) + "\n")
+            outf.write("\t".join(map(str, intron_hist[1])) + "\n")
+            
             outf.write("Non-canonical counts:\n")
             for k in sorted(non_canonical_dict.keys()):
                 outf.write("%d\t%d\n" % (k, non_canonical_dict[k]))
