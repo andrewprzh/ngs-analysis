@@ -164,8 +164,8 @@ def parse_args():
 
 MIN_FRAC = 0.1
 ITERATIONS = 20
-EXON_BINS = [20 * i for i in range(20)] + [10000]
-INTRON_BINS = [100 * i for i in range(50)] + [1000000]
+EXON_BINS = [20 * i for i in range(50)] + [10000]
+INTRON_BINS = [200 * i for i in range(50)] + [1000000]
 
 
 def main():
@@ -208,7 +208,8 @@ def main():
 
             outf.write("Subsampled gene counts:\n")
             for p in sorted(gene_count_dict.keys()):
-                outf.write("%.2f\t%s\n" % (p, "\t".join(map(str, gene_count_dict[p]))))
+                quantiles = numpy.quantile(gene_count_dict[p], [0.5, 0.25, 0.75])
+                outf.write("%.2f\t%s\n" % (p, "\t".join(map(str, quantiles))))
 
 
 if __name__ == "__main__":
