@@ -165,7 +165,7 @@ def parse_args():
 MIN_FRAC = 0.1
 ITERATIONS = 20
 EXON_BINS = [20 * i for i in range(50)] + [10000]
-INTRON_BINS = [200 * i for i in range(50)] + [1000000]
+INTRON_BINS = [1000 * i for i in range(50)] + [1000000]
 
 
 def main():
