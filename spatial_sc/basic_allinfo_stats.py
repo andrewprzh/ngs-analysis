@@ -164,8 +164,13 @@ def parse_args():
 
 MIN_FRAC = 0.1
 ITERATIONS = 20
-EXON_BINS = [20 * i for i in range(50)] + [10000]
-INTRON_BINS = [1000 * i for i in range(50)] + [1000000]
+EXON_BINS = [20 * i for i in range(51)] + [10000]
+INTRON_BINS = [1000 * i for i in range(51)] + [1000000]
+
+
+def print_hist(bins, val_lists, outf):
+    for i in range(len(bins) - 1):
+        outf.write("%d\t%s\n", (bins[i], "\t".join(map(str, [val[i] for val in val_lists[0]]))))
 
 
 def main():
@@ -187,26 +192,20 @@ def main():
         gene_count_dict[1.0].append(count_genes(read_dict, 1.0))
 
         with open(args.output + name + ".general_stats.tsv", "w") as outf:
-            outf.write("Internal exons:\n")
+            outf.write("\nExons:\n")
             internal_hist = numpy.histogram(internal_exons_lengths, bins=EXON_BINS)
-            outf.write("\t".join(map(str, internal_hist[0])) + "\n")
-            outf.write("\t".join(map(str, internal_hist[1])) + "\n")
-
             terminal_hist = numpy.histogram(terminal_exons_lengths, bins=EXON_BINS)
-            outf.write("Terminal exons:\n")
-            outf.write("\t".join(map(str, terminal_hist[0])) + "\n")
-            outf.write("\t".join(map(str, terminal_hist[1])) + "\n")
+            print_hist(terminal_hist[1], [internal_hist[0], terminal_hist[0]], outf)
 
             intron_hist = numpy.histogram(introns_lengths, bins=INTRON_BINS)
-            outf.write("Introns:\n")
-            outf.write("\t".join(map(str, intron_hist[0])) + "\n")
-            outf.write("\t".join(map(str, intron_hist[1])) + "\n")
+            outf.write("\nIntrons:\n")
+            print_hist(terminal_hist[1], [intron_hist[0]], outf)
             
-            outf.write("Non-canonical counts:\n")
+            outf.write("\nNon-canonical counts:\n")
             for k in sorted(non_canonical_dict.keys()):
                 outf.write("%d\t%d\n" % (k, non_canonical_dict[k]))
 
-            outf.write("Subsampled gene counts:\n")
+            outf.write("\nSubsampled gene counts:\n")
             for p in sorted(gene_count_dict.keys()):
                 quantiles = numpy.quantile(gene_count_dict[p], [0.5, 0.25, 0.75])
                 outf.write("%.2f\t%s\n" % (p, "\t".join(map(str, quantiles))))
