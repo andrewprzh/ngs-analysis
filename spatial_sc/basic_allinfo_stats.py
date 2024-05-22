@@ -166,8 +166,8 @@ MIN_FRAC = 0.1
 ITERATIONS = 20
 EXON_BINS = [20 * i for i in range(51)] + [10000]
 LONG_EXON_BINS = [50 * i for i in range(51)] + [10000]
-SHORT_INTRON_BINS = [1000 * i for i in range(51)] + [1000000]
-INTRON_BINS = [10 * i for i in range(51)] + [1000000]
+SHORT_INTRON_BINS = [5 * i for i in range(51)] + [1000000]
+INTRON_BINS = [2000 * i for i in range(51)] + [1000000]
 
 
 def print_hist(bins, val_lists, name):
@@ -211,10 +211,10 @@ def main():
         print_hist(terminal_hist[1], [internal_hist[0], terminal_hist[0]], args.output + name + ".long_exon_lengths")
 
         intron_hist = numpy.histogram(introns_lengths, bins=INTRON_BINS)
-        print_hist(terminal_hist[1], [intron_hist[0]], args.output + name + ".intron_lengths")
+        print_hist(intron_hist[1], [intron_hist[0]], args.output + name + ".intron_lengths")
 
         intron_hist = numpy.histogram(introns_lengths, bins=SHORT_INTRON_BINS)
-        print_hist(terminal_hist[1], [intron_hist[0]], args.output + name + ".short-intron_lengths")
+        print_hist(intron_hist[1], [intron_hist[0]], args.output + name + ".short-intron_lengths")
 
         with open(args.output + name + ".canonical_stats.tsv", "w") as outf:
             for k in sorted(non_canonical_dict.keys()):
