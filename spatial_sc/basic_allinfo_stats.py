@@ -142,13 +142,13 @@ def process_allinfo(read_dict: dict, transcript_collector: TranscriptCollector):
 
 def count_genes(read_dict: dict, percentage: float):
     assert 0.0 <= percentage <= 1.0
-    gene_set = set()
+    gene_set = defaultdict(int)
     for readid in read_dict:
         r = random.random()
         if r > percentage:
             continue
-        gene_set.add(read_dict[readid][2])
-    return len(gene_set)
+        gene_set[read_dict[readid][2]] += 1
+    return sum(v > 10 for v in gene_set.values())
 
 
 def parse_args():
@@ -200,7 +200,6 @@ def main():
             for i in range(ITERATIONS):
                 gene_count_dict[percentage].append(count_genes(read_dict, percentage))
             percentage += MIN_FRAC
-        gene_count_dict[1.0].append(count_genes(read_dict, 1.0))
 
         internal_hist = numpy.histogram(internal_exons_lengths, bins=EXON_BINS)
         terminal_hist = numpy.histogram(terminal_exons_lengths, bins=EXON_BINS)
