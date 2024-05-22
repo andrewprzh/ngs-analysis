@@ -165,20 +165,24 @@ def parse_args():
 MIN_FRAC = 0.1
 ITERATIONS = 20
 EXON_BINS = [20 * i for i in range(51)] + [10000]
-INTRON_BINS = [1000 * i for i in range(51)] + [1000000]
+LONG_EXON_BINS = [50 * i for i in range(51)] + [10000]
+SHORT_INTRON_BINS = [1000 * i for i in range(51)] + [1000000]
+INTRON_BINS = [10 * i for i in range(51)] + [1000000]
 
 
-def print_hist(bins, val_lists, outf):
-    for i in range(len(bins) - 1):
-        outf.write("%d\t%s\n", (bins[i], "\t".join(map(str, [val[i] for val in val_lists]))))
-    outf.write("\n")
+def print_hist(bins, val_lists, name):
+    with open(name + ".tsv", "w") as outf:
+        for i in range(len(bins) - 1):
+            outf.write("%d\t%s\n" % (bins[i], "\t".join(map(str, [val[i] for val in val_lists]))))
 
-    total_counts = [sum(v) for v in val_lists]
-    for i in range(len(bins) - 1):
-        normalized_values = []
-        for j in range(len(val_lists)):
-            normalized_values.append(val_lists[j][i] / total_counts[j])
-        outf.write("%d\t%s\n", (bins[i], "\t".join(map(lambda x: ("%.4f" % x), normalized_values))))
+    with open(name + ".norm.tsv", "w") as outf:
+        total_counts = [sum(v) for v in val_lists]
+        for i in range(len(bins) - 1):
+            normalized_values = []
+            for j in range(len(val_lists)):
+                normalized_values.append(val_lists[j][i] / total_counts[j])
+            outf.write("%d\t%s\n" % (bins[i], "\t".join(map(lambda x: ("%.4f" % x), normalized_values))))
+
 
 def main():
     args = parse_args()
@@ -198,24 +202,28 @@ def main():
             percentage += MIN_FRAC
         gene_count_dict[1.0].append(count_genes(read_dict, 1.0))
 
-        with open(args.output + name + ".general_stats.tsv", "w") as outf:
-            outf.write("\nExons:\n")
-            internal_hist = numpy.histogram(internal_exons_lengths, bins=EXON_BINS)
-            terminal_hist = numpy.histogram(terminal_exons_lengths, bins=EXON_BINS)
-            print_hist(terminal_hist[1], [internal_hist[0], terminal_hist[0]], outf)
+        internal_hist = numpy.histogram(internal_exons_lengths, bins=EXON_BINS)
+        terminal_hist = numpy.histogram(terminal_exons_lengths, bins=EXON_BINS)
+        print_hist(terminal_hist[1], [internal_hist[0], terminal_hist[0]], args.output + name + ".exon_lengths")
 
-            intron_hist = numpy.histogram(introns_lengths, bins=INTRON_BINS)
-            outf.write("\nIntrons:\n")
-            print_hist(terminal_hist[1], [intron_hist[0]], outf)
-            
-            outf.write("\nNon-canonical counts:\n")
+        internal_hist = numpy.histogram(internal_exons_lengths, bins=LONG_EXON_BINS)
+        terminal_hist = numpy.histogram(terminal_exons_lengths, bins=LONG_EXON_BINS)
+        print_hist(terminal_hist[1], [internal_hist[0], terminal_hist[0]], args.output + name + ".long_exon_lengths")
+
+        intron_hist = numpy.histogram(introns_lengths, bins=INTRON_BINS)
+        print_hist(terminal_hist[1], [intron_hist[0]], args.output + name + ".intron_lengths")
+
+        intron_hist = numpy.histogram(introns_lengths, bins=SHORT_INTRON_BINS)
+        print_hist(terminal_hist[1], [intron_hist[0]], args.output + name + ".short-intron_lengths")
+
+        with open(args.output + name + ".canonical_stats.tsv", "w") as outf:
             for k in sorted(non_canonical_dict.keys()):
                 outf.write("%d\t%d\n" % (k, non_canonical_dict[k]))
 
-            outf.write("\nSubsampled gene counts:\n")
+        with open(args.output + name + ".gene_cov.tsv", "w") as outf:
             for p in sorted(gene_count_dict.keys()):
                 quantiles = numpy.quantile(gene_count_dict[p], [0.5, 0.25, 0.75])
-                outf.write("%.2f\t%s\n" % (p, "\t".join(map(str, quantiles))))
+                outf.write("%.2f\t%s\n" % (p * 100, "\t".join(map(str, quantiles))))
 
 
 if __name__ == "__main__":
