@@ -170,8 +170,15 @@ INTRON_BINS = [1000 * i for i in range(51)] + [1000000]
 
 def print_hist(bins, val_lists, outf):
     for i in range(len(bins) - 1):
-        outf.write("%d\t%s\n", (bins[i], "\t".join(map(str, [val[i] for val in val_lists[0]]))))
+        outf.write("%d\t%s\n", (bins[i], "\t".join(map(str, [val[i] for val in val_lists]))))
+    outf.write("\n")
 
+    total_counts = [sum(v) for v in val_lists]
+    for i in range(len(bins) - 1):
+        normalized_values = []
+        for j in range(len(val_lists)):
+            normalized_values.append(val_lists[j][i] / total_counts[j])
+        outf.write("%d\t%s\n", (bins[i], "\t".join(map(lambda x: ("%.4f" % x), normalized_values))))
 
 def main():
     args = parse_args()
