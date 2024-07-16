@@ -17,8 +17,14 @@ pdfWidth=11
 pdfHeight=8;
 
 countData = read.table("Novogene.HiFi.transcript_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
-exp_name = "WT_vs_1B"
-countData <- countData[,c(1,2,3,10,11,12)]
+#exp_name = "WT_vs_1B"
+#countData <- countData[,c(1,2,3,10,11,12)]
+#exp_name = "WT_vs_B1A"
+#countData <- countData[,c(4,5,6,10,11,12)]
+exp_name = "WT_vs_ID7"
+countData <- countData[,c(7,8,9,10,11,12)]
+
+
 samples = names(countData)
 samplesData = read.table("samples_short.tsv", header=TRUE, sep="\t", row.names=1 )
 head(samplesData)
@@ -67,7 +73,7 @@ plot1 <- ggplot(pca_df) +
 grid.arrange(plot1, ncol = 1)
 
 
-# get results
+# get DE results
 res <- results(ddsMat)
 gene_id <- row.names(res)
 res <- as.data.frame(res)
@@ -111,7 +117,6 @@ normalized_counts = counts(ddsMat,normalized=TRUE)
 normalized_counts_dt = data.frame("gene_id"=rownames(normalized_counts),normalized_counts)
 gene = subset(normalized_counts_dt, gene_id %in% DGEgenes)[1]
 vals = as.matrix(subset(normalized_counts_dt, gene_id %in% DGEgenes)[2:ncol(normalized_counts_dt)])
-#TOO SLOW
 #gene = normalized_counts_dt[1]
 #vals = as.matrix(normalized_counts_dt[2:ncol(normalized_counts_dt)])
 
@@ -196,7 +201,7 @@ gcolors <- function(group_colors, uni, colors) {
 }
 
 
-# ================= FOR GO  =========================
+# ================= FOR GO (NOT USED)  =========================
 
 
 description <-read.table("all_genes.go_terms_annot.txt", sep="\t", row.names = NULL, header = TRUE)
@@ -258,7 +263,7 @@ dev.off()
 
 
 
-# ================= FOR KEGG  =========================
+# ================= FOR KEGG (NOT USED)  =========================
 
 #description <-read.table("selected_kegg_genes.txt", sep="\t", row.names = NULL, header = TRUE)
 #description <-read.table("kegg+oil_short.txt", sep="\t", row.names = NULL, header = TRUE)
