@@ -19,6 +19,7 @@ class PositionFilter:
 
     def update(self, reditools_output):
         for l in open(reditools_output):
+            if l.startswith("Region"): continue
             v = l.strip().split("\t")
             rna_sub = v[7]
             try:
@@ -42,6 +43,9 @@ class PositionFilter:
     def filter_table(self, reditools_output, filtered_output_name):
         with open(filtered_output_name, "w") as outf:
             for l in open(reditools_output):
+                if l.startswith("Region"):
+                    outf.write(l)
+                    continue
                 v = l.strip().split("\t")
                 position = int(v[1])
                 chr_id = v[0]
