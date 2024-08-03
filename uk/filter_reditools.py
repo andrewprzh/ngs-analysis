@@ -58,6 +58,8 @@ class PositionFilter:
         for g in gffutils_db.features_of_type('gene', order_by=('seqid', 'start')):
             gene_dict[g.seqid + g.strand].append((g.start, g.end, g.id))
 
+        print("Total genes loaded %d" % sum([len(s) for s in gene_dict.values()]))
+
         new_dict = defaultdict(set)
         pos_gene_dict = {}
         for chr_info in self.position_dict.keys():
@@ -101,16 +103,20 @@ def main():
         print("Processing %s" % inf)
         position_filter.update(inf)
 
+    print("Total positions collected %d" % sum([len(s) for s in position_filter.position_dict.values()]))
+
     if args.genedb:
         print("Filtering using gene annotation %s" % args.genedb)
         position_dict = position_filter.filter_genes(args.genedb)
+
+        print("Total positions after gene filtering %d" % sum([len(s) for s in position_filter.position_dict.values()]))
 
         with open("position_info.tsv", "w") as outf:
             for pos in position_dict.keys():
                 outf.write("%s\t%s\t%d\t%s\n" % (pos[0], pos[1], pos[2], position_dict[pos]))
 
     for inf in args.tables:
-        filtered_table = inf + "filtered.tsv"
+        filtered_table = inf + ".filtered.tsv"
         print("Filtering %s to %s" % (inf, filtered_table))
         position_filter.filter_table(inf, filtered_table)
 
