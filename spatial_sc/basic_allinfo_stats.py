@@ -148,7 +148,7 @@ def count_genes(read_dict: dict, percentage: float):
         if r > percentage:
             continue
         gene_set[read_dict[readid][2]] += 1
-    return sum(v > 10 for v in gene_set.values())
+    return sum(v >= 10 for v in gene_set.values())
 
 
 def parse_args():
@@ -200,6 +200,14 @@ def main():
             for i in range(ITERATIONS):
                 gene_count_dict[percentage].append(count_genes(read_dict, percentage))
             percentage += MIN_FRAC
+
+
+        print(numpy.median(internal_exons_lengths))
+        print(numpy.median(terminal_exons_lengths))
+        print(numpy.median(introns_lengths))
+        print(numpy.mean(internal_exons_lengths))
+        print(numpy.mean(terminal_exons_lengths))
+        print(numpy.mean(introns_lengths))
 
         internal_hist = numpy.histogram(internal_exons_lengths, bins=EXON_BINS)
         terminal_hist = numpy.histogram(terminal_exons_lengths, bins=EXON_BINS)
