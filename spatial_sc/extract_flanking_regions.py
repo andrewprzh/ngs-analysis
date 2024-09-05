@@ -27,7 +27,7 @@ def reverse_complement(my_seq):  ## obtain reverse complement of a sequence
 
 
 def get_regions(fasta_record, start, end, strand):
-    left_region = fasta_record[start - REGION_LEN:strand]
+    left_region = fasta_record[start - REGION_LEN:start]
     right_region = fasta_record[end + 1:end + REGION_LEN + 1]
     if strand == "+":
         return left_region, right_region
@@ -48,8 +48,9 @@ def process_exon_file(exon_file, output_dir, fasta_dict):
         chr_id, start, end, strand = exon_info[0], int(exon_info[1]), int(exon_info[2]), exon_info[3]
 
         upstream_seq, downstream_seq = get_regions(fasta_dict[chr_id].seq, start, end, strand)
-        upstream_buffer.append(SeqRecord.SeqRecord(seq=Seq.Seq(upstream_seq), id="%s_%s_upstream" % (v[0], v[1])))
-        downstream_buffer.append(SeqRecord.SeqRecord(seq=Seq.Seq(downstream_seq), id="%s_%s_downstream" % (v[0], v[1])))
+        exon_str = "_".join(v)
+        upstream_buffer.append(SeqRecord.SeqRecord(seq=Seq.Seq(upstream_seq), id="%s_upstream" % exon_str, description=""))
+        downstream_buffer.append(SeqRecord.SeqRecord(seq=Seq.Seq(downstream_seq), id="%s_downstream" % exon_str, description=""))
 
     upstream_fasta = os.path.join(output_dir, name + ".upstream.fasta")
     downstream_fasta = os.path.join(output_dir, name + ".downstream.fasta")
@@ -60,7 +61,7 @@ def process_exon_file(exon_file, output_dir, fasta_dict):
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output folder", default="./")
-    parser.add_argument("--fastq", "-f", type=str, help="reference genome", required=True)
+    parser.add_argument("--reference", "-r", type=str, help="reference genome", required=True)
     parser.add_argument("--input", "-i", type=str, nargs='+',
                         help="one or more files with input exon lists (allows wildcards)", required=True)
 
