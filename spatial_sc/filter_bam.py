@@ -83,7 +83,7 @@ def parse_args():
     parser.add_argument("--spliced", default=False, action="store_true",
                         help="keep only spliced reads")
 
-    parser.add_argument("--bam", "-b", type=str, help="BAM file ", required=True)
+    parser.add_argument("--bam", "-b", nargs="+", type=str, help="BAM file ", required=True)
 
     args = parser.parse_args()
     return args
@@ -91,14 +91,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    in_bam = args.bam
-    if not args.output:
-        args.output = os.path.dirname(in_bam)
-
-    if os.path.isdir(args.output):
-        out_bam = os.path.join(args.output, os.path.splitext(os.path.basename(in_bam))[0] + "." + args.suffix + ".bam")
-    else:
-        out_bam = args.output
 
     if not args.list:
         read_set = None
@@ -107,7 +99,17 @@ def main():
     else:
         read_set = read_reads(args.list, args.read_column)
 
-    filter_reads(in_bam, out_bam, read_set, spliced=args.spliced)
+    for in_bam in args.bam:
+        print("Processing %s" % in_bam)
+        if not args.output:
+            args.output = os.path.dirname(in_bam)
+
+        if os.path.isdir(args.output):
+            out_bam = os.path.join(args.output, os.path.splitext(os.path.basename(in_bam))[0] + "." + args.suffix + ".bam")
+        else:
+            out_bam = args.output
+
+        filter_reads(in_bam, out_bam, read_set, spliced=args.spliced)
 
 
 if __name__ == "__main__":
