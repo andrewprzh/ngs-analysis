@@ -39,7 +39,11 @@ def read_called_barcodes(inf):
     return read_set
 
 
-def filter_reads(in_file_name, out_file_name, read_set):
+def has_intron(cigartules):
+    return any(x[0] == 3 for x in cigartules)
+
+
+def filter_reads(in_file_name, out_file_name, read_set=None, spliced=False):
     inf = pysam.AlignmentFile(in_file_name, "rb")
     outf = pysam.AlignmentFile(out_file_name, "wb", template=inf)
 
@@ -54,7 +58,7 @@ def filter_reads(in_file_name, out_file_name, read_set):
         if count % 100000 == 0:
             sys.stdout.write("Processed " + str(count) + " reads\r")
 
-        if read.query_name in read_set:
+        if (not read_set or read.query_name in read_set) and (not spliced or has_intron(read.cigartuples)):
             outf.write(read)
             passed += 1
 
@@ -72,10 +76,12 @@ def parse_args():
                                                          "or file name")
     parser.add_argument("--suffix", type=str, help="file suffix (works if output is a folder),"
                                                    " default: filtered", default="filtered")
-    parser.add_argument("--list", "-l", type=str, help="read list", required=True)
+    parser.add_argument("--list", "-l", type=str, help="read list")
     parser.add_argument("--read_column", type=int, help="read id column (0 based index)", default=0)
     parser.add_argument("--barcodes", default=False, action="store_true",
                         help="read list is barcode files, filter only barcoded ones")
+    parser.add_argument("--spliced", default=False, action="store_true",
+                        help="keep only spliced reads")
 
     parser.add_argument("--bam", "-b", type=str, help="BAM file ", required=True)
 
@@ -94,12 +100,14 @@ def main():
     else:
         out_bam = args.output
 
-    if args.barcodes:
+    if not args.list:
+        read_set = None
+    elif args.barcodes:
         read_set = read_called_barcodes(args.list)
     else:
         read_set = read_reads(args.list, args.read_column)
 
-    filter_reads(in_bam, out_bam, read_set)
+    filter_reads(in_bam, out_bam, read_set, spliced=args.spliced)
 
 
 if __name__ == "__main__":
