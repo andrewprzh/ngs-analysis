@@ -21,7 +21,7 @@ def read_reads(inf, col):
     for l in open(inf):
         v = l.strip().split('\t')
         if len(v) > col:
-            read_set.add([col])
+            read_set.add(v[col])
         elif not warn_printed:
             print("Malformed line with %d columns %s" % (len(v), l))
             warn_printed = True
