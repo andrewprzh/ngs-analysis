@@ -44,7 +44,7 @@ def has_intron(cigartules):
     return any(x[0] == 3 for x in cigartules)
 
 
-def filter_reads(in_file_name, read_set=None):
+def count_stats(in_file_name, read_set=None):
     inf = pysam.AlignmentFile(in_file_name, "rb")
     total_reads = 0
     stat_dict = defaultdict(int)
@@ -59,7 +59,7 @@ def filter_reads(in_file_name, read_set=None):
         else:
             mapped = "non-primary"
 
-        if read.query_name in read_set:
+        if read_set is not None and read.query_name in read_set:
             barcoded = "barcoded"
         else:
             barcoded = "no barcode"
@@ -100,10 +100,8 @@ def main():
 
     for in_bam in args.bam:
         print("Processing %s" % in_bam)
-        if not args.output:
-            args.output = os.path.dirname(in_bam)
 
-        filter_reads(in_bam, read_set)
+        count_stats(in_bam, read_set)
         print("End processing %s" % in_bam)
 
 
