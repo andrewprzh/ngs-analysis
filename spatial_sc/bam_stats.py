@@ -16,35 +16,22 @@ import pysam
 from collections import defaultdict
 
 
-def read_reads(inf, col):
-    read_set = set()
-    warn_printed = False
-    for l in open(inf):
-        v = l.strip().split('\t')
-        if len(v) > col:
-            read_set.add([col])
-        elif not warn_printed:
-            print("Malformed line with %d columns %s" % (len(v), l))
-            warn_printed = True
-    return read_set
-
-
 def read_called_barcodes(inf):
-    read_set = set()
+    barcode_dict = {}
     for l in open(inf):
         v = l.strip().split('\t')
         if len(v) >= 2 and v[1] == "*":
             continue
-        read_set.add(v[0])
-    print("Loaded %d read ids" % len(read_set))
-    return read_set
+        barcode_dict[v[0]] = v[1]
+    print("Loaded %d read ids" % len(barcode_dict))
+    return barcode_dict
 
 
 def has_intron(cigartules):
     return any(x[0] == 3 for x in cigartules)
 
 
-def count_stats(in_file_name, read_set=None):
+def count_stats(in_file_name, barcode_dict=None, intron_chr_set=None):
     inf = pysam.AlignmentFile(in_file_name, "rb")
     total_reads = 0
     stat_dict = defaultdict(int)
@@ -59,7 +46,7 @@ def count_stats(in_file_name, read_set=None):
         else:
             mapped = "non-primary"
 
-        if read_set is not None and read.query_name in read_set:
+        if barcode_dict is not None and read.query_name in barcode_dict:
             barcoded = "barcoded"
         else:
             barcoded = "no barcode"
@@ -94,14 +81,14 @@ def parse_args():
 def main():
     args = parse_args()
 
-    read_set = None
+    barcode_dict = None
     if args.barcodes:
-        read_set = read_called_barcodes(args.barcodes)
+        barcode_dict = read_called_barcodes(args.barcodes)
 
     for in_bam in args.bam:
         print("Processing %s" % in_bam)
 
-        count_stats(in_bam, read_set)
+        count_stats(in_bam, barcode_dict)
         print("End processing %s" % in_bam)
 
 
