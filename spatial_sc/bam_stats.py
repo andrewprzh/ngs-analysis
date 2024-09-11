@@ -171,6 +171,7 @@ def count_known(introns, chr_id, intron_chr_dict):
 def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
     inf = pysam.AlignmentFile(in_file_name, "rb")
     total_reads = 0
+    primary_alignments = 0
     stat_dict = defaultdict(int)
     intron_barcode_dict = defaultdict(int)
     known_intron_barcode_dict  = defaultdict(int)
@@ -183,9 +184,13 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
             mapped = "unmapped"
         elif not read.is_secondary and not read.is_supplementary:
             mapped = "primary"
+            primary_alignments += 1
             is_primary = True
         else:
             mapped = "non-primary"
+
+        if not is_primary:
+            continue
 
         is_barcoded = barcode_dict is not None and read.query_name in barcode_dict
         if is_barcoded:
@@ -220,7 +225,7 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
         if total_reads % 100000 == 0:
             sys.stdout.write("Processed " + str(total_reads) + " reads\r")
 
-    print("Processed %d reads" % total_reads)
+    print("Processed %d reads, of them primary %d" % (total_reads, primary_alignments))
     inf.close()
     for k in sorted(stat_dict.keys()):
         print("%s\t%d" % (k, stat_dict[k]))
