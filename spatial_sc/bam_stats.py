@@ -19,12 +19,17 @@ import gffutils
 
 
 def read_called_barcodes(inf):
+    total_reads = 0
     barcode_dict = {}
     for l in open(inf):
+        total_reads += 1
         v = l.strip().split('\t')
         if len(v) >= 2 and v[1] == "*":
             continue
         barcode_dict[v[0]] = v[1]
+        if total_reads % 100000 == 0:
+            sys.stdout.write("Processed " + str(total_reads) + " reads\r")
+
     print("Loaded %d read ids" % len(barcode_dict))
     return barcode_dict
 
@@ -32,8 +37,12 @@ def read_called_barcodes(inf):
 def load_intron_chr_dict(genedb_path):
     gene_db = gffutils.FeatureDB(genedb_path)
     intron_chr_dict = defaultdict(set)
+    total_genes = 0
 
-    for g in gene_db.features_of_type('gene', order_by=('seqid', 'start')):
+    for g in gene_db.features_of_type('gene'):
+        total_genes += 1
+        if total_genes % 100000 == 0:
+            sys.stdout.write("Loaded " + str(total_genes) + " genes\r")
         for t in gene_db.children(g, featuretype=('transcript', 'mRNA')):
             exons = []
             for e in gene_db.children(t, featuretype='exon', order_by='start'):
@@ -243,12 +252,19 @@ def main():
 
     barcode_dict = None
     if args.barcodes:
+        print("Loading barcodes from %s" % args.barcodes)
         barcode_dict = read_called_barcodes(args.barcodes)
+        print("Loaded %d barcodes" % len(barcode_dict))
+
+    intron_chr_dict = None
+    if args.genedb:
+        print("Loading introns from %s" % args.genedb)
+        intron_chr_dict = load_intron_chr_dict(args.genedb)
+        print("Loaded %d introns" % sum([len(x) for x in intron_chr_dict.values()]))
 
     for in_bam in args.bam:
         print("Processing %s" % in_bam)
-
-        count_stats(in_bam, barcode_dict)
+        count_stats(in_bam, barcode_dict, intron_chr_dict)
         print("End processing %s" % in_bam)
 
 
