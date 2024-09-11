@@ -14,6 +14,8 @@ import os
 import sys
 import pysam
 from collections import defaultdict
+from enum import Enum
+import gffutils
 
 
 def read_called_barcodes(inf):
@@ -27,9 +29,44 @@ def read_called_barcodes(inf):
     return barcode_dict
 
 
+def load_intron_chr_dict(genedb_path):
+    gene_db = gffutils.FeatureDB(genedb_path)
+    intron_chr_dict = defaultdict(set)
+
+    for g in gene_db.features_of_type('gene', order_by=('seqid', 'start')):
+        for t in gene_db.children(g, featuretype=('transcript', 'mRNA')):
+            exons = []
+            for e in gene_db.children(t, featuretype='exon', order_by='start'):
+                exons.append((e.start, e.end))
+
+            for intron in junctions_from_blocks(exons):
+                intron_chr_dict[g.seqid].add(intron)
+
+    return intron_chr_dict
+
+
 def has_intron(cigartules):
     return any(x[0] == 3 for x in cigartules)
 
+
+class CigarEvent(Enum):
+    match = 0
+    insertion = 1
+    deletion = 2
+    skipped = 3
+    soft_clipping = 4
+    hard_clipping = 5
+    padding = 6
+    seq_match = 7
+    seq_mismatch = 8
+
+    @classmethod
+    def get_match_events(cls):
+        return {cls.match, cls.seq_match, cls.seq_mismatch}
+
+    @classmethod
+    def get_ins_del_match_events(cls):
+        return {cls.match, cls.insertion, cls.deletion, cls.seq_match, cls.seq_mismatch}
 
 
 def get_read_blocks(ref_start, cigar_tuples):
@@ -103,17 +140,34 @@ def get_read_blocks(ref_start, cigar_tuples):
     return ref_blocks, read_blocks, cigar_blocks
 
 
+def junctions_from_blocks(sorted_blocks):
+    junctions = []
+    if len(sorted_blocks) >= 2:
+        for i in range(0, len(sorted_blocks) - 1):
+            if sorted_blocks[i][1] + 1 < sorted_blocks[i + 1][0]:
+                junctions.append((sorted_blocks[i][1] + 1, sorted_blocks[i + 1][0] - 1))
+    return junctions
+
+
 def correct_bam_coords(blocks):
     return list(map(lambda x: (x[0] + 1, x[1]), blocks))
 
 
+def get_introns(read):
+    exons, _, _ = get_read_blocks(read.reference_start, read.cigartuples)
+    return junctions_from_blocks(exons)
 
-def introns_known(read, intron_chr_set):
-    chr_id = read.reference_name
+
+def count_known(introns, chr_id, intron_chr_dict):
+    known_introns = 0
+    if intron_chr_dict:
+        for i in introns:
+            known_introns += 1 if i in intron_chr_dict[chr_id] else 0
+
+    return known_introns
 
 
-
-def count_stats(in_file_name, barcode_dict=None, intron_chr_set=None):
+def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
     inf = pysam.AlignmentFile(in_file_name, "rb")
     total_reads = 0
     stat_dict = defaultdict(int)
@@ -130,18 +184,33 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_set=None):
         else:
             mapped = "non-primary"
 
-        if barcode_dict is not None and read.query_name in barcode_dict:
+        is_barcoded = barcode_dict is not None and read.query_name in barcode_dict
+        if is_barcoded:
             barcoded = "barcoded"
         else:
             barcoded = "no barcode"
 
-        is_spliced = has_intron(read.cigartuples)
+        introns = get_introns(read)
+        is_spliced = len(introns) > 0
+        chr_id = read.reference_name
+        known_introns = count_known(introns, chr_id, intron_chr_dict)
+        all_introns = len(introns)
         if is_spliced:
-            spliced = "spliced"
+            if known_introns == all_introns:
+                spliced = "spliced_known"
+            elif known_introns == 0:
+                spliced = "spliced_all_novel"
+            else:
+                spliced = "spliced_novel"
         else:
             spliced = "unspliced"
 
-
+        if is_barcoded and is_spliced:
+            barcode = barcode_dict[read.query_name]
+            for i in introns:
+                intron_barcode_dict[(barcode, chr_id, i)] += 1
+                if i in intron_chr_dict[chr_id]:
+                    known_intron_barcode_dict[(barcode, chr_id, i)] += 1
 
         stat_dict[(mapped, barcoded, spliced)] += 1
 
@@ -152,6 +221,9 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_set=None):
     inf.close()
     for k in sorted(stat_dict.keys()):
         print("%s\t%d" % (k, stat_dict[k]))
+
+    print("Barcode-intron pairs: %d" % len(intron_barcode_dict))
+    print("Barcode-known-intron pairs: %d" % len(known_intron_barcode_dict))
 
 
 def parse_args():
