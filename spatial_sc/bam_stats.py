@@ -87,8 +87,6 @@ def get_read_blocks(ref_start, cigar_tuples):
     current_cigar_block_start = None
     has_match = False
     ref_blocks = []
-    cigar_blocks = []
-    read_blocks = []
 
     while cigar_index < len(cigar_tuples):
         cigar_event = CigarEvent(cigar_tuples[cigar_index][0])
@@ -120,8 +118,6 @@ def get_read_blocks(ref_start, cigar_tuples):
             if current_ref_block_start:
                 if has_match:
                     ref_blocks.append((current_ref_block_start, ref_pos - 1))
-                    read_blocks.append((current_read_block_start, read_pos - 1))
-                    cigar_blocks.append((current_cigar_block_start, cigar_index - 1))
                 has_match = False
                 current_ref_block_start = None
                 current_read_block_start = None
@@ -131,8 +127,6 @@ def get_read_blocks(ref_start, cigar_tuples):
             if current_ref_block_start:
                 if has_match:
                     ref_blocks.append((current_ref_block_start, ref_pos - 1))
-                    read_blocks.append((current_read_block_start, read_pos - 1))
-                    cigar_blocks.append((current_cigar_block_start, cigar_index - 1))
                 has_match = False
                 current_ref_block_start = None
                 current_read_block_start = None
@@ -143,10 +137,8 @@ def get_read_blocks(ref_start, cigar_tuples):
 
     if current_ref_block_start and has_match:
         ref_blocks.append((current_ref_block_start, ref_pos - 1))
-        read_blocks.append((current_read_block_start, read_pos - 1))
-        cigar_blocks.append((current_cigar_block_start, cigar_index - 1))
 
-    return ref_blocks, read_blocks, cigar_blocks
+    return ref_blocks
 
 
 def junctions_from_blocks(sorted_blocks):
@@ -163,7 +155,7 @@ def correct_bam_coords(blocks):
 
 
 def get_introns(read):
-    exons, _, _ = get_read_blocks(read.reference_start, read.cigartuples)
+    exons = get_read_blocks(read.reference_start, read.cigartuples)
     return junctions_from_blocks(exons)
 
 
@@ -186,10 +178,12 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
     for read in inf:
         total_reads += 1
 
+        is_primary = False
         if read.reference_id == -1:
             mapped = "unmapped"
         elif not read.is_secondary and not read.is_supplementary:
             mapped = "primary"
+            is_primary = True
         else:
             mapped = "non-primary"
 
@@ -214,7 +208,7 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
         else:
             spliced = "unspliced"
 
-        if is_barcoded and is_spliced:
+        if is_barcoded and is_spliced and is_primary:
             barcode = barcode_dict[read.query_name]
             for i in introns:
                 intron_barcode_dict[(barcode, chr_id, i)] += 1
