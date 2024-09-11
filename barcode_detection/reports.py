@@ -1,4 +1,4 @@
-
+\
 NOSEQ = "*"
 
 
@@ -22,8 +22,8 @@ class BarcodeDetectionResult:
     def more_informative_than(self, that):
         if self.polyT != that.polyT:
             return self.polyT > that.polyT
-        if self.primer != that.r1:
-            return self.primer > that.r1
+#        if self.primer != that.r1:
+#            return self.primer > that.r1
         if self.linker_start != that.linker_start:
             return self.linker_start > that.linker_start
         return self.BC_score > that.BC_score
@@ -50,8 +50,8 @@ class ReadStats:
         self.read_count += 1
         if barcode_detection_result.polyT != -1:
             self.polyT_count += 1
-        if barcode_detection_result.r1 != -1:
-            self.primer_count += 1
+#        if barcode_detection_result.r1 != -1:
+#            self.primer_count += 1
         if barcode_detection_result.linker_start != -1:
             self.linker_count += 1
         if barcode_detection_result.barcode != NOSEQ:
