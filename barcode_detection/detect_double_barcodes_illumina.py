@@ -91,7 +91,7 @@ class DoubleBarcodeDetector:
         presumable_polyt_start = linker_end + self.RIGHT_BC_LENGTH + self.UMI_LENGTH
         search_start = presumable_polyt_start - 4
         search_end = min(len(sequence), presumable_polyt_start + 10)
-        polyt_start = find_polyt_start(sequence[search_start:search_end], window_size=5, polya_fraction=1.0)
+        polyt_start = find_polyt_start(sequence[search_start:search_end], window_size=4, polya_fraction=1.0)
         if polyt_start != -1:
             polyt_start += search_start
 
