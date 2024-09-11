@@ -1,6 +1,6 @@
 from collections import defaultdict
-import ctypes
-lib = ctypes.cdll.LoadLibrary('./cseqlib/cseqlib.so')
+#import ctypes
+lib = None # ctypes.cdll.LoadLibrary('./cseqlib/cseqlib.so')
 
 
 class KmerIndexer:
