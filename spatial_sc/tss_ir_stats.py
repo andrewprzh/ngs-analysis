@@ -67,7 +67,7 @@ def parse_args():
     # parser.add_argument("--output", "-o", type=str, help="output folder (same as input file if not set), "
     #                                                      "or file name")
     parser.add_argument("--allinfo", type=str, help="allinfo file or read id list")
-    parser.add_argument("--ra", type=str, help="read assignments")
+    parser.add_argument("--ra", type=str, help="read assignments", required=True)
 
     args = parser.parse_args()
     return args
@@ -76,7 +76,11 @@ def parse_args():
 def main():
     args = parse_args()
 
+    ids = None
+    if args.allinfo:
+        ids = read_ids(args.allinfo)
 
+    process_read_assignments(args.ra, ids)
 
 
 if __name__ == "__main__":
