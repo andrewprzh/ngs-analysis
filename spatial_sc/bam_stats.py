@@ -230,8 +230,17 @@ def count_stats(in_file_name, barcode_dict=None, intron_chr_dict=None):
     for k in sorted(stat_dict.keys()):
         print("%s\t%d" % (k, stat_dict[k]))
 
-    print("Barcode-intron pairs: %d" % len(intron_barcode_dict))
-    print("Barcode-known-intron pairs: %d" % len(known_intron_barcode_dict))
+    print("All reads\t%d" % sum(stat_dict.values()))
+    print("A-Unspliced\t%d" % sum(stat_dict[k] if k[2] == "unspliced" else 0 for k in stat_dict.keys()))
+    print("A-Spliced\t%d" % sum(stat_dict[k] if k[2] != "unspliced" else 0 for k in stat_dict.keys()))
+    print("A-SplicedK\t%d" % sum(stat_dict[k] if k[2] == "spliced_known" else 0 for k in stat_dict.keys()))
+    print("BC reads\t%d" % sum(stat_dict.values()))
+    print("B-Unspliced\t%d" % sum(stat_dict[k] if k[1] == "barcoded" and k[2] == "unspliced" else 0 for k in stat_dict.keys()))
+    print("B-Spliced\t%d" % sum(stat_dict[k] if k[1] == "barcoded" and k[2] != "unspliced" else 0 for k in stat_dict.keys()))
+    print("B-SplicedK\t%d" % sum(stat_dict[k] if k[1] == "barcoded" and k[2] == "spliced_known" else 0 for k in stat_dict.keys()))
+    print()
+    print("Barcode-intron pairs\t%d" % len(intron_barcode_dict))
+    print("Bc-known-intron pairs\t%d" % len(known_intron_barcode_dict))
 
 
 def parse_args():
