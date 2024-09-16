@@ -57,6 +57,9 @@ def process_read_assignments(read_assignments, ids=None):
         if any(attr.startswith("unspliced_intron_retention") for attr in attributes):
             stat_dict["unspliced_intron_retention"] += 1
 
+        if len(processed_reads) % 100000 == 0:
+            sys.stdout.write("Processed " + str(len(processed_reads)) + " reads\r")
+
     print("Total reads\t%d" % len(processed_reads))
     for k in sorted(stat_dict.keys()):
         print("%s\t%d" % (k, stat_dict[k]))
