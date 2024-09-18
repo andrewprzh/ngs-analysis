@@ -156,22 +156,23 @@ def print_hist(bins, val_lists, name):
 def main():
     args = parse_args()
     transcript_dict = load_transcripts(args.genedb)
-    read_dict = load_allinfo(args.allinfo)
 
-    transcript_cov_fractions = process_allinfo(read_dict, transcript_dict)
-    print("All reads")
-    print("Mean\t%.2f" % numpy.mean(transcript_cov_fractions))
-    print("Med\t%.2f" % numpy.median(transcript_cov_fractions))
-    print("Q25\t%.2f" % numpy.quantile(transcript_cov_fractions, 0.25))
-    print("Q75\t%.2f" % numpy.quantile(transcript_cov_fractions, 0.75))
-    for gene_list in args.gene_lists:
-        gene_set = load_genes(gene_list)
-        transcript_cov_fractions = process_allinfo(read_dict, transcript_dict, gene_set)
-        print("Stats for %s" % gene_list)
+    for allinfo in args.allinfo:
+        read_dict = load_allinfo(allinfo)
+        transcript_cov_fractions = process_allinfo(read_dict, transcript_dict)
+        print("All reads for %s" % allinfo)
         print("Mean\t%.2f" % numpy.mean(transcript_cov_fractions))
         print("Med\t%.2f" % numpy.median(transcript_cov_fractions))
         print("Q25\t%.2f" % numpy.quantile(transcript_cov_fractions, 0.25))
         print("Q75\t%.2f" % numpy.quantile(transcript_cov_fractions, 0.75))
+        for gene_list in args.gene_lists:
+            gene_set = load_genes(gene_list)
+            transcript_cov_fractions = process_allinfo(read_dict, transcript_dict, gene_set)
+            print("Stats for %s" % gene_list)
+            print("Mean\t%.2f" % numpy.mean(transcript_cov_fractions))
+            print("Med\t%.2f" % numpy.median(transcript_cov_fractions))
+            print("Q25\t%.2f" % numpy.quantile(transcript_cov_fractions, 0.25))
+            print("Q75\t%.2f" % numpy.quantile(transcript_cov_fractions, 0.75))
 
 
 if __name__ == "__main__":
