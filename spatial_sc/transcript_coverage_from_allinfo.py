@@ -14,7 +14,6 @@ from traceback import print_exc
 from collections import defaultdict
 import gffutils
 import numpy
-from toolz.curried import unique
 
 
 # % Transcript covered
