@@ -145,16 +145,16 @@ def common_unique_genes(read_dict1, read_dict2):
     unique2 = gene_set2.difference(gene_set1)
     return (("common", gene_set1.intersection(gene_set2)),
             ("unique1", unique1),
-            ("unique1_10", filter(lambda x: gene_counts1[x] >= 10, unique1)),
+            ("unique1_10", set(filter(lambda x: gene_counts1[x] >= 10, unique1))),
             ("unique2", unique2),
-            ("unique2_10", filter(lambda x: gene_counts2[x] >= 10, unique2)))
+            ("unique2_10", set(filter(lambda x: gene_counts2[x] >= 10, unique2))))
 
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--allinfo", "-a", nargs='+', type=str, help="allinfo files", required=True)
     parser.add_argument("--genedb", "-g", type=str, help="gffutils genedb", required=True)
-    parser.add_argument("--gene_list", nargs="+", type=str, help="gene list(s) to analyse")
+    parser.add_argument("--gene_list", nargs="+", type=str, help="gene list(s) to analyse", default=[])
     args = parser.parse_args()
     return args
 
@@ -175,6 +175,9 @@ def print_hist(bins, val_lists, name):
 
 def print_stats(header, read_dict, transcript_dict, gene_set=None):
     transcript_cov_fractions = process_allinfo(read_dict, transcript_dict, gene_set)
+    if not transcript_cov_fractions:
+        print("No data for %s" % header)
+        return
     print(header)
     print("Mean\t%.5f" % numpy.mean(transcript_cov_fractions))
     print("Med\t%.5f" % numpy.median(transcript_cov_fractions))
@@ -193,14 +196,15 @@ def main():
         read_dicts.append(read_dict)
         print_stats("All reads for %s" % allinfo, read_dict, transcript_dict)
 
-        for gene_list in args.gene_lists:
+        for gene_list in args.gene_list:
             gene_set = load_genes(gene_list)
-            print_stats("Stats for %s" % gene_list, read_dict, transcript_dict, gene_set)
+            print_stats("Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set)
 
     if len(read_dicts) == 2:
         for header, gene_set in common_unique_genes(read_dicts[0], read_dicts[1]):
-            print_stats("Stats for allinfo %s, %s" % (os.path.basename(args.allinfo[0]), header), read_dicts[0], transcript_dict, gene_set)
-            print_stats("Stats for allinfo %s, %s" % (os.path.basename(args.allinfo[1]), header), read_dicts[1], transcript_dict, gene_set)
+            print("Using gene set %s of size %d" % (header, len(gene_set)))
+            print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[0])), read_dicts[0], transcript_dict, gene_set)
+            print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[1])), read_dicts[1], transcript_dict, gene_set)
 
 
 if __name__ == "__main__":
