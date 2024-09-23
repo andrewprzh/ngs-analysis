@@ -14,6 +14,7 @@ from traceback import print_exc
 from collections import defaultdict
 import gffutils
 import numpy
+import gzip
 
 
 # % Transcript covered
@@ -105,6 +106,37 @@ def load_allinfo(inf):
 
     print("Loaded %d reads" % len(read_dict))
     return read_dict
+
+
+def load_read_assignments(read_assignments):
+    # read_id -> (chr, strand, gene, isoform, exons)
+    read_dict = {}
+
+    fname, outer_ext = os.path.splitext(os.path.basename(read_assignments))
+    low_ext = outer_ext.lower()
+
+    if low_ext in ['.gz', '.gzip']:
+        handle = gzip.open(read_assignments, "rt")
+    else:
+        handle = open(read_assignments)
+
+    for l in handle:
+        if l.startswith("#"): continue
+
+        v = l.split("\t")
+        read_id = v[0]
+        gene_id = v[1]
+        transcript_id = v[11]
+        exons = v[8].split(";%;")
+        exon1 = exons[1].split("_")
+        chr_id = exon1[0]
+        strand = exon1[3]
+        exon_coords = []
+        for e in exons:
+            if not e: continue
+            ex = e.split("_")
+            exon_coords.append((int(ex[1]), int(ex[2])))
+        read_dict[v[0]] = (chr_id, strand, gene_id, transcript_id, exon_coords)
 
 
 def load_genes(inf):
