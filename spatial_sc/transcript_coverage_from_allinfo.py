@@ -117,17 +117,21 @@ def load_genes(inf):
     return gene_set
 
 
-def process_allinfo(read_dict, transcript_dict, gene_set=None):
+def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=False):
     transcript_cov_fractions = []
+    transcript_exon_count = []
     for readid in read_dict:
         read_info = read_dict[readid]
         gene_id = read_info[2]
         if gene_set and gene_id not in gene_set: continue
         transcript_id = read_info[3]
-        isoform_exons = transcript_dict[transcript_id][2]
         read_exons = read_info[4]
+        if spliced_only and len(read_exons) == 1:
+            continue
+        isoform_exons = transcript_dict[transcript_id][2]
         transcript_cov_fractions.append(transcript_coverage_fraction(read_exons, isoform_exons))
-    return transcript_cov_fractions
+        transcript_exon_count.append(len(read_exons))
+    return transcript_cov_fractions, transcript_exon_count
 
 
 def common_unique_genes(read_dict1, read_dict2):
@@ -172,16 +176,18 @@ def print_hist(bins, val_lists, name):
             outf.write("%d\t%s\n" % (bins[i], "\t".join(map(lambda x: ("%.4f" % x), normalized_values))))
 
 
-def print_stats(header, read_dict, transcript_dict, gene_set=None):
-    transcript_cov_fractions = process_allinfo(read_dict, transcript_dict, gene_set)
+def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=False):
+    transcript_cov_fractions, transcript_exon_count = process_allinfo(read_dict, transcript_dict, gene_set, spliced_only)
     if not transcript_cov_fractions:
         print("No data for %s" % header)
         return
     print(header)
     print("Mean\t%.5f" % numpy.mean(transcript_cov_fractions))
-    print("Med\t%.5f" % numpy.median(transcript_cov_fractions))
-    print("Q25\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.25))
-    print("Q75\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.75))
+    print("Med \t%.5f" % numpy.median(transcript_cov_fractions))
+    print("E.avg\t%.5f" % numpy.mean(transcript_exon_count))
+
+    # print("Q25\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.25))
+    # print("Q75\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.75))
     print()
 
 
@@ -194,16 +200,25 @@ def main():
         read_dict = load_allinfo(allinfo)
         read_dicts.append(read_dict)
         print_stats("All reads for %s" % allinfo, read_dict, transcript_dict)
-
         for gene_list in args.gene_list:
             gene_set = load_genes(gene_list)
             print_stats("Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set)
+
+        print_stats("SPLICED reads for %s" % allinfo, read_dict, transcript_dict, spliced_only=True)
+        for gene_list in args.gene_list:
+            gene_set = load_genes(gene_list)
+            print_stats("SPLICED Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set, spliced_only=True)
+
 
     if len(read_dicts) == 2:
         for header, gene_set in common_unique_genes(read_dicts[0], read_dicts[1]):
             print("Using gene set %s of size %d" % (header, len(gene_set)))
             print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[0])), read_dicts[0], transcript_dict, gene_set)
             print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[1])), read_dicts[1], transcript_dict, gene_set)
+
+            print("Using gene set %s of size %d, SPLICED ONLY" % (header, len(gene_set)))
+            print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[0])), read_dicts[0], transcript_dict, gene_set, spliced_only=True)
+            print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[1])), read_dicts[1], transcript_dict, gene_set, spliced_only=True)
 
 
 if __name__ == "__main__":
