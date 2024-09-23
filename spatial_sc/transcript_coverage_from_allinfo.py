@@ -120,7 +120,7 @@ def load_genes(inf):
 def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=False):
     transcript_cov_fractions = []
     transcript_exon_count = []
-    gene_set = set()
+    gene_ids = set()
     for readid in read_dict:
         read_info = read_dict[readid]
         gene_id = read_info[2]
@@ -129,11 +129,11 @@ def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=Fals
         read_exons = read_info[4]
         if spliced_only and len(read_exons) == 1:
             continue
-        gene_set.add(gene_id)
+        gene_ids.add(gene_id)
         isoform_exons = transcript_dict[transcript_id][2]
         transcript_cov_fractions.append(transcript_coverage_fraction(read_exons, isoform_exons))
         transcript_exon_count.append(len(read_exons))
-    return transcript_cov_fractions, transcript_exon_count, gene_set
+    return transcript_cov_fractions, transcript_exon_count, gene_ids
 
 
 def common_unique_genes(read_dict1, read_dict2):
