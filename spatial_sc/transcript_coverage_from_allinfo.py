@@ -108,6 +108,7 @@ def load_allinfo(inf):
     return read_dict
 
 
+# 9ba552b4-fb77-4f4b-8795-fdceaf13cf00    chr1    -       ENST00000488147.1       ENSG00000227232.5       inconsistent    alternative_structure_novel:14830-16139,tes_match_precise:4     14400-14829,16140-16224 gene_assignment=inconsistent; PolyA=False; Classification=novel_not_in_catalog;
 def load_read_assignments(read_assignments):
     # read_id -> (chr, strand, gene, isoform, exons)
     read_dict = {}
@@ -122,21 +123,21 @@ def load_read_assignments(read_assignments):
 
     for l in handle:
         if l.startswith("#"): continue
-
         v = l.split("\t")
-        read_id = v[0]
-        gene_id = v[1]
-        transcript_id = v[11]
-        exons = v[8].split(";%;")
-        exon1 = exons[1].split("_")
-        chr_id = exon1[0]
-        strand = exon1[3]
+        assigniment_type = v[5]
+        if not assigniment_type.startswith("unique"): continue
+        gene_id = v[4]
+        transcript_id = v[3]
+        chr_id = v[1]
+        strand = v[2]
+        exons = v[7].split(",")
         exon_coords = []
         for e in exons:
             if not e: continue
-            ex = e.split("_")
-            exon_coords.append((int(ex[1]), int(ex[2])))
+            ex = e.split("-")
+            exon_coords.append((int(ex[0]), int(ex[1])))
         read_dict[v[0]] = (chr_id, strand, gene_id, transcript_id, exon_coords)
+    return read_dict
 
 
 def load_genes(inf):
@@ -189,9 +190,10 @@ def common_unique_genes(read_dict1, read_dict2):
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--allinfo", "-a", nargs='+', type=str, help="allinfo files", required=True)
+    parser.add_argument("--input", "-i", nargs='+', type=str, help="allinfo/read assignments files", required=True)
     parser.add_argument("--genedb", "-g", type=str, help="gffutils genedb", required=True)
     parser.add_argument("--gene_list", nargs="+", type=str, help="gene list(s) to analyse", default=[])
+    parser.add_argument("--data_type", '-d', choices=['auto', 'allinfo', 'ra'], help="input data type", default="auto")
     args = parser.parse_args()
     return args
 
@@ -232,19 +234,29 @@ def main():
     transcript_dict = load_transcripts(args.genedb)
     read_dicts = []
 
-    for allinfo in args.allinfo:
-        read_dict = load_allinfo(allinfo)
+    for inf in args.input:
+        if args.data_type == "auto":
+            fname, outer_ext = os.path.splitext(os.path.basename(inf))
+            low_ext = outer_ext.lower()
+            if low_ext == ".allinfo":
+                read_dict = load_allinfo(inf)
+            else:
+                read_dict = load_read_assignments(inf)
+        elif args.data_type == "allinfo":
+            read_dict = load_allinfo(inf)
+        else:
+            read_dict = load_read_assignments(inf)
+
         read_dicts.append(read_dict)
-        print_stats("All reads for %s" % allinfo, read_dict, transcript_dict)
+        print_stats("All reads for %s" % inf, read_dict, transcript_dict)
         for gene_list in args.gene_list:
             gene_set = load_genes(gene_list)
             print_stats("Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set)
 
-        print_stats("SPLICED reads for %s" % allinfo, read_dict, transcript_dict, spliced_only=True)
+        print_stats("SPLICED reads for %s" % inf, read_dict, transcript_dict, spliced_only=True)
         for gene_list in args.gene_list:
             gene_set = load_genes(gene_list)
             print_stats("SPLICED Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set, spliced_only=True)
-
 
     if len(read_dicts) == 2:
         for header, gene_set in common_unique_genes(read_dicts[0], read_dicts[1]):
