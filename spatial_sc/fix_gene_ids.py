@@ -45,7 +45,7 @@ def main():
     args = parse_args()
     gene_ids = load_transcripts(args.genedb)
 
-    for gene_list in args.gene_lists:
+    for gene_list in args.gene_list:
         fix_ids(gene_ids, gene_list, gene_list + ".fixed.tsv")
 
 
