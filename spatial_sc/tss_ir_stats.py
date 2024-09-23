@@ -15,7 +15,7 @@ import sys
 import pysam
 from collections import defaultdict
 from enum import Enum
-import gffutils
+import gzip
 
 
 def read_ids(inf):
@@ -35,7 +35,15 @@ def read_ids(inf):
 def process_read_assignments(read_assignments, ids=None):
     stat_dict = defaultdict(int)
     processed_reads = set()
-    for l in open(read_assignments):
+    fname, outer_ext = os.path.splitext(os.path.basename(read_assignments))
+    low_ext = outer_ext.lower()
+
+    if low_ext in ['.gz', '.gzip']:
+        handle = gzip.open(read_assignments, "rt")
+    else:
+        handle = open(read_assignments)
+
+    for l in handle:
         if l.startswith("#"): continue
 
         v = l.split("\t")
