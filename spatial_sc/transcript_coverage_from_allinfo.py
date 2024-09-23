@@ -120,6 +120,7 @@ def load_genes(inf):
 def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=False):
     transcript_cov_fractions = []
     transcript_exon_count = []
+    gene_set = set()
     for readid in read_dict:
         read_info = read_dict[readid]
         gene_id = read_info[2]
@@ -128,10 +129,11 @@ def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=Fals
         read_exons = read_info[4]
         if spliced_only and len(read_exons) == 1:
             continue
+        gene_set.add(gene_id)
         isoform_exons = transcript_dict[transcript_id][2]
         transcript_cov_fractions.append(transcript_coverage_fraction(read_exons, isoform_exons))
         transcript_exon_count.append(len(read_exons))
-    return transcript_cov_fractions, transcript_exon_count
+    return transcript_cov_fractions, transcript_exon_count, gene_set
 
 
 def common_unique_genes(read_dict1, read_dict2):
@@ -177,14 +179,16 @@ def print_hist(bins, val_lists, name):
 
 
 def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=False):
-    transcript_cov_fractions, transcript_exon_count = process_allinfo(read_dict, transcript_dict, gene_set, spliced_only)
+    transcript_cov_fractions, transcript_exon_count, gene_set = process_allinfo(read_dict, transcript_dict, gene_set, spliced_only)
     if not transcript_cov_fractions:
         print("No data for %s" % header)
         return
     print(header)
-    print("Mean\t%.5f" % numpy.mean(transcript_cov_fractions))
-    print("Med \t%.5f" % numpy.median(transcript_cov_fractions))
-    print("E.avg\t%.5f" % numpy.mean(transcript_exon_count))
+    print("Reads\t%d" % len(transcript_cov_fractions))
+    print("Genes\t%d" % len(gene_set))
+    print("Mean \t%.5f" % numpy.mean(transcript_cov_fractions))
+    print("Med  \t%.5f" % numpy.median(transcript_cov_fractions))
+    print("E.avg \t%.5f" % numpy.mean(transcript_exon_count))
 
     # print("Q25\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.25))
     # print("Q75\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.75))
