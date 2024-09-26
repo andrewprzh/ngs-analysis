@@ -32,7 +32,9 @@ def print_dict(d):
 
 incorrectly_called = defaultdict(int)
 incorrectly_detected = defaultdict(int)
+basic_stats = defaultdict(int)
 
+# read_id        barcode UMI     BC_score        valid_UMI       strand  polyT_start     primer_end      linker_start    linker_end
 for l in open(sys.argv[1]):
     if l.startswith("#"): continue
 
@@ -42,7 +44,16 @@ for l in open(sys.argv[1]):
     score = int(v[3])
 
     count += 1
-    if bc == "*": continue
+    if v[6] != '-1':
+        basic_stats["polyA"] += 1
+    if v[7] != '-1':
+        basic_stats["primer"] += 1
+    if v[8] != '-1':
+        basic_stats["linker"] += 1
+    if bc == "*":
+        continue
+    else:
+        basic_stats["barcode"] += 1
     barcoded += 1
     all_barcodes.add(bc)
     score_barcoded[score] += 1
@@ -53,6 +64,13 @@ for l in open(sys.argv[1]):
     true_bc = readv[3]
     true_umi = readv[4]
     true_barcodes.add(true_bc)
+
+    if v[6] != '-1':
+        basic_stats["polyA"] += 1
+    if v[7] != '-1':
+        basic_stats["primer"] += 1
+    if v[8] != '-1':
+        basic_stats["linker"] += 1
 
     if true_bc == bc:
         correct += 1
@@ -85,6 +103,8 @@ print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(true_umis
 print(true_umis_dists)
 print("Incorrect calls: %d" % sum(incorrectly_called.values()))
 print()
+print("Basic stats")
+print_dict(basic_stats)
 
 per_barcode_precision_values = []
 for bc in barcode_barcoded:
