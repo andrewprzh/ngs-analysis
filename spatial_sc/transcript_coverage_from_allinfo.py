@@ -125,7 +125,9 @@ def load_read_assignments(read_assignments):
         if l.startswith("#"): continue
         v = l.split("\t")
         assigniment_type = v[5]
+        attributes = v[8]
         if not assigniment_type.startswith("unique"): continue
+        if attributes.find("PolyA=True") == -1: continue
         gene_id = v[4]
         transcript_id = v[3]
         chr_id = v[1]

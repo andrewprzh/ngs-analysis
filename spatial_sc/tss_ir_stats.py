@@ -68,9 +68,9 @@ def process_read_assignments(read_assignments, ids=None):
 #        if len(processed_reads) % 100000 == 0:
 #            sys.stdout.write("Processed " + str(len(processed_reads)) + " reads\r")
 
-    print("\n%d\nTotal reads" % len(processed_reads))
+    print("\n%d\t\t#reads\n" % len(processed_reads))
     for k in sorted(stat_dict.keys()):
-        print("%d\t%s" % (stat_dict[k], k))
+        print("%d\t\t%s" % (stat_dict[k], k))
 
 
 def parse_args():
