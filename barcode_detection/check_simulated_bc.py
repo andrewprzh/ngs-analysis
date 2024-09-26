@@ -65,13 +65,6 @@ for l in open(sys.argv[1]):
     true_umi = readv[4]
     true_barcodes.add(true_bc)
 
-    if v[6] != '-1':
-        basic_stats["polyA"] += 1
-    if v[7] != '-1':
-        basic_stats["primer"] += 1
-    if v[8] != '-1':
-        basic_stats["linker"] += 1
-
     if true_bc == bc:
         correct += 1
         score_correct[score] += 1
