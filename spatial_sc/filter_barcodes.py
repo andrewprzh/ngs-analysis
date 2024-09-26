@@ -12,17 +12,20 @@ import argparse
 from traceback import print_exc
 
 
+#READ_3_ENST00000347546.8_GGTGGCTCCTCGTT_AACTCATGC_0_aligned_3201310_F_301_2292_499      GGTGGCTCCTCGTT  AACTCATGC       14      True    -       561     519     528     545
+
 def filter_barcodes(inf, outf, filter_umis=False, min_score=None, whitelist=None):
     with open(outf, "w") as filtered_barcodes:
         for l in open(inf):
+            if l.startswith("#"): continue
             v = l.strip().split('\t')
-            if len(v) < 10 or v[6] == "*":
+            if len(v) < 10 or v[1] == "*":
                 continue
-            if filter_umis and v[9] != "True":
+            if filter_umis and v[4] != "True":
                 continue
-            if min_score is not None and int(v[8]) < min_score:
+            if min_score is not None and int(v[3]) < min_score:
                 continue
-            if whitelist and v[6] not in whitelist:
+            if whitelist and v[1] not in whitelist:
                 continue
             filtered_barcodes.write(l)
 
