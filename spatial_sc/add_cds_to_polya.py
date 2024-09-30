@@ -13,8 +13,7 @@ import argparse
 from traceback import print_exc
 from collections import defaultdict
 import gffutils
-import numpy
-from pyfaidx import Fasta
+
 
 
 def find_cds(gffutils_db, t_id):
