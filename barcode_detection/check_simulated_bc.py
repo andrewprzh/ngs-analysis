@@ -59,6 +59,7 @@ for l in open(sys.argv[1]):
     score_barcoded[score] += 1
     if score >= MIN_SCORE:
         barcode_barcoded[bc] += 1
+        basic_stats["bc13"] += 1
 
     readv = v[0].split("_")
     true_bc = readv[3]
