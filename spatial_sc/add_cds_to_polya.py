@@ -78,7 +78,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    random.seed(args.seed)
     gffutils_db = gffutils.FeatureDB(args.genedb)
     cds_dict = {}
     with open(args.output, "w") as outf:
