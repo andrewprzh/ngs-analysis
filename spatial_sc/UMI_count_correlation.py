@@ -12,11 +12,20 @@ from traceback import print_exc
 from collections import defaultdict
 
 # 82718f26-b81f-4561-ac75-59b987941431    ACGCGTTTAAGACG  ATCGGCTAG       14      True    -       82      40      49      66
+# LH00376:28:22GVKLLT3:4:1101:2655:1016   41      -1      8       25      +       CAACTGGCCGGGTA  TACCGTCGT       13      False
+
 def get_umi_dict(inf, trusted_only=False):
     umi_dict = defaultdict(set)
-    for l in inf:
+    for l in open(inf):
         if l.startswith("#"): continue
-        v = l.strip().split("\t")
+        v = l.strip().split('\t')
+        if v[-1] in ['True', 'False']:
+            # old format
+            if v[6] == '*' or v[7] == '*': continue
+            if trusted_only and v[-1] != "True": continue
+            umi_dict[v[6]].add(v[7])
+            continue
+
         if v[1] == '*' or v[2] == '*': continue
         if trusted_only and v[4] != "True": continue
         umi_dict[v[1]].add(v[2])
