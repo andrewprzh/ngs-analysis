@@ -32,11 +32,11 @@ def find_cds(gffutils_db, t_id, polya_pos):
     exons = []
     for e in gffutils_db.children(t, featuretype="CDS", order_by="start"):
         cds.append((e.start, e.end))
-    for e in gffutils_db.children(t, featuretype="exons", order_by="start"):
-        cds.append((e.start, e.end))
+    for e in gffutils_db.children(t, featuretype="exon", order_by="start"):
+        exons.append((e.start, e.end))
 
     if not cds:
-        return "NC"
+        return "NC", "0", "*"
 
     utr = []
     if t.strand == "+":
@@ -47,7 +47,6 @@ def find_cds(gffutils_db, t_id, polya_pos):
                 utr.append((cds_end_pos + 1, e[1]))
             elif cds_end_pos <= e[0]:
                 utr.append(e)
-
         utr[-1] = (utr[-1][0], polya_pos)
     else:
         cds_end_pos = cds[0][0]
@@ -58,10 +57,10 @@ def find_cds(gffutils_db, t_id, polya_pos):
                 break
             elif e[1] <= cds_end_pos:
                 utr.append(e)
-
+#        print(exons, cds_end_pos, utr)
         utr[0] = (polya_pos, utr[0][1])
-        
-    utr = sorted(utr)
+
+#    utr = sorted(utr)
     utr_str = ";%;" + ";%;".join("%s_%d_%d_%s" % (t.seqid, e[0], e[1], t.strand) for e in utr)
 
     return "%s_%d_%d_%s" % (t.seqid, cds_end_pos, cds_end_pos, t.strand), str(intervals_total_length(utr)), utr_str
@@ -89,11 +88,11 @@ def main():
             v = l.strip().split('\t')
             t_id = v[1]
             polya_pos = int(v[4].split("_")[1])
-            if t_id in cds_dict:
-                cds, utr_len, utrs = cds_dict[t_id]
-            else:
-                cds, utr_len, utrs = find_cds(gffutils_db, t_id, polya_pos)
-                cds_dict[t_id] = (cds, utr_len, utrs)
+#            if t_id in cds_dict:
+#                cds, utr_len, utrs = cds_dict[t_id]
+#            else:
+            cds, utr_len, utrs = find_cds(gffutils_db, t_id, polya_pos)
+#                cds_dict[t_id] = (cds, utr_len, utrs)
             outf.write(l + "\t%s\t%s\t%s\n" % (cds, utr_len, utrs))
 
 
