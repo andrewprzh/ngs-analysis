@@ -45,9 +45,9 @@ def process_exon_file(exon_file, output_dir, fasta_dict):
         assert len(exon_info) == 4
         chr_id, start, end, strand = exon_info[0], int(exon_info[1]), int(exon_info[2]), exon_info[3]
 
-        upstream_seq, downstream_seq = get_regions(fasta_dict[chr_id].seq, start, end, strand)
+        exon_seq = get_regions(fasta_dict[chr_id].seq, start, end, strand)
         exon_str = "_".join(v)
-        seq_buffer.append(SeqRecord.SeqRecord(seq=Seq.Seq(upstream_seq), id="%s_upstream" % exon_str, description=""))
+        seq_buffer.append(SeqRecord.SeqRecord(seq=Seq.Seq(exon_seq), id="%s_exon" % exon_str, description=""))
 
     out_fasta = os.path.join(output_dir, name + ".exons.fasta")
     SeqIO.write(seq_buffer, out_fasta, 'fasta')
