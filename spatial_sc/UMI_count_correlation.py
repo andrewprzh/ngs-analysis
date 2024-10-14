@@ -11,7 +11,6 @@ import argparse
 from traceback import print_exc
 from collections import defaultdict
 import pysam
-from mpi4py.futures.aplus import catch
 
 
 # 82718f26-b81f-4561-ac75-59b987941431    ACGCGTTTAAGACG  ATCGGCTAG       14      True    -       82      40      49      66
@@ -25,11 +24,11 @@ def get_umi_dict(inf, bam=None, trusted_only=False):
                 forbidden_reads.add(r.query_name)
         except ValueError:
             try:
-                for r in pysam.AlignmentFile(bam, "rb").fetch("chrM"):
+                for r in pysam.AlignmentFile(bam, "rb").fetch("MT"):
                     forbidden_reads.add(r.query_name)
             except ValueError:
                 print("No chrM or MT found")
-            
+
     discarded = 0
     umi_dict = defaultdict(set)
     for l in open(inf):
