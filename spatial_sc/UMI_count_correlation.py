@@ -11,6 +11,8 @@ import argparse
 from traceback import print_exc
 from collections import defaultdict
 import pysam
+from mpi4py.futures.aplus import catch
+
 
 # 82718f26-b81f-4561-ac75-59b987941431    ACGCGTTTAAGACG  ATCGGCTAG       14      True    -       82      40      49      66
 # LH00376:28:22GVKLLT3:4:1101:2655:1016   41      -1      8       25      +       CAACTGGCCGGGTA  TACCGTCGT       13      False
@@ -18,15 +20,24 @@ import pysam
 def get_umi_dict(inf, bam=None, trusted_only=False):
     forbidden_reads = set()
     if bam:
-        for r in pysam.AlignmentFile(bam, "rb").fetch("chrM"):
-            forbidden_reads.add(r.query_name)
-
+        try:
+            for r in pysam.AlignmentFile(bam, "rb").fetch("chrM"):
+                forbidden_reads.add(r.query_name)
+        except ValueError:
+            try:
+                for r in pysam.AlignmentFile(bam, "rb").fetch("chrM"):
+                    forbidden_reads.add(r.query_name)
+            except ValueError:
+                print("No chrM or MT found")
+            
+    discarded = 0
     umi_dict = defaultdict(set)
     for l in open(inf):
         if l.startswith("#"): continue
         v = l.strip().split('\t')
         read_id = v[0]
         if read_id in forbidden_reads:
+            discarded += 1
             continue
         if v[-1] in ['True', 'False']:
             # old format
@@ -39,6 +50,7 @@ def get_umi_dict(inf, bam=None, trusted_only=False):
         if trusted_only and v[4] != "True": continue
         umi_dict[v[1]].add(v[2])
 
+    print("Discarded %d reads from chrM" % discarded)
     return umi_dict
 
 
