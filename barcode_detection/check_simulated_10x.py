@@ -77,18 +77,18 @@ for l in open(sys.argv[1]):
         umi = umi[:13]
     umi_ed = editdistance.eval(true_umi, umi)
     umis_dists[umi_ed] += 1
-    if v[9].startswith("T"):
+    if v[4].startswith("T"):
         true_umis_dists[umi_ed] += 1
 
 print("All barcodes %d, true barcodes %d" % (len(all_barcodes), len(true_barcodes)))
 
 print("Total\t%d\nBarcode\t%d\nCorrect\t%d" % (count, barcoded, correct))
 
-print("MinScore\tPrecision\tRecall")
+print("MinScore\tTotal\tCorrect\tIncorrect\tPrecision\tRecall")
 for score in SCORES:
-    total_barcoded = sum(score_barcoded[s] for s in range(score, 15))
-    total_correct = sum(score_correct[s] for s in range(score, 15))
-    print("%d\t%.2f\t%.2f" % (score, (100 * total_correct / total_barcoded), (100 * total_correct / count)))
+    total_barcoded = sum(score_barcoded[s] for s in range(score, 17))
+    total_correct = sum(score_correct[s] for s in range(score, 17))
+    print("%d\t%d\t%d\t%d\t%.2f\t%.2f" % (score, total_barcoded, total_correct, total_barcoded - total_correct, (100 * total_correct / total_barcoded), (100 * total_correct / count)))
 
 print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(umis_dists[:2]), sum(umis_dists[:3]), sum(umis_dists[:4])))
 print(true_umis_dists)

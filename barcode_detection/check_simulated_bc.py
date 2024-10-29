@@ -48,8 +48,8 @@ for l in open(sys.argv[1]):
         basic_stats["polyA"] += 1
     if v[7] != '-1':
         basic_stats["primer"] += 1
-    if v[8] != '-1':
-        basic_stats["linker"] += 1
+#    if v[8] != '-1':
+#        basic_stats["linker"] += 1
     if bc == "*":
         continue
     else:
@@ -78,7 +78,7 @@ for l in open(sys.argv[1]):
         umi = umi[:13]
     umi_ed = editdistance.eval(true_umi, umi)
     umis_dists[umi_ed] += 1
-    if v[9].startswith("T"):
+    if v[4].startswith("T"):
         true_umis_dists[umi_ed] += 1
 
 print("All barcodes %d, true barcodes %d" % (len(all_barcodes), len(true_barcodes)))
