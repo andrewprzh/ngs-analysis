@@ -31,14 +31,15 @@ def get_umi_dict(inf, trusted_only=False):
         if trusted_only and v[4] != "True": continue
         umi_dict[v[1]].add(v[2])
 
-    count_dict = {}
+    count_dict = defaultdict(int)
     for k in umi_dict.keys():
         count_dict[k] = len(umi_dict[k])
     return count_dict
 
 
 def load_counts(inf):
-    barcode_counts = {}
+    barcode_counts = defaultdict(int)
+
     for l in open(inf):
         v = l.strip().split('\t')
         if len(v) != 2: continue
@@ -74,7 +75,7 @@ def main():
 
     print("Outputting results to %s" % args.output)
     with open(args.output, "w") as outf:
-        outf.write("Barcode\t" + "\t".join(args.input) + "\n")
+        outf.write("Barcode\t" + "\t".join([args.lr_barcodes, args.sr_counts]) + "\n")
         for b in all_barcodes:
             counts = []
             for d in count_dicts:

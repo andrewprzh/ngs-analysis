@@ -29,14 +29,14 @@ def load_allinfo(inf, gene_name_dict=None):
         else:
             if gene_id in gene_name_dict:
                 gene_name = gene_name_dict[gene_id]
-                gene_name_dict[gene_name] += 1
+                gene_count_dict[gene_name] += 1
 
     print("Loaded %d genes" % len(gene_count_dict))
     return gene_count_dict
 
 
 def load_counts(inf):
-    barcode_counts = {}
+    barcode_counts = defaultdict(int)
     for l in open(inf):
         v = l.strip().split('\t')
         if len(v) != 2: continue
@@ -75,7 +75,7 @@ def main():
 
     gene_names = load_gene_names(args.genedb)
 
-    print("Loading %s" % args.lr_barcodes)
+    print("Loading %s" % args.lr_allinfo)
     count_dicts.append(load_allinfo(args.lr_allinfo, gene_names))
 
     print("Loading %s" % args.sr_counts)
@@ -88,7 +88,7 @@ def main():
 
     print("Outputting results to %s" % args.output)
     with open(args.output, "w") as outf:
-        outf.write("Barcode\t" + "\t".join(args.input) + "\n")
+        outf.write("Barcode\t" + "\t".join([args.lr_allinfo, args.sr_counts]) + "\n")
         for b in all_barcodes:
             counts = []
             for d in count_dicts:
