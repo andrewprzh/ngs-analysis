@@ -43,21 +43,29 @@ def load_counts(inf):
 
 def count_fold_change(count_dicts):
     fold_changes = defaultdict(list)
+    sr_counts = defaultdict(list)
+    lr_counts = defaultdict(list)
     for d in count_dicts:
         for k in d.keys():
             ont_count = d[k][0]
             sr_count = d[k][1]
+            sr_counts[k].append(sr_count)
+            lr_counts[k].append(ont_count)
             if sr_count == 0:
                 fold_changes[k].append(-1)
             else:
                 fold_changes[k].append(float(ont_count / sr_count))
 
-    sr_dominated = defaultdict(int)
-    lr_dominated = defaultdict(int)
+    sr_dominated = {}
+    lr_dominated = {}
     mean_fold_changes = defaultdict(float)
     for k in fold_changes.keys():
-        sr_dominated[k] = fold_changes[k].count(0)
-        lr_dominated[k] = fold_changes[k].count(-1)
+        sr_present = fold_changes[k].count(0)
+        if sr_present >= 6:
+            sr_dominated[k] = (sr_present, numpy.mean(sr_counts[k]))
+        lr_present = fold_changes[k].count(-1)
+        if lr_present >= 6:
+            lr_dominated[k] = (lr_present, numpy.mean(lr_counts[k]))
         fold_change_vals = list(filter(lambda x: x > 0, fold_changes[k]))
         if len(fold_change_vals) > 3:
             mean_fold_changes[k] = numpy.mean(fold_change_vals)
