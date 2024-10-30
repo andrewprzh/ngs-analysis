@@ -18,7 +18,10 @@ import numpy
 def sort_dict(d):
     res = []
     for k in d.keys():
-        res.append((k, d[k]))
+        if isinstance(tuple, d[k]):
+            res.append((k, d[k][0], d[k][1]))
+        else:
+            res.append((k, d[k]))
     res = sorted(res, key=lambda x: x[1])
     return res
 
@@ -26,6 +29,10 @@ def sort_dict(d):
 def dump_pairs(outf, lp):
     for k, v in lp:
         outf.write("%s\t%.6f\n" % (k, v))
+
+def dump_triples(outf, lp):
+    for k, v1, v2 in lp:
+        outf.write("%s\t%d\t%.6f\n" % (k, v1, v2))
 
 
 def load_counts(inf):
