@@ -12,22 +12,54 @@ from traceback import print_exc
 from collections import defaultdict
 import glob
 
+import numpy
+
+
+def sort_dict(d):
+    res = []
+    for k in d.keys():
+        res.append((k, d[k]))
+    res = sorted(res, key=lambda x: x[1])
+    return res
+
+
+def dump_pairs(outf, lp):
+    for k, v in lp:
+        outf.write("%s\t%.6f\n" % (k, v))
+
 
 def load_counts(inf):
-    counts = defaultdict(int)
+    counts = defaultdict(tuple)
 
     for l in open(inf):
         v = l.strip().split('\t')
-        if len(v) != 2: continue
-        counts[v[0]] = int(v[1])
+        if len(v) != 3: continue
+        counts[v[0]] = (int(v[1]), int(v[2]))
     return counts
 
 
-def fold_change(count_dicts):
+def count_fold_change(count_dicts):
     fold_changes = defaultdict(list)
     for d in count_dicts:
         for k in d.keys():
-            fold_changes.
+            ont_count = d[k][0]
+            sr_count = d[k][1]
+            if sr_count == 0:
+                fold_changes[k].append(-1)
+            else:
+                fold_changes[k].append(float(ont_count / sr_count))
+
+    sr_dominated = defaultdict(int)
+    lr_dominated = defaultdict(int)
+    mean_fold_changes = defaultdict(float)
+    for k in fold_changes.keys():
+        sr_dominated[k] = fold_changes[k].count(0)
+        lr_dominated[k] = fold_changes[k].count(-1)
+        fold_change_vals = filter(lambda x: x > 0, fold_changes[k])
+        if len(fold_change_vals) > 3:
+            mean_fold_changes[k] = numpy.mean(fold_change_vals)
+
+    return mean_fold_changes, lr_dominated, sr_dominated
 
 
 def parse_args():
@@ -48,19 +80,21 @@ def main():
             print("Loading %s" % inf)
             count_dicts.append(load_counts(inf))
 
-    print("Merging barcodes")
-    all_barcodes = set()
-    for d in count_dicts:
-        all_barcodes.update(d.keys())
+    print("Merging counts")
+    mean_fold_changes, lr_dominated, sr_dominated = count_fold_change(count_dicts)
+
+    fold_change_val = sort_dict(mean_fold_changes)
+    lr_dominated_val = sort_dict(lr_dominated)
+    sr_dominated_val = sort_dict(sr_dominated)
 
     print("Outputting results to %s" % args.output)
     with open(args.output, "w") as outf:
-        outf.write("Barcode\t" + "\t".join([args.lr_barcodes, args.sr_counts]) + "\n")
-        for b in all_barcodes:
-            counts = []
-            for d in count_dicts:
-                counts.append(d[b])
-            outf.write(b + "\t" + "\t".join(map(str, counts)) + "\n")
+        outf.write("Fold change values\n")
+        dump_pairs(outf, fold_change_val)
+        outf.write("\nMost represented in SR\n")
+        dump_pairs(outf, sr_dominated_val)
+        outf.write("\nMost represented in LR\n")
+        dump_pairs(outf, lr_dominated_val)
 
 
 if __name__ == "__main__":
