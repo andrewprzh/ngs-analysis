@@ -34,7 +34,10 @@ def load_counts(inf):
     for l in open(inf):
         v = l.strip().split('\t')
         if len(v) != 3: continue
-        counts[v[0]] = (int(v[1]), int(v[2]))
+        try:
+            counts[v[0]] = (int(v[1]), int(v[2]))
+        except ValueError:
+            pass
     return counts
 
 
@@ -55,7 +58,7 @@ def count_fold_change(count_dicts):
     for k in fold_changes.keys():
         sr_dominated[k] = fold_changes[k].count(0)
         lr_dominated[k] = fold_changes[k].count(-1)
-        fold_change_vals = filter(lambda x: x > 0, fold_changes[k])
+        fold_change_vals = list(filter(lambda x: x > 0, fold_changes[k]))
         if len(fold_change_vals) > 3:
             mean_fold_changes[k] = numpy.mean(fold_change_vals)
 
