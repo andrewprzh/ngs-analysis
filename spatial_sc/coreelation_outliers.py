@@ -18,7 +18,7 @@ import numpy
 def sort_dict(d):
     res = []
     for k in d.keys():
-        if isinstance(tuple, d[k]):
+        if isinstance(d[k], tuple):
             res.append((k, d[k][0], d[k][1]))
         else:
             res.append((k, d[k]))
