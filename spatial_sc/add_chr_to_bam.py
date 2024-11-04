@@ -80,8 +80,6 @@ def amend_bam(in_file_name, out_file_name, main_bam):
     pysam.index(out_file_name)
 
 
-
-
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", "-o", type=str, help="output folder (same as input file if not set), "
@@ -104,7 +102,7 @@ def main():
             args.output = os.path.dirname(in_bam)
 
         if os.path.isdir(args.output):
-            out_bam = os.path.join(args.output, os.path.splitext(os.path.basename(in_bam))[0] + "." + args.suffix + ".bam")
+            out_bam = os.path.join(args.output, os.path.splitext(os.path.basename(in_bam))[0] + ".chr.bam")
         else:
             out_bam = args.output
 
