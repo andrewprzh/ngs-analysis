@@ -26,6 +26,17 @@ def sort_dict(d):
     return res
 
 
+def sort_dict2(d):
+    res = []
+    for k in d.keys():
+        if isinstance(d[k], tuple):
+            res.append((k, d[k][0], d[k][1]))
+        else:
+            res.append((k, d[k]))
+    res = sorted(res, key=lambda x: (x[1],x[2]), reverse=True)
+    return res
+
+
 def dump_pairs(outf, lp):
     for k, v in lp:
         outf.write("%s\t%.6f\n" % (k, v))
@@ -68,14 +79,16 @@ def count_fold_change(count_dicts):
     mean_fold_changes = defaultdict(float)
     for k in fold_changes.keys():
         sr_present = fold_changes[k].count(0)
-        if sr_present >= 6:
+        if sr_present >= 3:
             sr_dominated[k] = (sr_present, numpy.mean(sr_counts[k]))
         lr_present = fold_changes[k].count(-1)
-        if lr_present >= 6:
+        if lr_present >= 3:
             lr_dominated[k] = (lr_present, numpy.mean(lr_counts[k]))
         fold_change_vals = list(filter(lambda x: x > 0, fold_changes[k]))
         if len(fold_change_vals) > 3:
-            mean_fold_changes[k] = numpy.mean(fold_change_vals)
+            fc = numpy.mean(fold_change_vals)
+            if fc > 16 or fc < (1/16):
+                mean_fold_changes[k] = fc
 
     return mean_fold_changes, lr_dominated, sr_dominated
 
@@ -102,17 +115,17 @@ def main():
     mean_fold_changes, lr_dominated, sr_dominated = count_fold_change(count_dicts)
 
     fold_change_val = sort_dict(mean_fold_changes)
-    lr_dominated_val = sort_dict(lr_dominated)
-    sr_dominated_val = sort_dict(sr_dominated)
+    lr_dominated_val = sort_dict2(lr_dominated)
+    sr_dominated_val = sort_dict2(sr_dominated)
 
     print("Outputting results to %s" % args.output)
     with open(args.output, "w") as outf:
-        outf.write("Fold change values\n")
+        outf.write("Fold change values\t%d\t%d\n" % (len(list(filter(lambda x: x[1] < 1, fold_change_val))), len(list(filter(lambda x: x[1] > 1, fold_change_val)))))
         dump_pairs(outf, fold_change_val)
-        outf.write("\nMost represented in SR\n")
-        dump_pairs(outf, sr_dominated_val)
-        outf.write("\nMost represented in LR\n")
-        dump_pairs(outf, lr_dominated_val)
+        outf.write("\nMost represented in SR\t%d\n" % len(sr_dominated_val))
+        dump_triples(outf, sr_dominated_val)
+        outf.write("\nMost represented in LR\t%d\n" % len(lr_dominated_val))
+        dump_triples(outf, lr_dominated_val)
 
 
 if __name__ == "__main__":
