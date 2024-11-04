@@ -16,7 +16,7 @@ import numpy
 
 
 def load_counts(inf):
-    counts = defaultdict(tuple)
+    counts = {}
 
     for l in open(inf):
         v = l.strip().split('\t')
@@ -37,6 +37,10 @@ def extract_counts(count_dicts):
             all_genes.add(k)
     for d in count_dicts:
         for k in all_genes:
+            if k not in d:
+                sr_counts[k].append(0)
+                lr_counts[k].append(0)
+                continue
             ont_count = d[k][0]
             sr_count = d[k][1]
             sr_counts[k].append(sr_count)
@@ -70,11 +74,13 @@ def main():
 
     print("Outputting results to %s" % args.output)
     with open(args.output, "w") as outf:
-        outf.write("gene_id\t" + "\t".join(map(lambda x: "SR_" + x, samples_labels)) +
+        outf.write("gene_id\t" + "\t".join(map(lambda x: "SR_" + x, samples_labels)) + "\t" +
                    "\t".join(map(lambda x: "LR_" + x, samples_labels)) + "\n")
         for g in all_genes:
+            outf.write(g)
+            outf.write("\t")
             outf.write("\t".join(map(str, sr_counts[g])))
-            outf.write("\n")
+            outf.write("\t")
             outf.write("\t".join(map(str, lr_counts[g])))
             outf.write("\n")
 

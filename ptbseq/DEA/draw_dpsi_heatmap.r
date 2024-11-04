@@ -2,7 +2,8 @@ library(gplots)
 library(dplyr)
 
 # Read normalized counts
-  data = read.table("/home/andreyp/ablab/analysis/pertrubseq/dee/SCv3.UMI_filtered.exon_filtered.21.03/full_guides/oneVScontrol.dPSI.defaults.tsv", header=T, sep="\t", as.is=TRUE)
+data = read.table("/home/andrey/ablab/analysis/pertrubseq/dee/SCv3.UMI_filtered.exon_filtered.21.03/full_guides/oneVSee.dPSI.defaults.tsv", header=T, sep="\t", as.is=TRUE)
+                   
 
 genes = data[,1]
 mat = as.matrix(data[,2:ncol(data)])
