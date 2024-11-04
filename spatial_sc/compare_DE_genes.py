@@ -54,10 +54,11 @@ def load_genedb(genedb):
             tlen = 0
             for e in gffutils_db.children(t, featuretype="exon"):
                 ex += 1
-                tlen += e[1] - e[0] + 1
+                tlen += e.end - e.start + 1
             exon_counts.append(ex)
             tlens.append(tlen)
         gene_dict[gene_name] = (gene_type, len(exon_counts), numpy.mean(exon_counts), max(tlens))
+    return gene_dict
 
 
 def count_stats(gene_list, gene_dict):
@@ -65,6 +66,7 @@ def count_stats(gene_list, gene_dict):
     unspliced = 0
     gene_lengths = []
     spliced_gene_lengths = []
+    pcg = []
 
     gene_types = defaultdict(int)
 
@@ -73,6 +75,8 @@ def count_stats(gene_list, gene_dict):
         total += 1
         gene_info = gene_dict[g]
         gene_types[gene_info[0]] += 1
+        if gene_info[0] == 'protein_coding':
+            pcg.append(g)
         gene_lengths.append(gene_info[3])
         if gene_info[2] == 1:
             unspliced += 1
@@ -84,6 +88,8 @@ def count_stats(gene_list, gene_dict):
     print(gene_types)
     print("Mean gene len %.2f" % numpy.mean(gene_lengths))
     print("Mean spliced gene len %.2f" % numpy.mean(spliced_gene_lengths))
+    for g in sorted(pcg):
+        print(g)
 
 
 def parse_args():
