@@ -175,7 +175,7 @@ def process_fasta(in_fasta, chr_dicts):
         seq_name = r.id
         v = seq_name.split("_")
         chr_id = v[0]
-        exon_id = "%s_%d_%d_%s" % (chr_id, v[1], v[2], v[3])
+        exon_id = "%s_%s_%s_%s" % (chr_id, v[1], v[2], v[3])
         exon_info = chr_dicts[chr_id][exon_id]
         total_exons += 1
         cds_fractions.append(exon_info.cds_overlap)
@@ -210,9 +210,11 @@ def parse_args():
 
 def main():
     args = parse_args()
+    print("Loading %s" % args.genedb)
     chr_dicts = load_exon_info(args.genedb)
 
     for f in args.fasta:
+        print("Processing %s" % f)
         total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(f, chr_dicts)
         name = os.path.splitext(os.path.basename(f))[0]
         with open(os.path.join(args.output, name) + ".tsv") as outf:
