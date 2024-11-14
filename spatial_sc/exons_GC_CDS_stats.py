@@ -129,7 +129,7 @@ def load_exon_info(genedb_path):
     gene_db = gffutils.FeatureDB(genedb_path)
     chr_dicts = {}
     for g in gene_db.features_of_type('gene'):
-        if g.seqid not in g.seqid:
+        if g.seqid not in chr_dicts:
             chr_dicts[g.seqid] = {}
         exon_dict = chr_dicts[g.seqid]
         gene_dict = process_gene(gene_db, g)
@@ -139,16 +139,6 @@ def load_exon_info(genedb_path):
             else:
                 exon_dict[e] = gene_dict[e]
     return chr_dicts
-
-
-def print_exon_info(dict_list, out_file_name):
-    with open(out_file_name, "w") as outf:
-        outf.write("#exon\tCDS\tstart\tstop\tCDS_overlap\twhole_codon_count\n")
-        for d in dict_list:
-            for e, info in d.items():
-                outf.write("%s\t%s\t%d\t%d\t%d\t%.4f\t%d\n" %
-                           (e, list(info.gene_ids)[0], info.is_cds, info.contains_start, info.contains_stop,
-                            info.cds_overlap, info.whole_codon_count))
 
 
 def gc_content(seq):
