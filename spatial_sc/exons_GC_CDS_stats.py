@@ -174,7 +174,7 @@ def collect_exons(gene_db, gene):
 
 def normalize_exon(exon_id, gene_id, gene_db, gene_dicts):
     if gene_id not in gene_dicts:
-        gene_dicts[gene_id] = process_gene(gene_db, gene_id)
+        gene_dicts[gene_id] = collect_exons(gene_db, gene_id)
 
     exon_data = exon_id.split("_")
     exon = (int(exon_data[1]), int(exon_data[2]))
