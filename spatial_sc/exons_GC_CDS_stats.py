@@ -253,7 +253,7 @@ def main():
         print("Processing %s" % f)
         total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(f, chr_dicts, gene_db, gene_dicts)
         name = os.path.splitext(os.path.basename(f))[0]
-        with open(os.path.join(args.output, name) + ".tsv") as outf:
+        with open(args.outpu + "_" + name + ".tsv") as outf:
             outf.write("CDS count\t%d / %d\n" % (cds_count, total_exons))
             cds_cov_hist = numpy.histogram(cds_fractions, [0.1 * i for i in range(11)])
             outf.write("\nCDS coverage hist\t%.2f\t%.2f\n" % (numpy.mean(cds_fractions), numpy.median(cds_fractions)))
