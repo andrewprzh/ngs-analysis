@@ -127,15 +127,11 @@ def process_gene(gene_db, g):
 
 def load_exon_info(genedb_path):
     gene_db = gffutils.FeatureDB(genedb_path)
-    chr_dicts = []
-    exon_dict = OrderedDict()
-    current_seqid = ""
-    for g in gene_db.features_of_type('gene', order_by=('seqid', 'start')):
-        if current_seqid != g.seqid:
-            chr_dicts.append(exon_dict)
-            exon_dict = OrderedDict()
-            current_seqid = g.seqid
-
+    chr_dicts = {}
+    for g in gene_db.features_of_type('gene'):
+        if g.seqid not in g.seqid:
+            chr_dicts[g.seqid] = {}
+        exon_dict = chr_dicts[g.seqid]
         gene_dict = process_gene(gene_db, g)
         for e in sorted(gene_dict.keys()):
             if e in exon_dict:
