@@ -200,9 +200,9 @@ def print_hist(numpy_hist, stream):
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--output", "-o", type=str, help="output file name", required=True)
+    parser.add_argument("--output", "-o", type=str, help="output prefix", required=True)
     parser.add_argument("--genedb", "-g", type=str, help="gffutils gene DB", required=True)
-    parser.add_argument("--fasta", "-f", type=str, help="FASTA files with exons", required=True)
+    parser.add_argument("--fasta", "-f", nargs='+', type=str, help="FASTA files with exons", required=True)
 
     args = parser.parse_args()
     return args
@@ -211,23 +211,25 @@ def parse_args():
 def main():
     args = parse_args()
     chr_dicts = load_exon_info(args.genedb)
-    total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(args.fasta, chr_dicts)
 
-    with open(args.output) as outf:
-        outf.write("CDS count\t%d / %d\n" % (cds_count, total_exons))
-        cds_cov_hist = numpy.histogram(cds_fractions, [0.1 * i for i in range(11)])
-        outf.write("\nCDS coverage hist\t%.2f\t%.2f\n" % (numpy.mean(cds_fractions), numpy.median(cds_fractions)))
-        print_hist(cds_cov_hist, outf)
+    for f in args.fasta:
+        total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(f, chr_dicts)
+        name = os.path.splitext(os.path.basename(f))[0]
+        with open(os.path.join(args.output, name) + ".tsv") as outf:
+            outf.write("CDS count\t%d / %d\n" % (cds_count, total_exons))
+            cds_cov_hist = numpy.histogram(cds_fractions, [0.1 * i for i in range(11)])
+            outf.write("\nCDS coverage hist\t%.2f\t%.2f\n" % (numpy.mean(cds_fractions), numpy.median(cds_fractions)))
+            print_hist(cds_cov_hist, outf)
 
-        gc_hist = numpy.histogram(gc_content, [5 * i for i in range(21)])
-        outf.write("\nGC content\t%.2f\t%.2f\n" % (numpy.mean(gc_content), numpy.median(gc_content)))
-        print_hist(gc_hist, outf)
+            gc_hist = numpy.histogram(gc_content, [5 * i for i in range(21)])
+            outf.write("\nGC content\t%.2f\t%.2f\n" % (numpy.mean(gc_content), numpy.median(gc_content)))
+            print_hist(gc_hist, outf)
 
-        for k in sorted(introns_lengths.keys()):
-            intron_lens = introns_lengths[k]
-            hist = numpy.histogram(intron_lens, [100 * i for i in range(11)] + [1000 * i for i in range(2, 11)] + [100000, 1000000])
-            outf.write("\nIntron lengths %s\t%.2f\t%.2f\n" % (k, numpy.mean(intron_lens), numpy.median(intron_lens)))
-            print_hist(hist, outf)
+            for k in sorted(introns_lengths.keys()):
+                intron_lens = introns_lengths[k]
+                hist = numpy.histogram(intron_lens, [100 * i for i in range(11)] + [1000 * i for i in range(2, 11)] + [100000, 1000000])
+                outf.write("\nIntron lengths %s\t%.2f\t%.2f\n" % (k, numpy.mean(intron_lens), numpy.median(intron_lens)))
+                print_hist(hist, outf)
 
 
 if __name__ == "__main__":
