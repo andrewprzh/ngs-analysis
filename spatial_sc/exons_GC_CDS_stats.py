@@ -31,7 +31,18 @@ def equals_any_feature(exon, ordered_feature_list):
     return False
 
 
-def overlaps_any_feature(exon, ordered_feature_list):
+def overlaps_any_feature(exon, feature_list):
+    ovlp = 0.0
+    best_feature = None
+    for f in feature_list:
+        feature_overlap = (min(exon[1], f[1]) - max(exon[0], f[0]) + 1) / (exon[1] - exon[0] + 1)
+        if feature_overlap > ovlp:
+            ovlp = feature_overlap
+            best_feature = f
+    return best_feature
+
+
+def count_overlap(exon, ordered_feature_list):
     ovlp = 0.0
     for f in ordered_feature_list:
         ovlp = max(ovlp, (min(exon[1], f[1]) - max(exon[0], f[0]) + 1) / (exon[1] - exon[0] + 1))
@@ -108,7 +119,7 @@ def process_gene(gene_db, g):
             is_cds = equals_any_feature(exon, cds)
             has_start = contains_any_feature(exon, start_codons)
             has_stop = contains_any_feature(exon, stop_codons)
-            cds_overlap = overlaps_any_feature(exon, cds) if not is_cds else 1.0
+            cds_overlap = count_overlap(exon, cds) if not is_cds else 1.0
             if strand == "+":
                 preceding_intron = [] if i == 0 else junctions_from_blocks([exon_list[i-1], exon])
                 subsequent_intron = [] if i == len(exon_list)-1 else junctions_from_blocks([exon, exon_list[i+1]])
@@ -125,8 +136,7 @@ def process_gene(gene_db, g):
     return exon_dict
 
 
-def load_exon_info(genedb_path):
-    gene_db = gffutils.FeatureDB(genedb_path)
+def load_exon_info(gene_db):
     chr_dicts = {}
     for g in gene_db.features_of_type('gene'):
         if g.seqid not in chr_dicts:
@@ -149,8 +159,39 @@ def gc_content(seq):
     return float(gc) / float(len(seq))
 
 
+def collect_exons(gene_db, gene):
+    exons = set()
+    if isinstance(gene, str):
+        g = gene_db[gene]
+    else:
+        g = gene
+    for t in gene_db.children(g, featuretype=('transcript', 'mRNA')):
+        for c in gene_db.children(t, featuretype='exon', order_by='start'):
+            exons.add((c.start, c.end))
+
+    return exons
+
+
+def normalize_exon(exon_id, gene_id, gene_db, gene_dicts):
+    if gene_id not in gene_dicts:
+        gene_dicts[gene_id] = process_gene(gene_db, gene_id)
+
+    exon_data = exon_id.split("_")
+    exon = (int(exon_data[1]), int(exon_data[2]))
+    exons = gene_dicts[gene_id]
+
+    if equals_any_feature(exon, exons):
+        return exon_id
+
+    overlapping_exon = overlaps_any_feature(exon, exons)
+    if overlapping_exon is None:
+        return None
+
+    return "_".join([exon_data[0], str(overlapping_exon[0]),  str(overlapping_exon[1]), exon_data[3]])
+
+
 #>chr8_67163732_67163798_+_ENSG00000104218.15_downstream
-def process_fasta(in_fasta, chr_dicts):
+def process_fasta(in_fasta, chr_dicts, gene_db, gene_dicts):
     total_exons = 0
     cds_count = 0
     introns_lengths = defaultdict(list)
@@ -161,7 +202,12 @@ def process_fasta(in_fasta, chr_dicts):
         seq_name = r.id
         v = seq_name.split("_")
         chr_id = v[0]
+        gene_id = v[4]
         exon_id = "%s_%s_%s_%s" % (chr_id, v[1], v[2], v[3])
+        if exon_id not in chr_dicts[chr_id]:
+            exon_id = normalize_exon(exon_id, gene_id, gene_db, gene_dicts)
+        if exon_id is None: continue
+
         exon_info = chr_dicts[chr_id][exon_id]
         total_exons += 1
         cds_fractions.append(exon_info.cds_overlap)
@@ -170,12 +216,14 @@ def process_fasta(in_fasta, chr_dicts):
 
         preceding_intron_lengths = list(map(interval_len, exon_info.preceding_introns))
         subsequent_intron_lengths = list(map(interval_len, exon_info.subsequent_introns))
-        introns_lengths["upstream_min"].append(min(preceding_intron_lengths))
-        introns_lengths["upstream_max"].append(max(preceding_intron_lengths))
-        introns_lengths["upstream_all"] += preceding_intron_lengths
-        introns_lengths["downstream_min"].append(min(subsequent_intron_lengths))
-        introns_lengths["downstream_max"].append(max(subsequent_intron_lengths))
-        introns_lengths["downstream_all"] += subsequent_intron_lengths
+        if preceding_intron_lengths:
+            introns_lengths["upstream_min"].append(min(preceding_intron_lengths))
+            introns_lengths["upstream_max"].append(max(preceding_intron_lengths))
+            introns_lengths["upstream_all"] += preceding_intron_lengths
+        if subsequent_intron_lengths:
+            introns_lengths["downstream_min"].append(min(subsequent_intron_lengths))
+            introns_lengths["downstream_max"].append(max(subsequent_intron_lengths))
+            introns_lengths["downstream_all"] += subsequent_intron_lengths
     return total_exons, cds_count, cds_fractions, gc_contents, introns_lengths
 
 
@@ -197,11 +245,13 @@ def parse_args():
 def main():
     args = parse_args()
     print("Loading %s" % args.genedb)
-    chr_dicts = load_exon_info(args.genedb)
+    gene_db = gffutils.FeatureDB(args.genedb)
+    chr_dicts = load_exon_info(gene_db)
+    gene_dicts = {}
 
     for f in args.fasta:
         print("Processing %s" % f)
-        total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(f, chr_dicts)
+        total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(f, chr_dicts, gene_db, gene_dicts)
         name = os.path.splitext(os.path.basename(f))[0]
         with open(os.path.join(args.output, name) + ".tsv") as outf:
             outf.write("CDS count\t%d / %d\n" % (cds_count, total_exons))
