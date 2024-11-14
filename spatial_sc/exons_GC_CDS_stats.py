@@ -155,7 +155,7 @@ def process_fasta(in_fasta, chr_dicts):
     cds_count = 0
     introns_lengths = defaultdict(list)
     cds_fractions = []
-    gc_content = []
+    gc_contents = []
 
     for r in SeqIO.parse(in_fasta, "fasta"):
         seq_name = r.id
@@ -166,7 +166,7 @@ def process_fasta(in_fasta, chr_dicts):
         total_exons += 1
         cds_fractions.append(exon_info.cds_overlap)
         if exon_info.is_cds: cds_count += 1
-        gc_content.append(gc_content(str(r.seq)))
+        gc_contents.append(gc_content(str(r.seq)))
 
         preceding_intron_lengths = list(map(interval_len, exon_info.preceding_introns))
         subsequent_intron_lengths = list(map(interval_len, exon_info.subsequent_introns))
@@ -176,7 +176,7 @@ def process_fasta(in_fasta, chr_dicts):
         introns_lengths["downstream_min"].append(min(subsequent_intron_lengths))
         introns_lengths["downstream_max"].append(max(subsequent_intron_lengths))
         introns_lengths["downstream_all"] += subsequent_intron_lengths
-    return total_exons, cds_count, cds_fractions, gc_content, introns_lengths
+    return total_exons, cds_count, cds_fractions, gc_contents, introns_lengths
 
 
 def print_hist(numpy_hist, stream):
