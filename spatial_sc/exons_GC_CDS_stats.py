@@ -156,7 +156,7 @@ def gc_content(seq):
     for c in seq:
         if c.upper() in ['C', 'G']:
             gc += 1
-    return float(gc) / float(len(seq))
+    return float(gc) * 100.0 / float(len(seq))
 
 
 def collect_exons(gene_db, gene):
@@ -253,7 +253,7 @@ def main():
         print("Processing %s" % f)
         total_exons, cds_count, cds_fractions, gc_content, introns_lengths = process_fasta(f, chr_dicts, gene_db, gene_dicts)
         name = os.path.splitext(os.path.basename(f))[0]
-        with open(args.outpu + "_" + name + ".tsv") as outf:
+        with open(args.output + "_" + name + ".tsv", "w") as outf:
             outf.write("CDS count\t%d / %d\n" % (cds_count, total_exons))
             cds_cov_hist = numpy.histogram(cds_fractions, [0.1 * i for i in range(11)])
             outf.write("\nCDS coverage hist\t%.2f\t%.2f\n" % (numpy.mean(cds_fractions), numpy.median(cds_fractions)))
@@ -268,6 +268,9 @@ def main():
                 hist = numpy.histogram(intron_lens, [100 * i for i in range(11)] + [1000 * i for i in range(2, 11)] + [100000, 1000000])
                 outf.write("\nIntron lengths %s\t%.2f\t%.2f\n" % (k, numpy.mean(intron_lens), numpy.median(intron_lens)))
                 print_hist(hist, outf)
+                print(k)
+                print(",".join(list(map(str, intron_lens))))
+
 
 
 if __name__ == "__main__":
