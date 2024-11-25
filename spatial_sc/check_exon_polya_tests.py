@@ -18,6 +18,14 @@ from pyfaidx import Fasta
 DELTA = 0
 
 
+base_comp = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', " ": " "}
+
+
+def reverse_complement(my_seq):  ## obtain reverse complement of a sequence
+    lms = list(map(lambda x: base_comp[x], my_seq))[::-1]
+    return ''.join(lms)
+
+
 def equals_any_feature(exon, feature_list):
     for f in feature_list:
         if exon == f:
@@ -113,8 +121,8 @@ def process_csv(inf, genedb, gene_id_dict, chr_dict):
         strand = exon_values[4]
 
         transcripts = get_transcripts(genedb, gene_id)
-        #print("=== %s ===" % gene_id)
         comb, diff, p1_a, p2_a = process_test(polya1, polya2, exon, transcripts, strand)
+
         if comb == 4 and diff >= 10:
             #print(l.strip())
             diffs[diff] += 1
@@ -126,16 +134,23 @@ def process_csv(inf, genedb, gene_id_dict, chr_dict):
         polya_min = min(polya1, polya2)
         polya_max = max(polya1, polya2)
         polya_region = (chr_id, polya_min, polya_max)
+
+        polya_percent = 0
         if chr_dict and polya_region not in genomic_strs and diff < 50:
-            genomic_strs[polya_region] = str(chr_dict[chr_dict][polya_min:polya_max+1])
+            seq = str(chr_dict[chr_id][polya_min:polya_max+1])
+            if strand == '-':
+                seq = reverse_complement(seq)
+            genomic_strs[polya_region] = seq
+            polya_percent = seq.count('A') / len(seq)
 
-    #print("<<< %s >>>" % gene_id)
+        # ALL CONDITIONS ARE HERE
+        # comb - number of possible combinations
+        # p1_a, p2_a - whether polya1 and polya2 are annotated
+        # diff - distance
+        # polya_percent - percent of A bases inbetween these polyas
+        if comb == 4 and diff >= 10 and polya_percent <= 0.5:
+            print(l.strip())
 
-    #print(close_polya)
-
-#    print(sum(diffs.values()))
-#    for k in sorted(diffs.keys()):
-#        print(k, diffs[k])
     return combination_stats, genomic_strs
 
 
@@ -143,8 +158,8 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     # parser.add_argument("--output", "-o", type=str, help="output dir", required=True)
     parser.add_argument("--genedb", type=str, help="gffutils gene DB", required=True)
-    parser.add_argument("--reference", type=str, help="genome")
-    parser.add_argument("--csv", type=str, help="CSV file with polyA1/polyA2/exon", required=True)
+    parser.add_argument("--reference", type=str, help="genome in FASTA format with .fai index (samtools faidx genome.fa")
+    parser.add_argument("--csv", type=str, help="CSV file with polyA1/polyA2/exon (Lieke format)", required=True)
     parser.add_argument("--delta", type=int, help="coordinate comparison delta", default=0)
     args = parser.parse_args()
     return args
@@ -161,12 +176,18 @@ def main():
 
     if genomic_strs:
         a_percent = []
+        lens = []
         for k in genomic_strs:
             s = genomic_strs[k]
-            print(k, len(s), s.count("A"))
-            a_percent.append(s.count("A") / len(s))
+            #print(len(s), "\t", s.count("A") / len(s))
+            if s.count("A") * 2 <= len(s):
+                a_percent.append(s.count("A") / len(s))
 
-        print(numpy.histogram(a_percent, bins=[0.1 * i for i in range(11)])[0])
+            lens.append(len(s))
+
+#        print(numpy.histogram(a_percent, bins=[0.1 * i for i in range(11)])[0])
+#        print(numpy.histogram(lens, bins=[ i for i in range(5, 51)])[0])
+#        print(len(a_percent))
 
 
 if __name__ == "__main__":
