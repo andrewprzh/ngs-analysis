@@ -13,6 +13,7 @@ import gffutils
 from traceback import print_exc
 from collections import defaultdict
 import numpy
+from pyfaidx import Fasta
 
 DELTA = 0
 
@@ -94,10 +95,11 @@ def process_test(polya1, polya2, exon, transcripts, strand):
 
 
 # chr2_152694389_152694389_-,chr2_152672551_152672551_-,chr2_152714550_152714629_ENSG00000196504.19_-
-def process_csv(inf, genedb, gene_id_dict):
+def process_csv(inf, genedb, gene_id_dict, chr_dict):
     combination_stats = defaultdict(int)
     close_polya = defaultdict(int)
     diffs = defaultdict(int)
+    genomic_strs = {}
     for l in open(inf):
         if l.startswith("PolyA"): continue
         v = l.strip().split(',')
@@ -106,6 +108,7 @@ def process_csv(inf, genedb, gene_id_dict):
         polya2 = int(v[1].split('_')[1])
         exon_values = v[2].split('_')
         exon = (int(exon_values[1]), int(exon_values[2]))
+        chr_id = exon_values[0]
         gene_id = gene_id_dict[exon_values[3].split('.')[0]]
         strand = exon_values[4]
 
@@ -113,26 +116,34 @@ def process_csv(inf, genedb, gene_id_dict):
         #print("=== %s ===" % gene_id)
         comb, diff, p1_a, p2_a = process_test(polya1, polya2, exon, transcripts, strand)
         if comb == 4 and diff >= 10:
-            print(l.strip())
+            #print(l.strip())
             diffs[diff] += 1
         for c in [1, 3, 6, 10, 20, 50]:
             if diff <= c:
                 close_polya[(c, p1_a and p2_a)] += 1
         combination_stats[comb] += 1
-        #print("<<< %s >>>" % gene_id)
+
+        polya_min = min(polya1, polya2)
+        polya_max = max(polya1, polya2)
+        polya_region = (chr_id, polya_min, polya_max)
+        if chr_dict and polya_region not in genomic_strs and diff < 50:
+            genomic_strs[polya_region] = str(chr_dict[chr_dict][polya_min:polya_max+1])
+
+    #print("<<< %s >>>" % gene_id)
 
     #print(close_polya)
 
 #    print(sum(diffs.values()))
 #    for k in sorted(diffs.keys()):
 #        print(k, diffs[k])
-    return combination_stats
+    return combination_stats, genomic_strs
 
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     # parser.add_argument("--output", "-o", type=str, help="output dir", required=True)
     parser.add_argument("--genedb", type=str, help="gffutils gene DB", required=True)
+    parser.add_argument("--reference", type=str, help="genome")
     parser.add_argument("--csv", type=str, help="CSV file with polyA1/polyA2/exon", required=True)
     parser.add_argument("--delta", type=int, help="coordinate comparison delta", default=0)
     args = parser.parse_args()
@@ -144,8 +155,18 @@ def main():
     global DELTA
     DELTA = args.delta
     genedb = gffutils.FeatureDB(args.genedb)
+    reference_record_dict = Fasta(args.reference, indexname=args.reference + ".fai") if args.reference else None
     gene_ids = get_geneid_map(genedb)
-    process_csv(args.csv, genedb, gene_ids)
+    combination_stats, genomic_strs = process_csv(args.csv, genedb, gene_ids, reference_record_dict)
+
+    if genomic_strs:
+        a_percent = []
+        for k in genomic_strs:
+            s = genomic_strs[k]
+            print(k, len(s), s.count("A"))
+            a_percent.append(s.count("A") / len(s))
+
+        print(numpy.histogram(a_percent, bins=[0.1 * i for i in range(11)])[0])
 
 
 if __name__ == "__main__":
