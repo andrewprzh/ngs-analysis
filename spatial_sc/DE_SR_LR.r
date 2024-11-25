@@ -4,7 +4,6 @@ library(stringr)
 library(ggplot2)
 library(DESeq2)
 library(ggrepel)
-library (NMF)
 library(gplots)
 library( "RColorBrewer" )
 library(pheatmap)
@@ -128,7 +127,7 @@ write_tsv(subset ( res_sorted , gene_id %in% down_reg_genes) %>%
 library(biomaRt)
 human = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 
-gene_id <- "TBPB"
+gene_id <- "ATP5MK"
 results <- getBM(attributes = c("ensembl_gene_id", 
                                 "external_gene_name",
                                 "hsapiens_paralog_ensembl_gene", 

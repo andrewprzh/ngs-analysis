@@ -18,11 +18,34 @@ from numpy import histogram
 from kmer_indexer import *
 
 
+def cons(s):
+    mc = 1
+    c = 1
+    for i in range(len(s) - 1):
+        if s[i] == s[i+1]:
+            c += 1
+            if c > mc: mc = c
+        else: c = 1
+    return mc
+
+
+def count_gc(s):
+    gc = 0
+    for c in s:
+        if c in ['G', 'C']: gc += 1
+    return gc
+
+
+def print_dict(d):
+    for k in sorted(d.keys()):
+        print("%d\t%d" % (k, d[k]))
+
+
 class BarcodeStatCounter:
     def __init__(self, barcodes):
         self.barcodes = barcodes
         self.barcode_stats = []
-        self.barcode_indexer = KmerIndexer(barcodes, kmer_size=4)
+        self.barcode_indexer = KmerIndexer(barcodes, kmer_size=5)
 
     def _align(self, bc1, bc2):
         align_mgr = AlignmentMgr(match_score=1, mismatch_penalty=1)
@@ -59,6 +82,20 @@ class BarcodeStatCounter:
         h, b = histogram(self.barcode_stats, bins)
         print(h)
 
+    def count_consecutive(self):
+        d = defaultdict(int)
+        for b in self.barcodes:
+            d[cons(b)] += 1
+        print("Homopolymer lengths:")
+        print_dict(d)
+
+    def count_gc(self):
+        d = defaultdict(int)
+        for b in self.barcodes:
+            d[count_gc(b)] += 1
+        print("GC:")
+        print_dict(d)
+
 
 def load_barcodes(inf):
     barcode_list = []
@@ -80,8 +117,10 @@ def main():
     args = parse_args()
     barcodes = load_barcodes(args.barcodes)
     stat_counter = BarcodeStatCounter(barcodes)
-    stat_counter.count_edit_distances()
-    stat_counter.print_hist()
+    #stat_counter.count_edit_distances()
+    #stat_counter.print_hist()
+    stat_counter.count_consecutive()
+    stat_counter.count_gc()
 
 
 if __name__ == "__main__":
