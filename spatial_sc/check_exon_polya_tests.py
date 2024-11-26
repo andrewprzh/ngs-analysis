@@ -103,7 +103,7 @@ def process_test(polya1, polya2, exon, transcripts, strand):
 
 
 # chr2_152694389_152694389_-,chr2_152672551_152672551_-,chr2_152714550_152714629_ENSG00000196504.19_-
-def process_csv(inf, genedb, gene_id_dict, chr_dict):
+def process_csv(inf, genedb, gene_id_dict, chr_dict, args):
     combination_stats = defaultdict(int)
     close_polya = defaultdict(int)
     diffs = defaultdict(int)
@@ -148,7 +148,7 @@ def process_csv(inf, genedb, gene_id_dict, chr_dict):
         # p1_a, p2_a - whether polya1 and polya2 are annotated
         # diff - distance
         # polya_percent - percent of A bases inbetween these polyas
-        if comb == 4 and diff >= 10 and polya_percent <= 0.5:
+        if comb >= args.min_combinations and diff >= args.min_distance and polya_percent <= args.max_a_fraction:
             print(l.strip())
 
     return combination_stats, genomic_strs
@@ -158,9 +158,17 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     # parser.add_argument("--output", "-o", type=str, help="output dir", required=True)
     parser.add_argument("--genedb", type=str, help="gffutils gene DB", required=True)
-    parser.add_argument("--reference", type=str, help="genome in FASTA format with .fai index (samtools faidx genome.fa")
+    parser.add_argument("--reference", type=str, help="genome in FASTA format with .fai index (samtools faidx genome.fa)")
     parser.add_argument("--csv", type=str, help="CSV file with polyA1/polyA2/exon (Lieke format)", required=True)
     parser.add_argument("--delta", type=int, help="coordinate comparison delta", default=0)
+    parser.add_argument("--max_a_fraction", type=float, help="maximum allowed fraction of A bases between "
+                                                             "polyA sites closer than 50bp (requires reference genome) "
+                                                             "[0.5]", default=0.5)
+    parser.add_argument("--min_combinations", type=int, help="minimal number of possible polyA-exon combinations [4]", default=4)
+    parser.add_argument("--min_distance", type=int, help="minimal distance between polyA sites [10]", default=10)
+    parser.add_argument("--annotated", type=int, help="coordinate comparison delta", default=0)
+
+
     args = parser.parse_args()
     return args
 
