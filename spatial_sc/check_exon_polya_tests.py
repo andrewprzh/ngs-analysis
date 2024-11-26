@@ -180,7 +180,7 @@ def main():
     genedb = gffutils.FeatureDB(args.genedb)
     reference_record_dict = Fasta(args.reference, indexname=args.reference + ".fai") if args.reference else None
     gene_ids = get_geneid_map(genedb)
-    combination_stats, genomic_strs = process_csv(args.csv, genedb, gene_ids, reference_record_dict)
+    combination_stats, genomic_strs = process_csv(args.csv, genedb, gene_ids, reference_record_dict, args)
 
     if genomic_strs:
         a_percent = []
