@@ -148,7 +148,7 @@ def process_csv(inf, genedb, gene_id_dict, chr_dict, args):
         # p1_a, p2_a - whether polya1 and polya2 are annotated
         # diff - distance
         # polya_percent - percent of A bases inbetween these polyas
-        if comb >= args.min_combinations and diff >= args.min_distance and polya_percent <= args.max_a_fraction:
+        if comb >= args.min_combinations and diff >= args.min_distance and polya_percent <= args.max_a_fraction and (not args.annotated or (p1_a and p2_a)):
             print(l.strip())
 
     return combination_stats, genomic_strs
