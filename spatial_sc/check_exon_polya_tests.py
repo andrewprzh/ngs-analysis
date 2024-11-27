@@ -84,8 +84,8 @@ def process_test(polya1, polya2, exon, transcripts, strand):
         exons = transcripts[t]
         # print(exons, strand)
         polya_site = exons[-1][1] if strand == '+' else exons[0][0]
-        has_polya1 = equal_pos(polya1, polya_site, 50)
-        has_polya2 = equal_pos(polya2, polya_site, 50)
+        has_polya1 = equal_pos(polya1, polya_site, 1)
+        has_polya2 = equal_pos(polya2, polya_site, 1)
         if polya1 == polya_site: p1_a = True
         if polya2 == polya_site: p2_a = True
         if not has_polya1 and not has_polya2: continue
