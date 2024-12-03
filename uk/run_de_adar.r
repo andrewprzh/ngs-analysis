@@ -12,17 +12,18 @@ library(pheatmap)
 theme_set(theme_bw())
 
 #read data
-setwd("~/ablab/analysis/UK/")
+setwd("~/ablab/analysis/UK/DIE/ensemble")
 pdfWidth=11
 pdfHeight=8;
 
 countData = read.table("Novogene.HiFi.transcript_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
+names(countData)
 #exp_name = "WT_vs_1B"
 #countData <- countData[,c(1,2,3,10,11,12)]
-#exp_name = "WT_vs_B1A"
-#countData <- countData[,c(4,5,6,10,11,12)]
-exp_name = "WT_vs_ID7"
-countData <- countData[,c(7,8,9,10,11,12)]
+exp_name = "WT_vs_B1A"
+countData <- countData[,c(4,5,6,10,11,12)]
+#exp_name = "WT_vs_ID7"
+#countData <- countData[,c(7,8,9,10,11,12)]
 
 
 samples = names(countData)
