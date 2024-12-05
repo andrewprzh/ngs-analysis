@@ -119,6 +119,10 @@ def to_coors(reg_str):
     return chr_id, utr_coords, strand
 
 
+def to_allinfo_str(chr_id, intervals, strand):
+    return ";%;".join(["%s_%d_%d_%s" % (chr_id, x[0], x[1], strand) for x in intervals])
+
+
 def load_genes(inf):
     gene_dict = {}
     for l in open(inf):
@@ -172,7 +176,7 @@ def get_utr_classification(gene_utr_counts, chr_dict):
         print("Processing gene %s" % gene_id)
         utrs = set([x[0] for x in gene_dict[gene_id]])
         if len(utrs) != 2:
-            print("This gene has %d UTRs and will be ignored" % len(utrs))
+            print("This gene has %d UTR(s) and will be ignored" % len(utrs))
             continue
         utrs = list(utrs)
         utr_str1 = utrs[0]
@@ -180,42 +184,53 @@ def get_utr_classification(gene_utr_counts, chr_dict):
         utr_str2 = utrs[1]
         utr2 = to_coors(utr_str2)[1]
 
-        if gene_utr_counts[(gene_id, utr_str1, "Young")] > gene_utr_counts[(gene_id, utr_str1, "Old")]:
+        utr1_young_count = gene_utr_counts[(gene_id, utr_str1, "Young")]
+        utr1_old_count = gene_utr_counts[(gene_id, utr_str1, "Old")]
+        if utr1_young_count > utr1_old_count:
             utr1_dominant = "Young"
         else:
             utr1_dominant = "Old"
-        if gene_utr_counts[(gene_id, utr_str2, "Young")] > gene_utr_counts[(gene_id, utr_str2, "Old")]:
+
+        utr2_young_count = gene_utr_counts[(gene_id, utr_str2, "Young")]
+        utr2_old_count = gene_utr_counts[(gene_id, utr_str2, "Old")]
+        if utr2_young_count > utr2_old_count:
             utr2_dominant = "Young"
         else:
             utr2_dominant = "Old"
+
+        if utr2_dominant == utr1_dominant:
+            print("Awkward case of two UTRs being dominated in the same group")
 
         if not interval_list_overlaps(utr1, utr2):
             utr1_seq = extrac_seq(chr_dict, chr_id, utr1, strand)
             utr2_seq = extrac_seq(chr_dict, chr_id, utr2, strand)
             if utr1_seq:
-                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr1_seq), id="%s_%s_%s" % (gene_id, utr_str1, utr1_dominant), description="")
+                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr1_seq), id="%s_%s_%s_%d_%d" % (gene_id, utr_str1, utr1_dominant, utr1_young_count, utr1_old_count), description="")
                 utr_sequences[("no_overlap", utr1_dominant)].append(seq_rec)
             if utr2_seq:
-                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr2_seq), id="%s_%s_%s" % (gene_id, utr_str2, utr2_dominant), description="")
+                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr2_seq), id="%s_%s_%s_%d_%d" % (gene_id, utr_str2, utr2_dominant, utr2_young_count, utr2_old_count), description="")
                 utr_sequences[("no_overlap", utr2_dominant)].append(seq_rec)
         else:
             utr1_seq = extrac_seq(chr_dict, chr_id, utr1, strand)
             utr2_seq = extrac_seq(chr_dict, chr_id, utr2, strand)
             if utr1_seq:
-                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr1_seq), id="%s_%s_%s" % (gene_id, utr_str1, utr1_dominant), description="")
+                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr1_seq), id="%s_%s_%s_%d_%d" % (gene_id, utr_str1, utr1_dominant, utr1_young_count, utr1_old_count), description="")
                 utr_sequences[("overlap_full_UTR", utr1_dominant)].append(seq_rec)
             if utr2_seq:
-                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr2_seq), id="%s_%s_%s" % (gene_id, utr_str2, utr2_dominant), description="")
+                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr2_seq), id="%s_%s_%s_%d_%d" % (gene_id, utr_str2, utr2_dominant, utr2_young_count, utr2_old_count), description="")
                 utr_sequences[("overlap_full_UTR", utr2_dominant)].append(seq_rec)
+
             utr1_extra, utr2_extra = get_trailing_unique(utr1, utr2)
             if utr1_extra:
                 utr1_extra_seq = extrac_seq(chr_dict, chr_id, utr1_extra, strand)
-                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr1_extra_seq), id="%s_%s_%s" % (gene_id, utr1_extra, utr1_dominant),
+                utr1_extra_str = to_allinfo_str(chr_id, utr1_extra, strand)
+                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr1_extra_seq), id="%s_%s_%s_%d_%d" % (gene_id, utr1_extra_str, utr1_dominant, utr1_young_count, utr1_old_count),
                                               description="")
                 utr_sequences[("overlap_extra_UTR", utr1_dominant)].append(seq_rec)
             if utr2_extra:
                 utr2_extra_seq = extrac_seq(chr_dict, chr_id, utr2_extra, strand)
-                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr2_extra_seq), id="%s_%s_%s" % (gene_id, utr2_extra, utr2_dominant),
+                utr2_extra_str = to_allinfo_str(chr_id, utr2_extra, strand)
+                seq_rec = SeqRecord.SeqRecord(seq=Seq.Seq(utr2_extra_seq), id="%s_%s_%s_%d_%d" % (gene_id, utr2_extra_str, utr2_dominant, utr2_young_count, utr2_old_count),
                                               description="")
                 utr_sequences[("overlap_extra_UTR", utr2_dominant)].append(seq_rec)
 
@@ -234,9 +249,13 @@ def parse_args():
 
 def main():
     args = parse_args()
+    print("Loading gene list from %s" % args.gene_list)
     gene_polya_dict = load_genes(args.gene_list)
+    print("Reading ALLINFO %s" % args.allinfo)
     gene_utr_counts = process_allinfo_with_utr(args.allinfo, gene_polya_dict)
+    print("Reading genome %s" % args.genome)
     reference_record_dict = Fasta(args.genome)
+    print("Extracting UTR sequences")
     utr_sequences = get_utr_classification(gene_utr_counts, reference_record_dict)
 
     if not os.path.exists(args.output):
@@ -245,6 +264,7 @@ def main():
     for seq_type, dominant in utr_sequences.keys():
         out_fasta = os.path.join(args.output, "%s_%s.fasta" % (dominant, seq_type))
         SeqIO.write(utr_sequences[(seq_type, dominant)], out_fasta, 'fasta')
+        print("%d sequences were written to %s" % (len(utr_sequences[(seq_type, dominant)]), out_fasta))
 
 
 
