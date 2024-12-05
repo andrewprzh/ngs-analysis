@@ -10,6 +10,7 @@ import argparse
 from traceback import print_exc
 from collections import defaultdict
 import gffutils
+import glob
 
 
 class PositionFilter:
@@ -99,9 +100,10 @@ def parse_args():
 def main():
     args = parse_args()
     position_filter = PositionFilter()
-    for inf in args.tables:
-        print("Processing %s" % inf)
-        position_filter.update(inf)
+    for f in args.tables:
+        for inf in glob.glob(f):
+            print("Processing %s" % inf)
+            position_filter.update(inf)
 
     print("Total positions collected %d" % sum([len(s) for s in position_filter.position_dict.values()]))
 
