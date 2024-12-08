@@ -199,7 +199,8 @@ def get_utr_classification(gene_utr_counts, chr_dict):
             utr2_dominant = "Old"
 
         if utr2_dominant == utr1_dominant:
-            print("Awkward case of two UTRs being dominated in the same group")
+            print("Awkward case of two UTRs being dominated in the same group %d %d vs %d %d" % (utr1_young_count, utr1_old_count, utr2_young_count, utr2_old_count))
+            continue
 
         if not interval_list_overlaps(utr1, utr2):
             utr1_seq = extrac_seq(chr_dict, chr_id, utr1, strand)
