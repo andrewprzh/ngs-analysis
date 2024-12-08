@@ -48,6 +48,8 @@ class PositionFilter:
                     outf.write(l)
                     continue
                 v = l.strip().split("\t")
+                if v[9] == v[10] == '-':
+                    continue
                 position = int(v[1])
                 chr_id = v[0]
                 if position in self.position_dict[chr_id + "+"] or position in self.position_dict[chr_id + "-"]:
