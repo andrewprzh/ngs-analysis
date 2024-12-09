@@ -4,6 +4,9 @@
 # See file LICENSE for details.
 ############################################################################
 
+# Region  Position        Reference       Strand  Coverage-q30    MeanQ   BaseCount[A,C,G,T]      AllSubs Frequency       gCoverage-q30   gMeanQ  gBaseCount[A,C,G,T]     gAllSubs        gFrequency
+# GL000219.1      54843   T       2       49      46.53   [0, 0, 0, 49]   -       0.00    38      39.24   [0, 0, 0, 38]   -       0.00
+
 
 import sys
 import argparse
@@ -14,11 +17,14 @@ import glob
 
 
 class PositionFilter:
-    def __init__(self):
+    def __init__(self, args):
         # chr + strand -> position
         self.position_dict = defaultdict(set)
+        self.position_rna_cov = defaultdict(list)
+        self.args = args
 
     def update(self, reditools_output):
+        self.position_dict = defaultdict(set)
         for l in open(reditools_output):
             if l.startswith("Region"): continue
             v = l.strip().split("\t")
@@ -27,13 +33,27 @@ class PositionFilter:
                 rna_freq = float(v[8])
             except ValueError:
                 rna_freq = 0.0
+            try:
+                rna_cov = int(v[4])
+            except ValueError:
+                rna_cov = 0
+
             dna_sub = v[12]
             try:
                 dna_freq = float(v[13])
             except ValueError:
                 dna_freq = 0.0
+            try:
+                dna_cov = int(v[9])
+            except ValueError:
+                dna_cov = 0
             position = int(v[1])
             chr_id = v[0]
+
+            if dna_cov < self.args.min_dna_cov:
+                continue
+
+            self.position_rna_cov[(chr_id, position)].append(rna_cov)
 
             if rna_sub != dna_sub or rna_freq > dna_freq:
                 if rna_sub == "AG":
@@ -41,15 +61,34 @@ class PositionFilter:
                 elif rna_sub == "TC":
                     self.position_dict[chr_id + "-"].add(position)
 
+    def filter_coverage(self):
+        new_position_dict = defaultdict(set)
+        for chr_strand in self.position_dict:
+            for pos in self.position_dict[chr_strand]:
+                if self.args.min_cov_strategy == 1:
+                    if all(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_strand, pos)]):
+                        new_position_dict[chr_strand].add(pos)
+                elif self.args.min_cov_strategy == 2:
+                    if any(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_strand, pos)]):
+                        new_position_dict[chr_strand].add(pos)
+                elif self.args.min_cov_strategy == 3:
+                    cov_vals = self.position_rna_cov[(chr_strand, pos)]
+                    if sum(cov_vals) >= self.args.min_rna_cov * len(cov_vals) :
+                        new_position_dict[chr_strand].add(pos)
+                else:
+                    print("Unsupported srtatgy %d" % self.args.min_cov_strategy)
+                    exit(-1)
+        self.position_dict = new_position_dict
+
     def filter_table(self, reditools_output, filtered_output_name):
         with open(filtered_output_name, "w") as outf:
+            outf.write("Region\tPosition\tReference\tStrand\tCoverage-q30\tMeanQ\tBaseCount[A,C,G,T]\tAllSubs\tFrequency\tgCoverage-q30\tgMeanQ\tgBaseCount[A,C,G,T]\tgAllSubs\tgFrequency\n")
             for l in open(reditools_output):
                 if l.startswith("Region"):
-                    outf.write(l)
                     continue
                 v = l.strip().split("\t")
-                if v[9] == v[10] == '-':
-                    continue
+                # if v[9] == v[10] == '-':
+                #    continue
                 position = int(v[1])
                 chr_id = v[0]
                 if position in self.position_dict[chr_id + "+"] or position in self.position_dict[chr_id + "-"]:
@@ -94,6 +133,10 @@ def parse_args():
     parser.add_argument("--tables", "-t", nargs="+", help="REDItools output tables", required=True, type=str)
     parser.add_argument("--genedb", "-g", help="gffutils genedb (can be obtained using gtf2db.py);"
                                                "no gene filtring will be performed if not given", type=str)
+    parser.add_argument("--min_rna_cov", help="minimal # RNA reads", type=int, default=10)
+    parser.add_argument("--min_cov_strategy", help="minimal # RNA reads is required in 1: all samples, 2: average, 3: at least one (default: all)", type=int, default=1)
+    parser.add_argument("--min_dna_cov", help="minimal # DNA reads", type=int, default=1)
+
 
     args = parser.parse_args()
     return args
@@ -101,13 +144,16 @@ def parse_args():
 
 def main():
     args = parse_args()
-    position_filter = PositionFilter()
+    position_filter = PositionFilter(args)
     for f in args.tables:
         for inf in glob.glob(f):
             print("Processing %s" % inf)
             position_filter.update(inf)
 
     print("Total positions collected %d" % sum([len(s) for s in position_filter.position_dict.values()]))
+
+    position_filter.filter_coverage()
+    print("Total positions after filtering by coverage %d" % sum([len(s) for s in position_filter.position_dict.values()]))
 
     if args.genedb:
         print("Filtering using gene annotation %s" % args.genedb)
