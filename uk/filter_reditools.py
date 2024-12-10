@@ -65,14 +65,15 @@ class PositionFilter:
         new_position_dict = defaultdict(set)
         for chr_strand in self.position_dict:
             for pos in self.position_dict[chr_strand]:
+                chr_id = chr_strand[:-1]
                 if self.args.min_cov_strategy == 1:
-                    if all(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_strand, pos)]):
+                    if all(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_id, pos)]):
                         new_position_dict[chr_strand].add(pos)
                 elif self.args.min_cov_strategy == 2:
-                    if any(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_strand, pos)]):
+                    if any(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_id, pos)]):
                         new_position_dict[chr_strand].add(pos)
                 elif self.args.min_cov_strategy == 3:
-                    cov_vals = self.position_rna_cov[(chr_strand, pos)]
+                    cov_vals = self.position_rna_cov[(chr_id, pos)]
                     if sum(cov_vals) >= self.args.min_rna_cov * len(cov_vals) :
                         new_position_dict[chr_strand].add(pos)
                 else:
