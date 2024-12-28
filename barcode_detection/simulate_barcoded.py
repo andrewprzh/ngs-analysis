@@ -28,6 +28,15 @@ R1 = "CTACACGACGCTCTTCCGATCT" # R1
 BARCODE_LEN_10X = 16
 UMI_LEN_10X = 12
 
+
+STEREO_LINKER = "TTGTCTTCCTAAGAC"
+TSO_PRIMER = "ACTGAGAGGCATGGCGACCTTATCAG"
+PC1_PRIMER = "CTTCCGATCTATGGCGACCTTATCAG"
+STEREO_BC_LEN = 25
+STEREO_UMI_LEN = 10
+
+
+
 NUCLS = ['A', 'C', 'G', 'T']
 VNUCLS =  ['A', 'C', 'G']
 
@@ -47,6 +56,12 @@ def create_template_spatial(sequence, barcode, umi):
     assert len(barcode) == BC_LENGTH
     barcoded_part = PCR_PRIMER + barcode[:LEFT_BC_LENGTH] + LINKER + barcode[LEFT_BC_LENGTH:] + umi
     template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + UPS_PRIMER_REV
+    return reverese_complement(template_seq)
+
+
+def create_template_stereo(sequence, barcode, umi):
+    barcoded_part = PCR_PRIMER + barcode + STEREO_LINKER + umi
+    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO_PRIMER
     return reverese_complement(template_seq)
 
 
@@ -90,7 +105,7 @@ def parse_args():
     parser.add_argument("--barcodes", "-b", help="barcode list (random if not set)", type=str)
     parser.add_argument("--umis", "-u", help="UMI list (random if not set)", type=str)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
-    parser.add_argument("--mode", help="[spatial | 10x]", type=str, default="spatial")
+    parser.add_argument("--mode", help="[spatial | 10x | stereo]", type=str, default="stereo")
 
     args = parser.parse_args()
     return args
@@ -107,9 +122,21 @@ def main():
     count_dict = load_counts(args.counts, args.template_count)
     print("Loaded %d counts from %s" % (len(count_dict), args.counts))
 
-    bc_len = BC_LENGTH if args.mode == "spatial" else BARCODE_LEN_10X
-    umi_len = UMI_LENGTH if args.mode == "spatial" else UMI_LEN_10X
-    template_func = create_template_spatial if args.mode == "spatial" else create_template_10x
+    if args.mode == "10x":
+        bc_len = BARCODE_LEN_10X
+        umi_len = UMI_LEN_10X
+        template_func = create_template_10x
+    elif args.mode == "spatial":
+        bc_len = BC_LENGTH
+        umi_len = UMI_LENGTH
+        template_func = create_template_spatial
+    elif args.mode == "stereo":
+        bc_len = STEREO_BC_LEN
+        umi_len = STEREO_UMI_LEN
+        template_func = create_template_stereo
+    else:
+        print("Unknown mode %s" % args.mode)
+        exit(-1)
 
     scale_factor = 1000000.0 / sum(count_dict.values())
     counts_file = args.output + ".counts.tsv"
