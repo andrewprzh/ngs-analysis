@@ -60,7 +60,7 @@ def create_template_spatial(sequence, barcode, umi):
 
 
 def create_template_stereo(sequence, barcode, umi):
-    barcoded_part = PCR_PRIMER + barcode + STEREO_LINKER + umi
+    barcoded_part = PC1_PRIMER + barcode + STEREO_LINKER + umi
     template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO_PRIMER
     return reverese_complement(template_seq)
 
