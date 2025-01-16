@@ -11,6 +11,7 @@ from Bio import SeqIO
 import random
 from common import *
 from traceback import print_exc
+import numpy
 
 
 POLYA_LEN = 30
@@ -35,7 +36,9 @@ PC1_PRIMER = "CTTCCGATCTATGGCGACCTTATCAG"
 STEREO_BC_LEN = 25
 STEREO_UMI_LEN = 10
 
-
+CONCAT_STRAND_SWITCH_PROB = 0.4
+CONCAT_PROBABILITIES = [0.5, 0.35, 0.1, 0.05]
+CONCAT_COUNT = [1,2,3,4]
 
 NUCLS = ['A', 'C', 'G', 'T']
 VNUCLS =  ['A', 'C', 'G']
@@ -106,6 +109,7 @@ def parse_args():
     parser.add_argument("--umis", "-u", help="UMI list (random if not set)", type=str)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--mode", help="[spatial | 10x | stereo]", type=str, default="stereo")
+    parser.add_argument("--concatenate_templates", action="store_true", help="concatenate different cDNA templates together", default=False)
 
     args = parser.parse_args()
     return args
@@ -153,12 +157,27 @@ def main():
         transcript_seq = isoforms[t_id]
         template_list = []
         for i in range(count_dict[t_id]):
-            bc = barcodes[random.randint(0, len(barcodes) - 1)] if barcodes else get_random_seq(bc_len)
-            umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 2)
-            template = template_func(transcript_seq, bc, umi)
-            seq_id = "READ_%d_%s_%s_%s" % (i, t_id, bc, umi)
+            seq_id = "READ_%d_%s" % (i, t_id)
+            if args.concatenate_templates:
+                template_count = numpy.random.choice(CONCAT_COUNT, p=CONCAT_PROBABILITIES)
+            else:
+                template_count = 1
+
+            template = ""
+            for j in range(template_count):
+                bc = barcodes[random.randint(0, len(barcodes) - 1)] if barcodes else get_random_seq(bc_len)
+                umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 2)
+                sub_template = template_func(transcript_seq, bc, umi)
+                strand = "+"
+                if args.concatenate_templates and numpy.random.random() < CONCAT_STRAND_SWITCH_PROB:
+                    strand = "-"
+                    sub_template = reverese_complement(sub_template)
+
+                seq_id += "_%s_%s_%s" % (bc, umi, strand)
+                template += sub_template
             output_counts.write("%s\t%d\t%.4f\n" % (seq_id, 1, scale_factor))
-            template_list.append(SeqIO.SeqRecord(seq=Seq.Seq(template), id=seq_id,  description="", name=""))
+            template_list.append(SeqIO.SeqRecord(seq=Seq.Seq(template), id=seq_id, description="", name=""))
+
         SeqIO.write(template_list, output_fasta, "fasta")
     output_fasta.close()
     output_counts.close()
