@@ -24,7 +24,7 @@ for (i in 1:3) {
   for (j in (i+1):4) {
     print(i)
     print(j)
-    countData = read.table("~/ablab/analysis/italy/dipsacus/ST_new/Dipsacus.SUP.gene_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
+    countData = read.table("~/ablab/analysis/italy/dipsacus/2024/Dipsacus.SUP.gene_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
     samples = names(countData)
     all_cons = c("LCD", "LAL","LAD","LCL")
     
@@ -53,7 +53,7 @@ for (i in 1:3) {
     dgList <- calcNormFactors(dgList, method="TMM")
     
     #dispersion
-    housekeeping = as.vector(read.table("~/ablab/analysis/italy/dipsacus/ST_new/housekeeping_genes.tsv", header=FALSE, sep="\t"))
+    housekeeping = as.vector(read.table("~/ablab/analysis/italy/dipsacus/2024/housekeeping_genes.txt", header=FALSE, sep="\t"))
     head(housekeeping)
     
     dgListD <- dgList
@@ -111,9 +111,9 @@ for (i in 1:3) {
     deGenes <- row.names(deTable)
     length(deGenes)
     #output DE table
-    write.table(deTable, file=paste0("~/ablab/analysis/italy/dipsacus/ST_new/1vs1/DEG_table.list.", i, "_vs_", j, ".lfc2_p005.txt"), quote=FALSE, sep='\t', row.names = FALSE)
+    write.table(deTable, file=paste0("~/ablab/analysis/italy/dipsacus/2024/1vs1/DEG_table.list.", i, "_vs_", j, ".lfc2_p005.txt"), quote=FALSE, sep='\t', row.names = FALSE)
     #output DE genes
-    write.table(deGenes, file=paste0("~/ablab/analysis/italy/dipsacus/ST_new/1vs1/DE_genes.list.", i, "_vs_", j, ".lfc2_p005.txt"), quote=FALSE, sep='\t', row.names = FALSE)
+    write.table(deGenes, file=paste0("~/ablab/analysis/italy/dipsacus/2024/1vs1/DE_genes.list.", i, "_vs_", j, ".lfc2_p005.txt"), quote=FALSE, sep='\t', row.names = FALSE)
   }
 }
 
