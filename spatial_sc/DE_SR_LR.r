@@ -19,8 +19,10 @@ countData = read.table("all_counts.tsv", header=TRUE, sep="\t", row.names=1 )
 #unexpressed_genes <- subset(unexpressed_genes, unexpressed_genes[, "avg_count"] > 0)
 #countData <- countData[unexpressed_genes$gene_id,]
 
+countData <- countData[,c(9:16)]
+
 samples = names(countData)
-samplesData = read.table("samples.tsv", header=TRUE, sep="\t", row.names=1 )
+samplesData = read.table("samples_a.tsv", header=TRUE, sep="\t", row.names=1 )
 head(samplesData)
 
 # Build the dataframe from the conditions
@@ -33,7 +35,7 @@ summary(colData)
 ddsMat = DESeqDataSetFromMatrix(countData=countData, colData=colData, design = ~condition)
 
 #Set the reference to be compared
-ddsMat$condition = relevel(ddsMat$condition,"Illumina")
+ddsMat$condition = relevel(ddsMat$condition,"young")
 
 #ddsMat$batch <- factor(ddsMat$batch, levels=c('A', 'B', 'C'))
 # Run DESeq2
@@ -46,7 +48,7 @@ ddsMat <- DESeq(ddsMat)
 counts_normalized <- counts(ddsMat, normalized=TRUE)
 counts_stabilized <-getVarianceStabilizedData(ddsMat)
 norm_df <- mutate(as.data.frame(counts_normalized), gene_id = row.names(counts_normalized)) 
-write_tsv(norm_df, "deseq_normalization.tsv")
+write_tsv(norm_df, "lr_deseq_normalization.tsv")
 logNormCounts <- log2(counts_normalized + 1)
 
 #log count pearson corrleation
