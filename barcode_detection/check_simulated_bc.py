@@ -13,8 +13,8 @@ true_umis_dists = [0] * 15
 score_barcoded = defaultdict(int)
 score_correct = defaultdict(int)
 
-SCORES = [11, 12, 13, 14]
-MIN_SCORE = 13
+SCORES = [22, 23, 24, 25] #[11, 12, 13, 14]
+MIN_SCORE = 22
 
 barcode_barcoded = defaultdict(int)
 barcode_correct = defaultdict(int)
@@ -85,10 +85,16 @@ print("All barcodes %d, true barcodes %d" % (len(all_barcodes), len(true_barcode
 
 print("Total\t%d\nBarcode\t%d\nCorrect\t%d" % (count, barcoded, correct))
 
+print(score_barcoded)
+print(score_correct)
+
 print("MinScore\tPrecision\tRecall")
 for score in SCORES:
-    total_barcoded = sum(score_barcoded[s] for s in range(score, 15))
-    total_correct = sum(score_correct[s] for s in range(score, 15))
+    total_barcoded = sum(score_barcoded[s] for s in range(score, 26))
+    total_correct = sum(score_correct[s] for s in range(score, 26))
+    if total_barcoded == 0:
+        print("%d\t%.2f\t%.2f" % (score, 0, 0))
+        continue
     print("%d\t%.2f\t%.2f" % (score, (100 * total_correct / total_barcoded), (100 * total_correct / count)))
 
 print("UMIs within 1\t%d\nUMIs within 2\t%d\nUMIs within 3\t%d" % (sum(umis_dists[:2]), sum(umis_dists[:3]), sum(umis_dists[:4])))
