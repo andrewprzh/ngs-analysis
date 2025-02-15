@@ -22,9 +22,10 @@ class BaseAlignmentType(Enum):
     mismatch = 1
     insertion = 2
     clip = 3
+    deletion = 4
 
 
-def process_read(alignment, chr_str, quality_dict):
+def process_read(alignment, chr_str, quality_dict, err_dict):
     read_pos = 0
     ref_pos = alignment.reference_start
     try:
@@ -37,9 +38,14 @@ def process_read(alignment, chr_str, quality_dict):
     for cigartuple in alignment.cigartuples:
         event = cigartuple[0]
         event_len = cigartuple[1]
+
         if event == pysam.CHARD_CLIP or event == pysam.CPAD:
             continue
-        elif event == pysam.CREF_SKIP or event == pysam.CDEL:
+        elif event == pysam.CREF_SKIP:
+            ref_pos += event_len
+            continue
+        elif event == pysam.CDEL:
+            err_dict[BaseAlignmentType.deletion] += event_len
             ref_pos += event_len
             continue
         for i in range(event_len):
@@ -48,24 +54,29 @@ def process_read(alignment, chr_str, quality_dict):
                 read_pos += 1
             elif event == pysam.CDIFF:
                 quality_dict[BaseAlignmentType.mismatch][qualities[read_pos]] += 1
+                err_dict[BaseAlignmentType.mismatch] += 1
                 read_pos += 1
                 ref_pos += 1
             elif event == pysam.CEQUAL:
                 quality_dict[BaseAlignmentType.match][qualities[read_pos]] += 1
+                err_dict[BaseAlignmentType.match] += 1
                 read_pos += 1
                 ref_pos += 1
             elif event == pysam.CMATCH:
                 base_type = BaseAlignmentType.mismatch if alignment.query_sequence[read_pos] != chr_str[ref_pos] else BaseAlignmentType.match
+                err_dict[base_type] += 1
                 quality_dict[base_type][qualities[read_pos]] += 1
                 read_pos += 1
                 ref_pos += 1
             elif event == pysam.CINS:
                 quality_dict[BaseAlignmentType.insertion][qualities[read_pos]] += 1
+                err_dict[BaseAlignmentType.insertion] += 1
                 read_pos += 1
 
 
 def process_bam(in_bam, ref_dict):
     quality_dict = defaultdict(lambda: defaultdict(int))
+    err_dict = defaultdict(int)
     current_chr_id = ""
     current_chr_str = ""
 
@@ -78,8 +89,8 @@ def process_bam(in_bam, ref_dict):
             current_chr_id = chr_id
             current_chr_str = ref_dict[current_chr_id]
 
-        process_read(alignment, current_chr_str, quality_dict)
-    return quality_dict
+        process_read(alignment, current_chr_str, quality_dict, err_dict)
+    return quality_dict, err_dict
 
 
 def process_counts(count_dict: defaultdict):
@@ -115,7 +126,7 @@ def main():
     ref_dict = Fasta(args.fasta)
 
     print("Processing %s" % args.bam)
-    quality_dict = process_bam(pysam.AlignmentFile(args.bam), ref_dict)
+    quality_dict, err_dict = process_bam(pysam.AlignmentFile(args.bam), ref_dict)
     #print(quality_dict.keys())
 
     out_stream = sys.stdout
@@ -128,6 +139,14 @@ def main():
         out_stream.write("%s\n" % str(alignment_base_type))
         out_stream.write("\t".join(map(lambda x: "%.4f" % x, normalized_probabilities)) + "\n")
         out_stream.write("\t".join(map(lambda x: "%.4f" % x, smoothed_probabilities)) + "\n")
+
+    total_read_bases = (err_dict[BaseAlignmentType.match] + err_dict[BaseAlignmentType.mismatch] +
+                        err_dict[BaseAlignmentType.insertion]  + err_dict[BaseAlignmentType.deletion])
+    total_errors = err_dict[BaseAlignmentType.mismatch] + err_dict[BaseAlignmentType.insertion]  + err_dict[BaseAlignmentType.deletion]
+    out_stream.write("Total error rate: %.2f\n" % (100 * total_errors / total_read_bases))
+    out_stream.write("Mismatch rate: %.2f\n" % (100 * err_dict[BaseAlignmentType.mismatch] / total_read_bases))
+    out_stream.write("Insertion rate: %.2f\n" % (100 * err_dict[BaseAlignmentType.insertion] / total_read_bases))
+    out_stream.write("Deletion rate: %.2f\n" % (100 * err_dict[BaseAlignmentType.deletion] / total_read_bases))
 
     out_stream.close()
 
