@@ -137,8 +137,8 @@ def main():
         print("Type: %s, total observed events: %d" % (alignment_base_type, sum(quality_dict[alignment_base_type].values())))
         normalized_probabilities, smoothed_probabilities = process_counts(quality_dict[alignment_base_type])
         out_stream.write("%s\n" % str(alignment_base_type))
-        out_stream.write("\t".join(map(lambda x: "%.4f" % x, normalized_probabilities)) + "\n")
-        out_stream.write("\t".join(map(lambda x: "%.4f" % x, smoothed_probabilities)) + "\n")
+        out_stream.write("\t".join(map(lambda x: "%f" % x, normalized_probabilities)) + "\n")
+        out_stream.write("\t".join(map(lambda x: "%f" % x, smoothed_probabilities)) + "\n")
 
     total_read_bases = (err_dict[BaseAlignmentType.match] + err_dict[BaseAlignmentType.mismatch] +
                         err_dict[BaseAlignmentType.insertion]  + err_dict[BaseAlignmentType.deletion])
