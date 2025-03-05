@@ -12,26 +12,26 @@ library(pheatmap)
 theme_set(theme_bw())
 
 #read data
-setwd("~/ablab/analysis/UK/DIE/ensemble")
+setwd("~/ablab/analysis/UK/DIE/new_pb/ensembl")
 pdfWidth=11
 pdfHeight=8;
 
-countData = read.table("Novogene.HiFi.transcript_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
+countData = read.table("ADAR.PB2025.gene_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
 names(countData)
 #exp_name = "WT_vs_1B"
-#countData <- countData[,c(1,2,3,10,11,12)]
-exp_name = "WT_vs_B1A"
-countData <- countData[,c(4,5,6,10,11,12)]
-#exp_name = "WT_vs_ID7"
-#countData <- countData[,c(7,8,9,10,11,12)]
-
+#countData <- countData[,c(1,2,3,7,8,9)]
+#exp_name = "WT_vs_B1Al"
+#countData <- countData[,c(4,5,6,7,8,9)]
+exp_name = "WT_vs_ID7"
+countData <- countData[,c(10,11,12,7,8,9)]
+#exp_name = "WT_vs_ALL_novel"
 
 samples = names(countData)
 samplesData = read.table("samples_short.tsv", header=TRUE, sep="\t", row.names=1 )
 head(samplesData)
 
 # Build the dataframe from the conditions
-condition = factor(samplesData[row.names(samplesData) %in% samples,][[1]])
+condition = factor(samplesData[row.names(samplesData) %in% samples,][[2]])
 colData = data.frame(samples=samples, condition=condition)
 summary(colData)
 
@@ -83,7 +83,7 @@ res <- res %>%
   filter(!is.na(stat)) %>%
   arrange(desc(stat)) %>%
   select(gene_id, everything())
-write_tsv(res,  paste0(exp_name, "_deseq_results.tsv"))
+write_tsv(res,  paste0(exp_name, "_deseq_genes_results.tsv"))
 
 #cutoffs
 p_adj_cutoff <- 0.05
@@ -105,7 +105,7 @@ res_sorted <- res[order(res$padj), ]
 DGEgenes <-  subset ( res_sorted , padj < p_adj_cutoff & abs(log2FoldChange) > log2_cutoff)$gene_id 
 matDGEgenes <- subset(logNormCounts, gene_id %in% DGEgenes)
 write_tsv(subset ( res_sorted , gene_id %in% DGEgenes) %>% 
-            select(gene_id,log2FoldChange,padj), paste0(exp_name, "_DE_trascripts.tsv")) 
+            select(gene_id,log2FoldChange,padj), paste0(exp_name, "_DE_genes.tsv")) 
 
 pdf(file = paste0(exp_name, "_raw_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
 aheatmap(matDGEgenes, Rowv = TRUE , Colv = TRUE , distfun = "euclidean" , hclustfun = "average" )
@@ -138,13 +138,13 @@ row.names(zscore) = row.names(gene)
 
 # Generate new heatmap
 mat = as.matrix(zscore)
-pdf(file = paste0(exp_name, "_zscore_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
+pdf(file = paste0(exp_name, "_zscore_gene_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
 aheatmap(mat, Colv = NA)
 #plot(hclust(logDist),labels=colnames(logNormCounts),main=" log transformed read counts distance : Pearson correlation ")
 #colors = colorRampPalette(c("blue","black","red"),space="rgb")(256)
 #heatmap.2( mat, col=colors,density.info="none",trace="none", margins=c(10,19), lhei=c(1,7), Colv=NA)
 dev.off()
-write_tsv(data.frame(gene,mat),  paste0(exp_name, "_zscore_heatmap.tsv"))
+write_tsv(data.frame(gene,mat),  paste0(exp_name, "_zscore_gene_heatmap.tsv"))
 
 
 
