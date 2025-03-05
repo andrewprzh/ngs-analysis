@@ -10,8 +10,8 @@ def parse_arguments():
 
 
 def extract_ground_truth_barcodes(read_id):
-    parts = read_id.split('aligned')[0][:-4].split('_')
-    ground_truth_barcodes = set([parts[i] for i in range(3, len(parts), 3) if i < len(parts)])
+    parts = read_id.split('_')
+    ground_truth_barcodes = set([parts[i] for i in range(3, len(parts), 3) if i < len(parts) and len(parts[i]) == 25])
     return ground_truth_barcodes
 
 
@@ -64,6 +64,7 @@ def calculate_statistics(tsv_file):
     recall = correct_assignments / total_true_barcodes if total_true_barcodes > 0 else 0
 
     print(f"Total reads: {total_reads}")
+    print(f"Total true barcodes: {total_true_barcodes}")
     print(f"Reads with no barcodes assigned: {no_barcodes_assigned} ({no_barcodes_assigned / total_reads * 100:.2f}%)")
     print(f"Reads with all barcodes assigned correctly: {all_correct} ({all_correct / total_reads * 100:.2f}%)")
     print(f"Reads with some barcodes assigned correctly: {some_correct} ({some_correct / total_reads * 100:.2f}%)")
