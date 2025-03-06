@@ -48,8 +48,8 @@ def calculate_statistics(tsv_file):
         
         correct_in_read = sum(db in detected_barcodes for db in ground_truth_barcodes)
         incorrect_in_read = sum(db not in ground_truth_barcodes for db in detected_barcodes if db != '*')
-        if incorrect_in_read > 0:
-            print(read_id, ground_truth_barcodes, detected_barcodes, incorrect_in_read)
+        #if incorrect_in_read > 0:
+        #    print(read_id, ground_truth_barcodes, detected_barcodes, incorrect_in_read)
         excessive_assignments += max(0, len(detected_barcodes) - len(ground_truth_barcodes))
         total_assignments += min(len(detected_barcodes), len(ground_truth_barcodes))
         correct_assignments += correct_in_read
