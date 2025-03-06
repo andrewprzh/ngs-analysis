@@ -33,6 +33,7 @@ UMI_LEN_10X = 12
 STEREO_LINKER = "TTGTCTTCCTAAGAC"
 TSO_PRIMER = "ACTGAGAGGCATGGCGACCTTATCAG"
 PC1_PRIMER = "CTTCCGATCTATGGCGACCTTATCAG"
+TSO5 = "CCCGCCTCTCAGTACGTCAGCAG"
 STEREO_BC_LEN = 25
 STEREO_UMI_LEN = 10
 
@@ -64,7 +65,7 @@ def create_template_spatial(sequence, barcode, umi):
 
 def create_template_stereo(sequence, barcode, umi):
     barcoded_part = PC1_PRIMER + barcode + STEREO_LINKER + umi
-    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO_PRIMER
+    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + TSO5
     return reverese_complement(template_seq)
 
 
