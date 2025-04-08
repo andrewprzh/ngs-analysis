@@ -22,7 +22,7 @@ def calculate_statistics(tsv_file):
     with open(tsv_file, newline='') as file:
         reader = csv.reader(file, delimiter='\t')
         for row in reader:
-            read_id = row[0]
+            read_id = "_".join(row[0].split('_')[:-3])
             if read_id.startswith("#"): continue
             detected_barcode = row[1]
             read_barcodes[read_id].append(detected_barcode)
