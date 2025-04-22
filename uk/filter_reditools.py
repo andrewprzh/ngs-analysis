@@ -7,7 +7,7 @@
 # Region  Position        Reference       Strand  Coverage-q30    MeanQ   BaseCount[A,C,G,T]      AllSubs Frequency       gCoverage-q30   gMeanQ  gBaseCount[A,C,G,T]     gAllSubs        gFrequency
 # GL000219.1      54843   T       2       49      46.53   [0, 0, 0, 49]   -       0.00    38      39.24   [0, 0, 0, 38]   -       0.00
 
-
+import os
 import sys
 import argparse
 from traceback import print_exc
@@ -49,17 +49,18 @@ class PositionFilter:
                 dna_cov = 0
             position = int(v[1])
             chr_id = v[0]
+            strand = v[3]
 
             if dna_cov < self.args.min_dna_cov:
                 continue
 
             self.position_rna_cov[(chr_id, position)].append(rna_cov)
 
-            if rna_sub != dna_sub or rna_freq > dna_freq:
-                if rna_sub == "AG":
-                    self.position_dict[chr_id + "+"].add(position)
-                elif rna_sub == "TC":
-                    self.position_dict[chr_id + "-"].add(position)
+#            if rna_sub != dna_sub or rna_freq > dna_freq:
+#                if rna_sub == "AG":
+            self.position_dict[chr_id + strand].add(position)
+#                elif rna_sub == "TC":
+#                    self.position_dict[chr_id + "-"].add(position)
 
     def filter_coverage(self):
         new_position_dict = defaultdict(set)
@@ -134,6 +135,7 @@ def parse_args():
     parser.add_argument("--tables", "-t", nargs="+", help="REDItools output tables", required=True, type=str)
     parser.add_argument("--genedb", "-g", help="gffutils genedb (can be obtained using gtf2db.py);"
                                                "no gene filtring will be performed if not given", type=str)
+    parser.add_argument("--output", "-o", help="output folder", type=str, default="./")
     parser.add_argument("--min_rna_cov", help="minimal # RNA reads", type=int, default=10)
     parser.add_argument("--min_cov_strategy", help="minimal # RNA reads is required in 1: all samples, 2: average, 3: at least one (default: all)", type=int, default=1)
     parser.add_argument("--min_dna_cov", help="minimal # DNA reads", type=int, default=1)
@@ -167,7 +169,7 @@ def main():
                 outf.write("%s\t%s\t%d\t%s\n" % (pos[0], pos[1], pos[2], position_dict[pos]))
 
     for inf in args.tables:
-        filtered_table = inf + ".filtered.tsv"
+        filtered_table = os.path.join(args.output, os.path.basename(inf) + ".filtered.tsv")
         print("Filtering %s to %s" % (inf, filtered_table))
         position_filter.filter_table(inf, filtered_table)
 
