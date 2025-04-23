@@ -47,7 +47,7 @@ def create_group_files(args):
 
     for read in inf:
         read_id = read.query_name
-        group_index = int(read_id[-2:], 16) % args.group_num
+        group_index = random.randint(0, args.group_num-1)
         read_group = "GR" + str(group_index)
 
         split_outs[group_index].write(read)
