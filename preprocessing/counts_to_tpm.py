@@ -2,7 +2,7 @@ import sys
 
 count_dict = {}
 for l in open(sys.argv[1]):
-    if l.startswith("#"):
+    if l.startswith("#") or l.startswith("transcript_id"):
         continue
     v = l.split("\t")
     count_dict[v[0]] = float(v[1])

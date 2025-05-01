@@ -4,7 +4,7 @@ from traceback import print_exc
 import numpy as np
 
 
-BIN_COUNT = 1000
+BIN_COUNT = 100
 HIST_STEP = 1.0 / BIN_COUNT
 
 
