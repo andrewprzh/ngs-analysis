@@ -1,5 +1,7 @@
 import math
 import sys
+
+import numpy
 import pysam
 from traceback import print_exc
 import numpy as np
@@ -37,11 +39,12 @@ class TruncationStats:
 
 
 class TlenTruncationStats:
-    TRANSCRIPT_LEN_BINS = list(sorted([500, 1000, 2000, math.inf]))
+    TRANSCRIPT_LEN_BINS = list(sorted([300, 600, 1000, 1500, 2000, 3000, math.inf]))
     def __init__(self):
         self.transcript_len_dict = {}
         for tlen in self.TRANSCRIPT_LEN_BINS:
             self.transcript_len_dict[tlen] = TruncationStats()
+        self.read_lengths = []
 
     def add(self, transcript_len, reference_start, reference_end):
         left_truncation = float(reference_start) / float(transcript_len)
@@ -49,8 +52,12 @@ class TlenTruncationStats:
         for tlen in self.TRANSCRIPT_LEN_BINS:
             if transcript_len <= tlen:
                 self.transcript_len_dict[tlen].add(left_truncation, right_truncation)
+        self.read_lengths.append(reference_end - reference_start + 1)
 
     def print(self):
+        print(numpy.mean(self.read_lengths))
+        print(numpy.median(self.read_lengths))
+        print()
         sys.stdout.write("{")
         for tlen in self.TRANSCRIPT_LEN_BINS:
             if tlen == math.inf:
