@@ -32,10 +32,12 @@ class TruncationStats:
 
     def normalize(self):
         s = sum(self.right_truncations)
-        self.right_truncations = [float(x) / float(s) for x in self.right_truncations]
+        if s > 0:
+            self.right_truncations = [float(x) / float(s) for x in self.right_truncations]
         for i in range(BIN_COUNT):
             s = sum(self.left_truncations[i])
-            self.left_truncations[i] = [float(x) / float(s) for x in self.left_truncations[i]]
+            if s > 0:
+                self.left_truncations[i] = [float(x) / float(s) for x in self.left_truncations[i]]
 
 
 class TlenTruncationStats:
