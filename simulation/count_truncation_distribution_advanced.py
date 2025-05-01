@@ -75,14 +75,22 @@ class TlenTruncationStats:
 def main():
     bamfile = pysam.AlignmentFile(sys.argv[1], "rb")
     truncation_stats = TlenTruncationStats()
+    assigned_transcripts = defaultdict(int)
+
     for alignment in bamfile:
         if alignment.is_secondary or alignment.is_supplementary or alignment.is_unmapped:
               continue
 
-        transcript_len = bamfile.get_reference_length(bamfile.get_reference_name(alignment.reference_id))
+        transcript_len = bamfile.get_reference_length(alignment.reference_name)
         truncation_stats.add(transcript_len, alignment.reference_start, alignment.reference_end)
+        assigned_transcripts[alignment.reference_name] += 1
 
     truncation_stats.print()
+
+    scale_factor = sum(assigned_transcripts.values()) / 1000000.0
+    with open(sys.argv[2], "w") as outf:
+        for tid in sorted(assigned_transcripts.keys()):
+            outf.write("%s\t%.2f\t%.6f\n" % (tid, assigned_transcripts[tid], assigned_transcripts[tid] / scale_factor))
 
 
 if __name__ == "__main__":
