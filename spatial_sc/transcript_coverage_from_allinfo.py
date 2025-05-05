@@ -237,7 +237,7 @@ def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=
     output_handle.write("E.avg \t%.5f" % numpy.mean(transcript_exon_count))
 
     fraction_histogram, bins = numpy.histogram(transcript_cov_fractions, bins=[0.1 * i for i in range(11)])
-    for i in range(11):
+    for i in range(10):
         output_handle.write("%.1f\t%d\n" % (i * 0.1, fraction_histogram[i]))
     output_handle.write('\n')
 
