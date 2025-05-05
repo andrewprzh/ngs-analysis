@@ -152,9 +152,11 @@ def load_genes(inf):
     return gene_set
 
 
-def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=False):
+def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=False, spliced_isoforms=False):
     transcript_cov_fractions = []
     transcript_exon_count = []
+    length_pairs = []
+
     gene_ids = set()
     for readid in read_dict:
         read_info = read_dict[readid]
@@ -167,9 +169,12 @@ def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=Fals
             continue
         gene_ids.add(gene_id)
         isoform_exons = transcript_dict[transcript_id][2]
+        if spliced_isoforms and len(isoform_exons) == 1:
+            continue
         transcript_cov_fractions.append(transcript_coverage_fraction(read_exons, isoform_exons))
+        length_pairs.append((intervals_total_length(isoform_exons), intervals_total_length(read_exons)))
         transcript_exon_count.append(len(read_exons))
-    return transcript_cov_fractions, transcript_exon_count, gene_ids
+    return transcript_cov_fractions, transcript_exon_count, gene_ids, length_pairs
 
 
 def common_unique_genes(read_dict1, read_dict2):
@@ -195,6 +200,8 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input", "-i", nargs='+', type=str, help="allinfo/read assignments files", required=True)
     parser.add_argument("--genedb", "-g", type=str, help="gffutils genedb", required=True)
+    parser.add_argument("--output", "-o", type=str, help="output stats file", required=True)
+
     parser.add_argument("--gene_list", nargs="+", type=str, help="gene list(s) to analyse", default=[])
     parser.add_argument("--data_type", '-d', choices=['auto', 'allinfo', 'ra'], help="input data type", default="auto")
     args = parser.parse_args()
@@ -215,27 +222,39 @@ def print_hist(bins, val_lists, name):
             outf.write("%d\t%s\n" % (bins[i], "\t".join(map(lambda x: ("%.4f" % x), normalized_values))))
 
 
-def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=False):
-    transcript_cov_fractions, transcript_exon_count, gene_set = process_allinfo(read_dict, transcript_dict, gene_set, spliced_only)
+def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=False, spliced_isoforms=False, output_handle=sys.stdout):
+    transcript_cov_fractions, transcript_exon_count, gene_set, length_pairs =\
+        process_allinfo(read_dict, transcript_dict, gene_set, spliced_only, spliced_isoforms)
+
     if not transcript_cov_fractions:
-        print("No data for %s" % header)
+        output_handle.write("No data for %s\n" % header)
         return
-    print(header)
-    print("Reads\t%d" % len(transcript_cov_fractions))
-    print("Genes\t%d" % len(gene_set))
-    print("Mean \t%.5f" % numpy.mean(transcript_cov_fractions))
-    print("Med  \t%.5f" % numpy.median(transcript_cov_fractions))
-    print("E.avg \t%.5f" % numpy.mean(transcript_exon_count))
+    output_handle.write(header + "\n")
+    output_handle.write("Reads\t%d" % len(transcript_cov_fractions))
+    output_handle.write("Genes\t%d" % len(gene_set))
+    output_handle.write("Mean \t%.5f" % numpy.mean(transcript_cov_fractions))
+    output_handle.write("Med  \t%.5f" % numpy.median(transcript_cov_fractions))
+    output_handle.write("E.avg \t%.5f" % numpy.mean(transcript_exon_count))
+
+    fraction_histogram, bins = numpy.histogram(transcript_cov_fractions, bins=[0.1 * i for i in range(11)])
+    for i in range(11):
+        output_handle.write("%.1f\t%d\n" % (i * 0.1, fraction_histogram[i]))
+    output_handle.write('\n')
+
+    for pair in sorted(set(length_pairs)):
+        output_handle.write("%d\t%d\n" % (pair[0], pair[1]))
 
     # print("Q25\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.25))
     # print("Q75\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.75))
-    print()
+    output_handle.write('\n')
 
 
 def main():
     args = parse_args()
     transcript_dict = load_transcripts(args.genedb)
     read_dicts = []
+
+    output_file = open(args.output, "w")
 
     for inf in args.input:
         if args.data_type == "auto":
@@ -251,16 +270,18 @@ def main():
             read_dict = load_read_assignments(inf)
 
         read_dicts.append(read_dict)
-        print_stats("All reads for %s" % inf, read_dict, transcript_dict)
+        print_stats("All reads for %s" % inf, read_dict, transcript_dict, output_handle=output_file)
         for gene_list in args.gene_list:
             gene_set = load_genes(gene_list)
             print_stats("Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set)
 
-        print_stats("SPLICED reads for %s" % inf, read_dict, transcript_dict, spliced_only=True)
+        print_stats("SPLICED reads for %s" % inf, read_dict, transcript_dict, spliced_isoforms=True, output_handle=output_file)
         for gene_list in args.gene_list:
             gene_set = load_genes(gene_list)
             print_stats("SPLICED Stats for %s" % os.path.basename(gene_list), read_dict, transcript_dict, gene_set, spliced_only=True)
 
+    output_file.close()
+'''
     if len(read_dicts) == 2:
         for header, gene_set in common_unique_genes(read_dicts[0], read_dicts[1]):
             print("Using gene set %s of size %d" % (header, len(gene_set)))
@@ -270,7 +291,7 @@ def main():
             print("Using gene set %s of size %d, SPLICED ONLY" % (header, len(gene_set)))
             print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[0])), read_dicts[0], transcript_dict, gene_set, spliced_only=True)
             print_stats("Stats for allinfo %s" % (os.path.basename(args.allinfo[1])), read_dicts[1], transcript_dict, gene_set, spliced_only=True)
-
+'''
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
