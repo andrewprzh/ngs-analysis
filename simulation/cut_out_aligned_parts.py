@@ -9,15 +9,15 @@ BIN_COUNT = 100
 HIST_STEP = 1.0 / BIN_COUNT
 
 
-def process(transcript_dict):
-    bamfile = pysam.AlignmentFile(sys.argv[1], "rb")
+def process(transcript_dict, inbam):
+    bamfile = pysam.AlignmentFile(inbam, "rb")
     new_records = []
     transcript_counts = defaultdict(int)
     for alignment in bamfile:
         if alignment.is_secondary or alignment.is_supplementary or alignment.is_unmapped:
             continue
-
-        new_records.append(SeqRecord.SeqRecord(seq=Seq.Seq(transcript_dict[alignment.reference_name][alignment.reference_start, alignment.reference_end + 1]),
+        #print(alignment.reference_name, transcript_dict[alignment.reference_name], alignment.reference_start)
+        new_records.append(SeqRecord.SeqRecord(seq=Seq.Seq(transcript_dict[alignment.reference_name].seq[alignment.reference_start:alignment.reference_end + 1]),
                                                id="%s_%d_%d_%d" % (alignment.reference_name, transcript_counts[alignment.reference_name], alignment.reference_start, alignment.reference_end),
                                                description=""))
         transcript_counts[alignment.reference_name] += 1
@@ -42,14 +42,14 @@ def parse_args():
 def main():
     args = parse_args()
     transcript_dict = SeqIO.to_dict(SeqIO.parse(args.transcripts, "fasta"))
-    fasta_records = process(transcript_dict)
+    fasta_records = process(transcript_dict, args.bam)
     count_dict = defaultdict(int)
     for r in fasta_records:
         count_dict[r.id] = 1
     SeqIO.write(fasta_records, args.output + ".fasta", "fasta")
 
     scale_factor = sum(count_dict.values()) / 1000000.0
-    with open(sys.argv[2], "w") as outf:
+    with open(args.output + ".tsv", "w") as outf:
         for tid in sorted(count_dict.keys()):
             outf.write("%s\t%.2f\t%.6f\n" % (tid, count_dict[tid], count_dict[tid] / scale_factor))
 
