@@ -161,6 +161,7 @@ def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=Fals
         gene_id = read_info[2]
         if gene_set and gene_id not in gene_set: continue
         transcript_id = read_info[3]
+        if transcript_id == "None": continue
         read_exons = read_info[4]
         if spliced_only and len(read_exons) == 1:
             continue
