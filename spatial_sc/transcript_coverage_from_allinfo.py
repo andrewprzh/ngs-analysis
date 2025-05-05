@@ -155,7 +155,7 @@ def load_genes(inf):
 def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=False, spliced_isoforms=False):
     transcript_cov_fractions = []
     transcript_exon_count = []
-    length_pairs = []
+    length_fraction_pairs = []
 
     gene_ids = set()
     for readid in read_dict:
@@ -171,10 +171,11 @@ def process_allinfo(read_dict, transcript_dict, gene_set=None, spliced_only=Fals
         isoform_exons = transcript_dict[transcript_id][2]
         if spliced_isoforms and len(isoform_exons) == 1:
             continue
-        transcript_cov_fractions.append(transcript_coverage_fraction(read_exons, isoform_exons))
-        length_pairs.append((intervals_total_length(isoform_exons), intervals_total_length(read_exons)))
+        cov_fraction = transcript_coverage_fraction(read_exons, isoform_exons)
+        transcript_cov_fractions.append(cov_fraction)
+        length_fraction_pairs.append((intervals_total_length(isoform_exons), cov_fraction))
         transcript_exon_count.append(len(read_exons))
-    return transcript_cov_fractions, transcript_exon_count, gene_ids, length_pairs
+    return transcript_cov_fractions, transcript_exon_count, gene_ids, length_fraction_pairs
 
 
 def common_unique_genes(read_dict1, read_dict2):
@@ -223,7 +224,7 @@ def print_hist(bins, val_lists, name):
 
 
 def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=False, spliced_isoforms=False, output_handle=sys.stdout):
-    transcript_cov_fractions, transcript_exon_count, gene_set, length_pairs =\
+    transcript_cov_fractions, transcript_exon_count, gene_set, length_fraction_pairs =\
         process_allinfo(read_dict, transcript_dict, gene_set, spliced_only, spliced_isoforms)
 
     if not transcript_cov_fractions:
@@ -243,12 +244,12 @@ def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=
 
     lengths = [300, 600, 900, 1200, 1500, 2000, 2500, 3000, 5000, 10000]
     fraction_dict = defaultdict(list)
-    for pair in length_pairs:
+    for pair in length_fraction_pairs:
         transcript_len = pair[0]
-        read_len = pair[1]
+        cov_fraction = pair[1]
         for l in lengths:
             if transcript_len <= l:
-                fraction_dict[l].append(read_len / transcript_len)
+                fraction_dict[l].append(cov_fraction)
 
     for l in lengths:
         output_handle.write("%d\t%.3f\n" % (l, numpy.mean(fraction_dict[l])))
