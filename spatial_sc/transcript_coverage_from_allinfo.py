@@ -241,8 +241,17 @@ def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=
         output_handle.write("%.1f\t%d\n" % (i * 0.1, fraction_histogram[i]))
     output_handle.write('\n')
 
-    for pair in sorted(set(length_pairs)):
-        output_handle.write("%d\t%d\n" % (pair[0], pair[1]))
+    lengths = [300, 600, 900, 1200, 1500, 2000, 2500, 3000, 5000, 10000]
+    fraction_dict = defaultdict(list)
+    for pair in length_pairs:
+        transcript_len = pair[0]
+        read_len = pair[1]
+        for l in lengths:
+            if transcript_len <= l:
+                fraction_dict[l].append(read_len / transcript_len)
+
+    for l in lengths:
+        output_handle.write("%d\t%.3f\n" % (l, numpy.mean(fraction_dict[l])))
 
     # print("Q25\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.25))
     # print("Q75\t%.5f" % numpy.quantile(transcript_cov_fractions, 0.75))
