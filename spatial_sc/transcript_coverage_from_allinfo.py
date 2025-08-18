@@ -231,11 +231,11 @@ def print_stats(header, read_dict, transcript_dict, gene_set=None, spliced_only=
         output_handle.write("No data for %s\n" % header)
         return
     output_handle.write(header + "\n")
-    output_handle.write("Reads\t%d" % len(transcript_cov_fractions))
-    output_handle.write("Genes\t%d" % len(gene_set))
-    output_handle.write("Mean \t%.5f" % numpy.mean(transcript_cov_fractions))
-    output_handle.write("Med  \t%.5f" % numpy.median(transcript_cov_fractions))
-    output_handle.write("E.avg \t%.5f" % numpy.mean(transcript_exon_count))
+    output_handle.write("Reads\t%d\n" % len(transcript_cov_fractions))
+    output_handle.write("Genes\t%d\n" % len(gene_set))
+    output_handle.write("Mean \t%.5f\n" % numpy.mean(transcript_cov_fractions))
+    output_handle.write("Med  \t%.5f\n" % numpy.median(transcript_cov_fractions))
+    output_handle.write("E.avg \t%.5f\n" % numpy.mean(transcript_exon_count))
 
     fraction_histogram, bins = numpy.histogram(transcript_cov_fractions, bins=[0.1 * i for i in range(11)])
     for i in range(10):
