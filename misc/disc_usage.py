@@ -2,6 +2,8 @@
 import subprocess
 import requests
 import sys
+import os
+from os.path import abspath, dirname, realpath, join, isfile
 import time
 import datetime
 
@@ -11,10 +13,10 @@ THRESHOLD = 95               # % usage before sending alert
 CHECK_INTERVAL = 4 * 3600    # 4 hours in seconds
 WEEKLY_INTERVAL = 7 * 24 * 3600  # 1 week in seconds
 
-MAILGUN_DOMAIN = "YOUR_DOMAIN"   # e.g. sandboxXXX.mailgun.org
-MAILGUN_API_KEY = "YOUR_API_KEY"
-FROM_EMAIL = "alerts@" + MAILGUN_DOMAIN
-TO_EMAILS = ["recipient1@example.com", "recipient2@example.com"]
+MAILGUN_DOMAIN = "sandbox04a9219346e6491a88f560e5d5db7551.mailgun.org"   # e.g. sandboxXXX.mailgun.org
+MAILGUN_API_KEY = open(join(abspath(dirname(realpath(__file__))), ".mg")).readlines()[0].strip()
+FROM_EMAIL = "postmaster@sandbox04a9219346e6491a88f560e5d5db7551.mailgun.org"
+TO_EMAILS = ["andrewprzh@gmail.com"]
 # -----------------------------------
 
 def get_disk_usage(disk_name):
