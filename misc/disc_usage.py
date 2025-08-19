@@ -13,10 +13,10 @@ THRESHOLD = 95               # % usage before sending alert
 CHECK_INTERVAL = 4 * 3600    # 4 hours in seconds
 WEEKLY_INTERVAL = 7 * 24 * 3600  # 1 week in seconds
 
-MAILGUN_DOMAIN = "sandbox04a9219346e6491a88f560e5d5db7551.mailgun.org"   # e.g. sandboxXXX.mailgun.org
-MAILGUN_API_KEY = open(join(abspath(dirname(realpath(__file__))), ".mg")).readlines()[0].strip()
+MAILGUN_DOMAIN = open("/home/andreyp/.mg/.domain").readlines()[0].strip()   # e.g. sandboxXXX.mailgun.org
+MAILGUN_API_KEY = open("/home/andreyp/.mg/.api").readlines()[0].strip()
 FROM_EMAIL = "postmaster@sandbox04a9219346e6491a88f560e5d5db7551.mailgun.org"
-TO_EMAILS = ["andrewprzh@gmail.com"]
+TO_EMAILS = list(map(lambda x: x.strip(), open("/home/andreyp/.mg/.emails").readlines()))
 # -----------------------------------
 
 def get_disk_usage(disk_name):
