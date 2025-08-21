@@ -69,6 +69,17 @@ def create_template_stereo(sequence, barcode, umi):
     return reverese_complement(template_seq)
 
 
+VISIUM_HD_PRIMER = "ACACGACGCTCTTCCGATCT"
+VISIUM_HD_BC_LEN = 30
+VISIUM_HD_UMI_LEN = 10
+
+
+def create_template_visiumhd(sequence, barcode, umi):
+    barcoded_part = VISIUM_HD_PRIMER + umi + barcode
+    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence)
+    return reverese_complement(template_seq)
+
+
 #AATGATACGGCGACCACCGAGATCTACACNNNNNNNNNNACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT—--DNA------CCCATGTACTCTGCGTTGATACCACTGCTT
 
 # p5="AATGATACGGCGACCACCGAGATCTACAC"
@@ -109,7 +120,7 @@ def parse_args():
     parser.add_argument("--barcodes", "-b", help="barcode list (random if not set)", type=str)
     parser.add_argument("--umis", "-u", help="UMI list (random if not set)", type=str)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
-    parser.add_argument("--mode", help="[spatial | 10x | stereo]", type=str, default="stereo")
+    parser.add_argument("--mode", help="[spatial | 10x | stereo | visium_hd]", type=str, default="stereo")
     parser.add_argument("--concatenate_templates", action="store_true", help="concatenate different cDNA templates together", default=False)
 
     args = parser.parse_args()
@@ -139,6 +150,10 @@ def main():
         bc_len = STEREO_BC_LEN
         umi_len = STEREO_UMI_LEN
         template_func = create_template_stereo
+    elif args.mode == "visium_hd":
+        bc_len = VISIUM_HD_BC_LEN
+        umi_len = VISIUM_HD_UMI_LEN
+        template_func = create_template_visiumhd
     else:
         print("Unknown mode %s" % args.mode)
         exit(-1)
@@ -167,7 +182,7 @@ def main():
             template = ""
             for j in range(template_count):
                 bc = barcodes[random.randint(0, len(barcodes) - 1)] if barcodes else get_random_seq(bc_len)
-                umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 2)
+                umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 0)
                 sub_template = template_func(transcript_seq, bc, umi)
                 strand = "+"
                 if args.concatenate_templates and numpy.random.random() < CONCAT_STRAND_SWITCH_PROB:
