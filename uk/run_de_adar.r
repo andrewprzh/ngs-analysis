@@ -12,140 +12,149 @@ library(pheatmap)
 theme_set(theme_bw())
 
 #read data
-setwd("~/ablab/analysis/UK/DIE/new_pb/ensembl")
-pdfWidth=11
-pdfHeight=8;
-
-countData = read.table("ADAR.PB2025.gene_grouped_counts.tsv", header=TRUE, sep="\t", row.names=1 )
-names(countData)
-#exp_name = "WT_vs_1B"
-#countData <- countData[,c(1,2,3,7,8,9)]
-#exp_name = "WT_vs_B1Al"
-#countData <- countData[,c(4,5,6,7,8,9)]
-exp_name = "WT_vs_ID7"
-countData <- countData[,c(10,11,12,7,8,9)]
-#exp_name = "WT_vs_ALL_novel"
-
-samples = names(countData)
-samplesData = read.table("samples_short.tsv", header=TRUE, sep="\t", row.names=1 )
-head(samplesData)
-
-# Build the dataframe from the conditions
-condition = factor(samplesData[row.names(samplesData) %in% samples,][[2]])
-colData = data.frame(samples=samples, condition=condition)
-summary(colData)
-
-# create DeSeq object
-ddsMat = DESeqDataSetFromMatrix(countData=countData, colData=colData, design = ~condition)
-
-#Set the reference to be compared
-ddsMat$condition = relevel(ddsMat$condition,"WT")
-
-ddsMat <- DESeq(ddsMat)
-
-# normalize data
-counts_normalized <- counts(ddsMat, normalized=TRUE)
-counts_stabilized <-getVarianceStabilizedData(ddsMat)
-norm_df <- mutate(as.data.frame(counts_normalized), gene_id = row.names(counts_normalized)) 
-#write_tsv(norm_df, "deseq_normalization.tsv")
-logNormCounts <- log2(counts_normalized + 1)
-
-#log count pearson corrleation
-logDist <- as.dist (1 - cor( logNormCounts , method = "pearson" ) )
-plot(hclust(logDist),labels=colnames(logNormCounts),main=" log transformed read counts distance : Pearson correlation ")
-
-# plot PCA
-pca <- prcomp(t(counts_stabilized))
-pca_df <- tibble(sample = row.names(pca$x),
-                 PC1 = pca$x[, "PC1"], 
-                 PC2 = pca$x[, "PC2"], 
-                 PC3 = pca$x[, "PC3"]) 
-
-require(gridExtra)
-plot1 <- ggplot(pca_df) +
-  geom_point(aes(PC1, PC2, colour = condition), size = 3) +
-  labs(x = paste0("PC1 (", summary(pca)$importance[2, 1]*100, "%)"),
-       y = paste0("PC2 (", summary(pca)$importance[2, 2]*100, "%)")) +
-  scale_colour_brewer(palette = "Set1") +
-  geom_text_repel(data = pca_df, 
-                  aes(PC1, PC2, label = substr(sample,1,5) ),
-                  min.segment.length = unit(0.5, "lines")) +
-  theme(legend.position = "top")
-grid.arrange(plot1, ncol = 1)
-
-
-# get DE results
-res <- results(ddsMat)
-gene_id <- row.names(res)
-res <- as.data.frame(res)
-res <- cbind(gene_id, res)
-res <- res %>%
-  filter(!is.na(stat)) %>%
-  arrange(desc(stat)) %>%
-  select(gene_id, everything())
-write_tsv(res,  paste0(exp_name, "_deseq_genes_results.tsv"))
-
-#cutoffs
-p_adj_cutoff <- 0.05
-log2_cutoff <- 1
-
-#volcano plot
-res %>%
-  filter(!is.na(padj)) %>%
-  ggplot() +
-  geom_point(aes(log2FoldChange, -log10(padj), colour = (abs(log2FoldChange) > log2_cutoff & padj < p_adj_cutoff))) +
-  theme_bw() +
-  scale_color_manual(values = c("black", "red")) +
-  geom_text_repel(data = filter(res, padj < p_adj_cutoff),
-                  aes(log2FoldChange, -log10(padj), label = ""),
-                  min.segment.length = unit(0.1, "lines"))
-
-#select DE genes
-res_sorted <- res[order(res$padj), ]
-DGEgenes <-  subset ( res_sorted , padj < p_adj_cutoff & abs(log2FoldChange) > log2_cutoff)$gene_id 
-matDGEgenes <- subset(logNormCounts, gene_id %in% DGEgenes)
-write_tsv(subset ( res_sorted , gene_id %in% DGEgenes) %>% 
-            select(gene_id,log2FoldChange,padj), paste0(exp_name, "_DE_genes.tsv")) 
-
-pdf(file = paste0(exp_name, "_raw_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
-aheatmap(matDGEgenes, Rowv = TRUE , Colv = TRUE , distfun = "euclidean" , hclustfun = "average" )
-dev.off()
-
-# Get normalized counts and write this to a file
-normalized_counts = counts(ddsMat,normalized=TRUE)
-
-# Turn it into a dataframe to have proper column names.
-normalized_counts_dt = data.frame("gene_id"=rownames(normalized_counts),normalized_counts)
-gene = subset(normalized_counts_dt, gene_id %in% DGEgenes)[1]
-vals = as.matrix(subset(normalized_counts_dt, gene_id %in% DGEgenes)[2:ncol(normalized_counts_dt)])
-#gene = normalized_counts_dt[1]
-#vals = as.matrix(normalized_counts_dt[2:ncol(normalized_counts_dt)])
-
-# Adds a little noise to each element
-# To avoid the clusteing function failing on zero
-# variance datalines.
-vals = jitter(vals, factor = 1, amount=0.00001)
-
-# Calculate zscore
-score = NULL
-for (i in 1:nrow(vals)) {
-  row=vals[i,]
-  zscore=(row-mean(row))/sd(row)
-  score =rbind(score,zscore)
+for (feature_name in c("gene", "transcript")) {
+  for (experiment in c(1, 2, 3)) {
+    setwd("~/ablab/analysis/UK/DIE/new_pb_novel/ensembl//")
+    pdfWidth=11
+    pdfHeight=8;
+    
+    countData = read.table(paste0("ADAR.PB2025.", feature_name, "_grouped_counts.tsv"), header=TRUE, sep="\t", row.names=1 )
+    names(countData)
+    
+    if (experiment == 1) {
+      exp_name = "WT_vs_B1A_novel"
+      countData <- countData[,c(1,2,3,7,8,9)]
+    }
+    if (experiment == 2) {
+      exp_name = "WT_vs_1B_novel"
+      countData <- countData[,c(4,5,6,7,8,9)]
+    }
+    if (experiment == 3) {
+      exp_name = "WT_vs_ID7_novel"
+      countData <- countData[,c(10,11,12,7,8,9)]
+    }
+    
+    samples = names(countData)
+    samplesData = read.table("samples_short.tsv", header=TRUE, sep="\t", row.names=1 )
+    head(samplesData)
+    
+    # Build the dataframe from the conditions
+    condition = factor(samplesData[row.names(samplesData) %in% samples,][[2]])
+    colData = data.frame(samples=samples, condition=condition)
+    summary(colData)
+    
+    # create DeSeq object
+    ddsMat = DESeqDataSetFromMatrix(countData=countData, colData=colData, design = ~condition)
+    
+    #Set the reference to be compared
+    ddsMat$condition = relevel(ddsMat$condition,"WT")
+    
+    ddsMat <- DESeq(ddsMat)
+    
+    # normalize data
+    counts_normalized <- counts(ddsMat, normalized=TRUE)
+    counts_stabilized <-getVarianceStabilizedData(ddsMat)
+    norm_df <- mutate(as.data.frame(counts_normalized), gene_id = row.names(counts_normalized)) 
+    #write_tsv(norm_df, "deseq_normalization.tsv")
+    logNormCounts <- log2(counts_normalized + 1)
+    
+    #log count pearson corrleation
+    logDist <- as.dist (1 - cor( logNormCounts , method = "pearson" ) )
+    plot(hclust(logDist),labels=colnames(logNormCounts),main=" log transformed read counts distance : Pearson correlation ")
+    
+    # plot PCA
+    pca <- prcomp(t(counts_stabilized))
+    pca_df <- tibble(sample = row.names(pca$x),
+                     PC1 = pca$x[, "PC1"], 
+                     PC2 = pca$x[, "PC2"], 
+                     PC3 = pca$x[, "PC3"]) 
+    
+    require(gridExtra)
+    plot1 <- ggplot(pca_df) +
+      geom_point(aes(PC1, PC2, colour = condition), size = 3) +
+      labs(x = paste0("PC1 (", summary(pca)$importance[2, 1]*100, "%)"),
+           y = paste0("PC2 (", summary(pca)$importance[2, 2]*100, "%)")) +
+      scale_colour_brewer(palette = "Set1") +
+      geom_text_repel(data = pca_df, 
+                      aes(PC1, PC2, label = substr(sample,1,5) ),
+                      min.segment.length = unit(0.5, "lines")) +
+      theme(legend.position = "top")
+    grid.arrange(plot1, ncol = 1)
+    
+    
+    # get DE results
+    res <- results(ddsMat)
+    gene_id <- row.names(res)
+    res <- as.data.frame(res)
+    res <- cbind(gene_id, res)
+    res <- res %>%
+      filter(!is.na(stat)) %>%
+      arrange(desc(stat)) %>%
+      select(gene_id, everything())
+    write_tsv(res,  paste0(exp_name, "_deseq_", feature_name, "s_results.tsv"))
+    
+    #cutoffs
+    p_adj_cutoff <- 0.05
+    log2_cutoff <- 1
+    
+    #volcano plot
+    res %>%
+      filter(!is.na(padj)) %>%
+      ggplot() +
+      geom_point(aes(log2FoldChange, -log10(padj), colour = (abs(log2FoldChange) > log2_cutoff & padj < p_adj_cutoff))) +
+      theme_bw() +
+      scale_color_manual(values = c("black", "red")) +
+      geom_text_repel(data = filter(res, padj < p_adj_cutoff),
+                      aes(log2FoldChange, -log10(padj), label = ""),
+                      min.segment.length = unit(0.1, "lines"))
+    
+    #select DE genes
+    res_sorted <- res[order(res$padj), ]
+    DGEgenes <-  subset ( res_sorted , padj < p_adj_cutoff & abs(log2FoldChange) > log2_cutoff)$gene_id 
+    matDGEgenes <- subset(logNormCounts, gene_id %in% DGEgenes)
+    write_tsv(subset ( res_sorted , gene_id %in% DGEgenes) %>% 
+                select(gene_id,log2FoldChange,padj), paste0(exp_name, "_DE_", feature_name, "s.tsv")) 
+    
+    pdf(file = paste0(exp_name, "_", feature_name, "s_raw_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
+    aheatmap(matDGEgenes, Rowv = TRUE , Colv = TRUE , distfun = "euclidean" , hclustfun = "average" )
+    dev.off()
+    
+    # Get normalized counts and write this to a file
+    normalized_counts = counts(ddsMat,normalized=TRUE)
+    
+    # Turn it into a dataframe to have proper column names.
+    normalized_counts_dt = data.frame("gene_id"=rownames(normalized_counts),normalized_counts)
+    gene = subset(normalized_counts_dt, gene_id %in% DGEgenes)[1]
+    vals = as.matrix(subset(normalized_counts_dt, gene_id %in% DGEgenes)[2:ncol(normalized_counts_dt)])
+    #gene = normalized_counts_dt[1]
+    #vals = as.matrix(normalized_counts_dt[2:ncol(normalized_counts_dt)])
+    
+    # Adds a little noise to each element
+    # To avoid the clusteing function failing on zero
+    # variance datalines.
+    vals = jitter(vals, factor = 1, amount=0.00001)
+    
+    # Calculate zscore
+    score = NULL
+    for (i in 1:nrow(vals)) {
+      row=vals[i,]
+      zscore=(row-mean(row))/sd(row)
+      score =rbind(score,zscore)
+    }
+    zscore=score
+    row.names(zscore) = row.names(gene)
+    
+    # Generate new heatmap
+    mat = as.matrix(zscore)
+    pdf(file = paste0(exp_name, "_zscore_", feature_name, "s_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
+    aheatmap(mat, Colv = NA)
+    #plot(hclust(logDist),labels=colnames(logNormCounts),main=" log transformed read counts distance : Pearson correlation ")
+    #colors = colorRampPalette(c("blue","black","red"),space="rgb")(256)
+    #heatmap.2( mat, col=colors,density.info="none",trace="none", margins=c(10,19), lhei=c(1,7), Colv=NA)
+    dev.off()
+    write_tsv(data.frame(gene,mat),  paste0(exp_name, "_zscore_", feature_name, "s_heatmap.tsv"))
+  }
 }
-zscore=score
-row.names(zscore) = row.names(gene)
-
-# Generate new heatmap
-mat = as.matrix(zscore)
-pdf(file = paste0(exp_name, "_zscore_gene_heatmap.pdf"), width = pdfWidth, height = pdfHeight) 
-aheatmap(mat, Colv = NA)
-#plot(hclust(logDist),labels=colnames(logNormCounts),main=" log transformed read counts distance : Pearson correlation ")
-#colors = colorRampPalette(c("blue","black","red"),space="rgb")(256)
-#heatmap.2( mat, col=colors,density.info="none",trace="none", margins=c(10,19), lhei=c(1,7), Colv=NA)
-dev.off()
-write_tsv(data.frame(gene,mat),  paste0(exp_name, "_zscore_gene_heatmap.tsv"))
-
 
 
 # == heatmap with gene clusters ==
