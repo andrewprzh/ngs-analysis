@@ -69,15 +69,16 @@ def create_template_stereo(sequence, barcode, umi):
     return reverese_complement(template_seq)
 
 
-VISIUM_HD_PRIMER = "ACACGACGCTCTTCCGATCT"
+VISIUM_HD_3PRIMER = "CTACACGACGCTCTTCCGATCT"
+VISIUM_HD_5PRIMER = "ATGTACTCTGCGTTGATACCACTGCTT"
 VISIUM_HD_BC_LEN = 30
 VISIUM_HD_UMI_LEN = 10
 
 
 def create_template_visiumhd(sequence: str, barcode: str, umi:str):
     barcode = barcode.replace("|", "")
-    barcoded_part = VISIUM_HD_PRIMER + umi + barcode
-    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence)
+    barcoded_part = VISIUM_HD_3PRIMER + umi + barcode
+    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + VISIUM_HD_5PRIMER
     return reverese_complement(template_seq)
 
 
