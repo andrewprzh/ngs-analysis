@@ -38,19 +38,22 @@ def compute_metrics(tp, fp, fn):
     recall = tp / (tp + fp + fn) if (tp + fp + fn) > 0 else 0.0
     return precision, recall
 
-def get_spot_ids(barcode, part1_to_coord2, part2_to_coord1, spot_map):
+def get_spot_ids(barcode, part1_to_coord2, part2_to_coord1, spot_map, is_barcode_seq=True):
     """Convert barcode (p1|p2) into spot IDs at 2um, 8um, 16um."""
-    try:
-        p1, p2 = barcode.split("|")
-    except ValueError:
-        return None  # malformed
+    if is_barcode_seq:
+        try:
+            p1, p2 = barcode.split("|")
+        except ValueError:
+            return None  # malformed
 
-    if p1 not in part1_to_coord2 or p2 not in part2_to_coord1:
-        return None
+        if p1 not in part1_to_coord2 or p2 not in part2_to_coord1:
+            return None
 
-    coord1 = part2_to_coord1[p2]
-    coord2 = part1_to_coord2[p1]
-    spot2um = f"s_002um_{coord1}_{coord2}"
+        coord1 = part2_to_coord1[p2]
+        coord2 = part1_to_coord2[p1]
+        spot2um = f"s_002um_{coord1}_{coord2}"
+    else:
+        spot2um = barcode
 
     if spot2um not in spot_map:
         return None
@@ -61,7 +64,7 @@ def get_spot_ids(barcode, part1_to_coord2, part2_to_coord1, spot_map):
         "16um": spot_map[spot2um]["16um"],
     }
 
-def evaluate(reads_file, part1_to_coord2, part2_to_coord1, spot_map):
+def evaluate(reads_file, part1_to_coord2, part2_to_coord1, spot_map, assignment_type='seq'):
     counts = {level: Counter() for level in ["2um", "8um", "16um"]}
 
     with open(reads_file, newline='') as f:
@@ -79,7 +82,8 @@ def evaluate(reads_file, part1_to_coord2, part2_to_coord1, spot_map):
             true_barcode = parse_true_barcode(read_id)
 
             true_spots = get_spot_ids(true_barcode, part1_to_coord2, part2_to_coord1, spot_map)
-            pred_spots = get_spot_ids(pred_barcode, part1_to_coord2, part2_to_coord1, spot_map)
+            pred_spots = get_spot_ids(pred_barcode, part1_to_coord2, part2_to_coord1, spot_map,
+                                      is_barcode_seq=(assignment_type == 'seq'))
 
             if not true_spots or not pred_spots:
                 for level in ["2um", "8um", "16um"]:
@@ -112,13 +116,15 @@ def main():
     parser.add_argument("part1_to_coord2", help="TSV mapping part1 -> coord2")
     parser.add_argument("part2_to_coord1", help="TSV mapping part2 -> coord1")
     parser.add_argument("spot_map", help="TSV mapping 2um -> 8um,16um spot IDs")
+    parser.add_argument("--assignment", choices=['spot', 'seq'], default='seq',
+                        help="barcode assignment type [spot | seq]")
     args = parser.parse_args()
 
     part1_to_coord2 = load_simple_mapping(args.part1_to_coord2)
     part2_to_coord1 = load_simple_mapping(args.part2_to_coord1)
     spot_map = load_spot_mapping(args.spot_map)
 
-    results = evaluate(args.reads_tsv, part1_to_coord2, part2_to_coord1, spot_map)
+    results = evaluate(args.reads_tsv, part1_to_coord2, part2_to_coord1, spot_map, args.assignment)
 
     print("Level\tPrecision\tRecall\tTP\tFP\tFN")
     for level in ["2um", "8um", "16um"]:
