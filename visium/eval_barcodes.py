@@ -31,6 +31,8 @@ def parse_true_barcode(read_id):
     parts = read_id.split("_")
     if len(parts) < 4:
         raise ValueError(f"Unexpected read_id format: {read_id}")
+    if read_id.startswith('PacBio'):
+        return parts[7]
     return parts[3]
 
 def compute_metrics(tp, fp, fn):
@@ -96,7 +98,7 @@ def evaluate(reads_file, part1_to_coord2, part2_to_coord1, spot_map, assignment_
                 else:
                     counts[level]["fp"] += 1
                     c += 1
-                    #if c < 20: print("%s %s %s %s" % (read_id, true_spots[level], pred_spots[level], level))
+                    if c < 20: print("%s %s %s %s %s" % (read_id, pred_barcode, true_spots[level], pred_spots[level], level))
                     #counts[level]["fn"] += 1
 
     results = {}
