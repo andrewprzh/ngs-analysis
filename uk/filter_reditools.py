@@ -21,10 +21,11 @@ class PositionFilter:
         # chr + strand -> position
         self.position_dict = defaultdict(set)
         self.position_rna_cov = defaultdict(list)
+        self.position_rna_sub_cov = defaultdict(list)
         self.args = args
 
     def update(self, reditools_output):
-        self.position_dict = defaultdict(set)
+#        self.position_dict = defaultdict(set)
         for l in open(reditools_output):
             if l.startswith("Region"): continue
             v = l.strip().split("\t")
@@ -55,18 +56,21 @@ class PositionFilter:
                 continue
 
             self.position_rna_cov[(chr_id, position)].append(rna_cov)
+            self.position_rna_sub_cov[(chr_id, position)].append(rna_cov * rna_freq)
 
-#            if rna_sub != dna_sub or rna_freq > dna_freq:
-#                if rna_sub == "AG":
-            self.position_dict[chr_id + strand].add(position)
-#                elif rna_sub == "TC":
-#                    self.position_dict[chr_id + "-"].add(position)
+            if rna_sub != dna_sub or rna_freq > dna_freq:
+                if rna_sub == "AG":
+                     self.position_dict[chr_id + strand].add(position)
+                elif rna_sub == "TC":
+                    self.position_dict[chr_id + "-"].add(position)
 
     def filter_coverage(self):
         new_position_dict = defaultdict(set)
         for chr_strand in self.position_dict:
             for pos in self.position_dict[chr_strand]:
                 chr_id = chr_strand[:-1]
+                if sum(self.position_rna_sub_cov[(chr_id, pos)]) < len(self.position_rna_sub_cov[(chr_id, pos)]) / 2:
+                    continue
                 if self.args.min_cov_strategy == 1:
                     if all(x >= self.args.min_rna_cov for x in self.position_rna_cov[(chr_id, pos)]):
                         new_position_dict[chr_strand].add(pos)
