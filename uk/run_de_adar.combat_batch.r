@@ -9,7 +9,6 @@ library(gplots)
 library(RColorBrewer)
 library(pheatmap)
 library(sva)
-library(gridExtra)
 
 theme_set(theme_bw())
 
@@ -49,21 +48,18 @@ plot_pca <- function(countData, samplesData, out_prefix) {
                    PC2 = pca$x[, "PC2"], 
                    PC3 = pca$x[, "PC3"]) 
   
-  #  require(gridExtra)
+  require(gridExtra)
   pdf(file = paste0(out_prefix, "_PCA.pdf"), width = pdfWidth, height = pdfHeight) 
-  #plotPCA(vst(ddsMatAll, blind = FALSE), intgroup = "condition")
-  
   plot1 <- ggplot(pca_df) +
     geom_point(aes(PC1, PC2, colour = condition), size = 3) +
     labs(x = paste0("PC1 (", summary(pca)$importance[2, 1]*100, "%)"),
          y = paste0("PC2 (", summary(pca)$importance[2, 2]*100, "%)")) +
     scale_colour_brewer(palette = "Set1") +
     geom_text_repel(data = pca_df, 
-                    aes(PC1, PC2, label = substr(sample,1,5) ),
+                    aes(PC1, PC2, label = sample ),
                     min.segment.length = unit(0.5, "lines")) +
     theme(legend.position = "top")
   grid.arrange(plot1, ncol = 1)
-    
   dev.off()
 }
 
@@ -72,7 +68,7 @@ pdfHeight=8;
 for (ann in c("Ensemble", "RefSeq")) {
   folder_prefix = tolower(ann)
   for (folder in c(folder_prefix, paste0(folder_prefix, "_novel"))) {
-    wd <- paste0("~/ablab/analysis/UK/DIE/revio_no_bc/", folder, "/")
+    wd <- paste0("~/ablab/analysis/UK/DIE/revio/", folder, "/")
     setwd(wd)
     samplesData = read.table("../new_samples.tsv", header=TRUE, sep="\t", row.names=1 )
     
@@ -80,14 +76,13 @@ for (ann in c("Ensemble", "RefSeq")) {
       #removing batch effect
       rawData = read.table(paste0("ADAR.PB.", ann, ".", feature_name, "_grouped_counts.tsv.header.tsv"), header=TRUE, sep="\t", row.names=1 )
       plot_pca(rawData, samplesData, paste0(folder, "_", feature_name, "_raw_data"))
-      combat_counts <- rawData
       
-      #combat_counts <- ComBat_seq(
-      #  as.matrix(rawData),
-      #  batch = samplesData$batch,
-      #  group = samplesData$group 
-      #)
-      #plot_pca(combat_counts, samplesData, paste0(folder, "_", feature_name, "_batch_corrected"))
+      combat_counts <- ComBat_seq(
+        as.matrix(rawData),
+        batch = samplesData$batch,
+        group = samplesData$group 
+      )
+      plot_pca(combat_counts, samplesData, paste0(folder, "_", feature_name, "_batch_corrected"))
 
       # === RUN DE analysis ===
       for (experiment in c(1, 2, 4, 5)) {
@@ -210,5 +205,3 @@ for (ann in c("Ensemble", "RefSeq")) {
     }
   }
 }  
-
-
