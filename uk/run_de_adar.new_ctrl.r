@@ -72,7 +72,7 @@ pdfHeight=8;
 for (ann in c("Ensemble", "RefSeq")) {
   folder_prefix = tolower(ann)
   for (folder in c(folder_prefix, paste0(folder_prefix, "_novel"))) {
-    wd <- paste0("~/ablab/analysis/UK/DIE/revio_no_bc/", folder, "/")
+    wd <- paste0("~/ablab/analysis/UK/DIE/revio/", folder, "/")
     setwd(wd)
     samplesData = read.table("../new_samples.tsv", header=TRUE, sep="\t", row.names=1 )
     

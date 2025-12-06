@@ -69,7 +69,7 @@ for (ann in c("Ensemble", "RefSeq")) {
   folder_prefix <- tolower(ann)
   
   for (folder in c(folder_prefix, paste0(folder_prefix, "_novel"))) {
-    wd <- paste0("~/ablab/analysis/UK/DIE/revio_limma//", folder, "/")
+    wd <- paste0("~/ablab/analysis/UK/DIE/revio_limma/", folder, "/")
     setwd(wd)
     
     samplesData <- read.table("../new_samples.tsv", 
@@ -111,7 +111,10 @@ for (ann in c("Ensemble", "RefSeq")) {
                " (raw, batch in model)")
       
       # Remove batch effect for visualization only
-      v_corrected <- removeBatchEffect(v$E, batch = batch, design = design)
+      group_design <- model.matrix(~0 + group)
+      colnames(group_design) <- gsub("group", "", colnames(group_design))
+      
+      v_corrected <- removeBatchEffect(v$E, batch = batch, design = group_design)
       plot_pca(v_corrected, samplesData, 
                paste0(folder, "_", feature_name, "_batch_corrected"),
                " (batch corrected)")
@@ -141,14 +144,6 @@ for (ann in c("Ensemble", "RefSeq")) {
       for (comp_info in comparisons_info) {
         test_name <- comp_info$test
         control_name <- comp_info$control
-        
-        # Check if group names need X prefix (if they start with a number)
-        if (grepl("^[0-9]", test_name)) {
-          test_name <- paste0("X", test_name)
-        }
-        if (grepl("^[0-9]", control_name)) {
-          control_name <- paste0("X", control_name)
-        }
         
         # Check if these groups exist in the design
         if (test_name %in% colnames(design) && control_name %in% colnames(design)) {
@@ -238,7 +233,8 @@ for (ann in c("Ensemble", "RefSeq")) {
         
         # Get normalized counts (logCPM) for ALL samples
         logCPM <- cpm(dge, log = TRUE)
-        matDGEgenes <- logCPM[DGEgenes, , drop = FALSE]
+        selected_samples = rownames(samplesData)[samplesData$group %in% c(comparisons_info[[i]]$test, comparisons_info[[i]]$control)]
+        matDGEgenes <- logCPM[DGEgenes, selected_samples, drop = FALSE]
         
         # Write DE genes
         res %>%
@@ -277,4 +273,4 @@ for (ann in c("Ensemble", "RefSeq")) {
   }
 }
 
-cat("\n=== Analysis complete ===\n
+cat("\n=== Analysis complete ===\n")

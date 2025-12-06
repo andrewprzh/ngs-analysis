@@ -68,7 +68,7 @@ for (ann in c("Ensemble", "RefSeq")) {
   folder_prefix <- tolower(ann)
   
   for (folder in c(folder_prefix, paste0(folder_prefix, "_novel"))) {
-    wd <- paste0("~/ablab/analysis/UK/DIE/revio/", folder, "/")
+    wd <- paste0("~/ablab/analysis/UK/DIE/revio_deseq_batch/", folder, "/")
     setwd(wd)
     
     samplesData <- read.table("../new_samples.tsv", 
@@ -117,13 +117,16 @@ for (ann in c("Ensemble", "RefSeq")) {
                paste0(folder, "_", feature_name, "_raw_data"),
                " (batch in model)")
       
-      # Remove batch effect for visualization only
+      # Remove batch effect for visualization only using DESeq2's approach
+      # This uses the dispersion estimates and design from DESeq2
       mat <- assay(vsd)
-      mat_corrected <- limma::removeBatchEffect(mat, batch = batch, 
-                                                design = model.matrix(~ group))
-      plot_pca(mat_corrected, samplesData,
-               paste0(folder, "_", feature_name, "_batch_corrected"),
-               " (batch corrected)")
+      
+      # Alternative 1: Use limma's removeBatchEffect (keeps original approach)
+      #mat_corrected_limma <- limma::removeBatchEffect(mat, batch = batch, 
+      #                                                design = model.matrix(~ group))
+      #plot_pca(mat_corrected_limma, samplesData,
+      #         paste0(folder, "_", feature_name, "_batch_corrected_limma"),
+      #         " (batch corrected - limma)")
       
       # === RUN DE analysis ===
       
