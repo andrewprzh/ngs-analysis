@@ -98,7 +98,7 @@ def evaluate(reads_file, part1_to_coord2, part2_to_coord1, spot_map, assignment_
                 else:
                     counts[level]["fp"] += 1
                     c += 1
-                    if c < 20: print("%s %s %s %s %s" % (read_id, pred_barcode, true_spots[level], pred_spots[level], level))
+                    #if c < 20: print("%s %s %s %s %s" % (read_id, pred_barcode, true_spots[level], pred_spots[level], level))
                     #counts[level]["fn"] += 1
 
     results = {}
@@ -131,7 +131,7 @@ def main():
     print("Level\tPrecision\tRecall\tTP\tFP\tFN")
     for level in ["2um", "8um", "16um"]:
         r = results[level]
-        print(f"{level}\t{r['precision']:.3f}\t{r['recall']:.3f}\t{r['tp']}\t{r['fp']}\t{r['fn']}")
+        print(f"{level}\t{r['precision']:.4f}\t{r['recall']:.4f}\t{r['tp']}\t{r['fp']}\t{r['fn']}")
 
 if __name__ == "__main__":
     main()
