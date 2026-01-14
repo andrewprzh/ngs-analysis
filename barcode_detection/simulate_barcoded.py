@@ -78,7 +78,7 @@ VISIUM_HD_UMI_LEN = 10
 def create_template_visiumhd(sequence: str, barcode: str, umi:str):
     barcode = barcode.replace("|", "")
     barcoded_part = VISIUM_HD_3PRIMER + umi + barcode
-    template_seq = barcoded_part + "T" * POLYA_LEN + reverese_complement(sequence) + VISIUM_HD_5PRIMER
+    template_seq = barcoded_part + get_random_seq(2, 2) + "T" * POLYA_LEN + reverese_complement(sequence) + VISIUM_HD_5PRIMER
     return reverese_complement(template_seq)
 
 
