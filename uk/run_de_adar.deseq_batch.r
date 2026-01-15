@@ -102,7 +102,7 @@ for (ann in c("Ensemble", "RefSeq")) {
       )
       
       # Pre-filtering: remove low count features
-      keep <- rowSums(counts(dds)) >= 10
+      keep <- rowSums(counts(dds)) >= 1
       dds <- dds[keep, ]
       cat("Kept", sum(keep), "out of", length(keep), "features after filtering\n")
       
@@ -119,7 +119,7 @@ for (ann in c("Ensemble", "RefSeq")) {
       
       # Remove batch effect for visualization only using DESeq2's approach
       # This uses the dispersion estimates and design from DESeq2
-      mat <- assay(vsd)
+      # mat <- assay(vsd)
       
       # Alternative 1: Use limma's removeBatchEffect (keeps original approach)
       #mat_corrected_limma <- limma::removeBatchEffect(mat, batch = batch, 
@@ -213,7 +213,8 @@ for (ann in c("Ensemble", "RefSeq")) {
         # Get normalized counts for ALL samples
         normalized_counts <- counts(dds, normalized = TRUE)
         logNormCounts <- log2(normalized_counts + 1)
-        matDGEgenes <- logNormCounts[DGEgenes, , drop = FALSE]
+        selected_samples = rownames(samplesData)[samplesData$group %in% c(comp_info$test, comp_info$control)]
+        matDGEgenes <- logNormCounts[DGEgenes, selected_samples, drop = FALSE]
         
         # Write DE genes
         res_df %>%
