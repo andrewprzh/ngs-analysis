@@ -37,7 +37,7 @@ def parse_true_barcode(read_id):
 
 def compute_metrics(tp, fp, fn):
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fp + fn) if (tp + fp + fn) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     return precision, recall
 
 def get_spot_ids(barcode, part1_to_coord2, part2_to_coord1, spot_map, is_barcode_seq=True):
