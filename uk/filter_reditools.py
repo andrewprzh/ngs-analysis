@@ -62,7 +62,7 @@ class PositionFilter:
                 if rna_sub == "AG":
                      self.position_dict[chr_id + strand].add(position)
                 elif rna_sub == "TC":
-                    self.position_dict[chr_id + "-"].add(position)
+                     self.position_dict[chr_id + "-"].add(position)
 
     def filter_coverage(self):
         new_position_dict = defaultdict(set)

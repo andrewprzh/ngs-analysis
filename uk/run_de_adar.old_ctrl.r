@@ -89,7 +89,7 @@ for (ann in c("Ensemble", "RefSeq")) {
       #plot_pca(combat_counts, samplesData, paste0(folder, "_", feature_name, "_batch_corrected"))
 
       # === RUN DE analysis ===
-      for (experiment in c(1, 2, 4, 5)) {
+      for (experiment in c(1,2,4,5)) {
         if (experiment == 1) {
           exp_name = paste0("B1A_vs_WT.", folder)
           countData <- combat_counts[,c(1,2,3,7,8,9)]
@@ -115,7 +115,7 @@ for (ann in c("Ensemble", "RefSeq")) {
         head(samplesData)
         
         # Build the data frame from the conditions
-        condition = factor(samplesData[row.names(samplesData) %in% samples,][[2]])
+        condition = factor(samplesData[match(samples, row.names(samplesData)), ][[2]])
         colData = data.frame(samples=samples, condition=condition)
         summary(colData)
         
