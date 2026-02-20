@@ -28,6 +28,7 @@ TSO = "CCCATGTACTCTGCGTTGATACCACTGCTT"
 R1 = "CTACACGACGCTCTTCCGATCT" # R1
 BARCODE_LEN_10X = 16
 UMI_LEN_10X = 12
+UMI_LEN_10X_V2 = 10
 
 
 STEREO_LINKER = "TTGTCTTCCTAAGAC"
@@ -122,7 +123,7 @@ def parse_args():
     parser.add_argument("--barcodes", "-b", help="barcode list (random if not set)", type=str)
     parser.add_argument("--umis", "-u", help="UMI list (random if not set)", type=str)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
-    parser.add_argument("--mode", help="[spatial | 10x | stereo | visium_hd]", type=str, default="stereo")
+    parser.add_argument("--mode", help="[spatial | 10x | 10x_v2 | stereo | visium_hd]", type=str, default="stereo")
     parser.add_argument("--concatenate_templates", action="store_true", help="concatenate different cDNA templates together", default=False)
 
     args = parser.parse_args()
@@ -143,6 +144,10 @@ def main():
     if args.mode == "10x":
         bc_len = BARCODE_LEN_10X
         umi_len = UMI_LEN_10X
+        template_func = create_template_10x
+    elif args.mode == "10x_v2":
+        bc_len = BARCODE_LEN_10X
+        umi_len = UMI_LEN_10X_V2
         template_func = create_template_10x
     elif args.mode == "spatial":
         bc_len = BC_LENGTH
