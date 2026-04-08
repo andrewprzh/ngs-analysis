@@ -64,7 +64,7 @@ plot_pca <- function(transformed_data, samplesData, out_prefix, title_suffix = "
 pdfWidth <- 11
 pdfHeight <- 8
 
-for (ann in c("Ensemble", "RefSeq")) {
+for (ann in c("Ensemble94")) {
   folder_prefix <- tolower(ann)
   
   for (folder in c(folder_prefix, paste0(folder_prefix, "_novel"))) {

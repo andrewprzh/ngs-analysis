@@ -65,7 +65,7 @@ plot_pca <- function(countData, samplesData, out_prefix) {
 
 pdfWidth=11
 pdfHeight=8;
-for (ann in c("Ensemble", "RefSeq")) {
+for (ann in c("Ensemble94")) {
   folder_prefix = tolower(ann)
   for (folder in c(folder_prefix, paste0(folder_prefix, "_novel"))) {
     wd <- paste0("~/ablab/analysis/UK/DIE/revio/", folder, "/")
