@@ -76,6 +76,7 @@ def main():
     )
     parser.add_argument("input", help="Input FASTA/FASTQ (optionally .gz) or SAM/BAM/CRAM file")
     parser.add_argument("-o", "--output", help="Output TSV (default: <input>.tsv)")
+    parser.add_argument('--polya', action='store_true', default=False, help='some transcript may have undersdcore in their id')
     args = parser.parse_args()
 
     fmt = detect_format(args.input)
@@ -83,7 +84,12 @@ def main():
 
     counts = Counter()
     for read_id in iter_read_ids(args.input, fmt):
-        counts[read_id.split("_", 1)[0]] += 1
+        v = read_id.split("_", 5)
+        if args.polya and len(v) > 3 and v[3] == 'aligned':
+            transcript_id = v[0] + '_' + v[1]
+        else:
+            transcript_id = v[0]
+        counts[transcript_id] += 1
 
     with open(output, "w") as out:
         out.write("#id\tcount\n")
