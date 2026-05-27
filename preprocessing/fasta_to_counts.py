@@ -7,6 +7,7 @@ from collections import Counter
 
 FASTA_EXTS = (".fasta", ".fa", ".fna")
 FASTQ_EXTS = (".fastq", ".fq")
+BAM_EXTS = (".bam", ".sam", ".cram")
 
 
 def open_seq(path):
@@ -22,6 +23,8 @@ def detect_format(path):
         return "fasta"
     if low.endswith(FASTQ_EXTS):
         return "fastq"
+    if low.endswith(BAM_EXTS):
+        return "bam"
     raise ValueError(f"Cannot infer format from filename: {path}")
 
 
@@ -32,6 +35,19 @@ def default_output(path):
 
 
 def iter_read_ids(path, fmt):
+    if fmt == "bam":
+        try:
+            import pysam
+        except ImportError as e:
+            raise SystemExit("pysam is required for BAM/SAM/CRAM input: pip install pysam") from e
+        mode = {"bam": "rb", "sam": "r", "cram": "rc"}[path.lower().rsplit(".", 1)[-1]]
+        with pysam.AlignmentFile(path, mode, check_sq=False) as af:
+            for rec in af:
+                if rec.is_secondary or rec.is_supplementary:
+                    continue
+                yield rec.query_name
+        return
+
     with open_seq(path) as f:
         if fmt == "fasta":
             for line in f:
@@ -54,11 +70,11 @@ def iter_read_ids(path, fmt):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Count reads per transcript from a simulated FASTA/FASTQ "
+        description="Count reads per transcript from a simulated FASTA/FASTQ/BAM "
                     "(transcript id = read id split by '_', first element). "
-                    "Supports plain and gzip-compressed input."
+                    "Supports plain and gzip-compressed FASTA/FASTQ, plus SAM/BAM/CRAM."
     )
-    parser.add_argument("input", help="Input FASTA/FASTQ file (optionally .gz)")
+    parser.add_argument("input", help="Input FASTA/FASTQ (optionally .gz) or SAM/BAM/CRAM file")
     parser.add_argument("-o", "--output", help="Output TSV (default: <input>.tsv)")
     args = parser.parse_args()
 
