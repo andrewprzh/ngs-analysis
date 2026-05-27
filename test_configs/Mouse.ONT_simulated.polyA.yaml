@@ -1,0 +1,19 @@
+name: Mouse.ONT_simulated.polyA
+output: /abga/work/andreyp/ci_isoquant/output
+run_type: polya_prediction
+genome: /abga/work/andreyp/data/reference/mouse/GRCm39.primary_assembly.genome.fa
+genedb: /abga/work/andreyp/data/reference/mouse/gencode.vM36.basic.annotation.gtf
+reads: /abga/work/coroari/thesis_model/polya/simulated_aligned_reads_mouse_1.fasta
+datatype: ont
+isoquant_options: '"-t 16 --complete_genedb --no_model_construction --force "'
+reference_polya_gtf: /abga/work/coroari/thesis_model/polya/updated_mouse_polya_1.gtf
+simulated_counts: /abga/work/andreyp/ci_isoquant/data/mouse/simulated_aligned_reads_mouse_1.tsv
+
+baselines:
+  polya_prediction:
+    precision: 96.0
+    recall: 82.0
+    precision_known: 96.0
+    recall_known: 79.0
+    precision_novel: 97.0
+    recall_novel: 87.0

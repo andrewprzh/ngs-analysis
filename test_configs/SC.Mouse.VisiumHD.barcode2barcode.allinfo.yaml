@@ -1,0 +1,12 @@
+name: SC.Mouse.VisiumHD.barcode2barcode.allinfo
+output: /abga/work/andreyp/ci_isoquant/output
+run_type: allinfo
+genome: /abga/work/andreyp/data/reference/mouse/GRCm39.primary_assembly.genome.fa
+genedb: /abga/work/andreyp/data/reference/mouse/gencode.vM36.basic.annotation.gtf
+bam: /abga/work/andreyp/ci_isoquant/data/barcodes/Mouse.VisiumHD.800K.aligned.bam
+datatype: ont
+isoquant_options: '"-m visium_hd --complete_genedb --barcoded_reads /abga/work/andreyp/ci_isoquant/data/barcodes/Mouse.VisiumHD.800K.barcoded_reads.tsv
+  --barcode2barcode /abga/work/andreyp/data/visium/spaceranger/barcode_seq_to_spots.tsv
+  --large_output allinfo --no_model_construction -t 10"'
+edit_distance: '4'
+check_input_files: UMI_filtered.barcode_barcode_col0.ED4.allinfo.gz UMI_filtered.barcode_barcode_col0.ED4.stats.tsv

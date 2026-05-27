@@ -1,0 +1,30 @@
+name: Mouse.ONT_simulated.R10.no_gtf
+output: /abga/work/andreyp/ci_isoquant/output
+run_type: transcripts,quantification_novel
+genome: /abga/work/andreyp/data/reference/mouse/GRCm39.primary_assembly.genome.fa
+bam: /abga/work/andreyp/ci_isoquant/data/mouse/Mouse.ONT.R10.4.simulated.sorted.bam
+datatype: ont
+isoquant_options: '"-t 12 --complete_genedb  --force "'
+reduced_db: /abga/work/andreyp/ci_isoquant/data/ref/mouse/no_db/mouse.gencode.M26.spatial
+reference_tpm: /abga/work/andreyp/ci_isoquant/data/mouse/Mouse.ONT.R10.4.simulated.counts.tsv
+baselines:
+  transcripts:
+    full_recall: 54.2
+    full_precision: 89.0
+    known_recall: -1.0
+    known_precision: -1.0
+    novel_recall: 54.2
+    novel_precision: 89.0
+  quantification_novel:
+    reported_overlap: 19240.0
+    corr_overlap: 0.9083
+    good_matches_overlap: 407.0
+    fair_matches_overlap: 879.0
+    false_reports_overlap: 0.0
+    missed_overlap: 0.0
+    reported_full: 21603.0
+    corr_full: 0.5226
+    good_matches_full: 407.0
+    fair_matches_full: 879.0
+    false_reports_full: 2363.0
+    missed_full: 16430.0
