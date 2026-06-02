@@ -1,0 +1,40 @@
+# General terms
+multiomics
+multi-omic
+multi omics
+integrative omics
+omics integration
+cross-omics
+panomics
+pan-omics
+trans-omics
+transomics
+multi-layer omics
+multi-modal omics
+multimodal omics
+
+# Data integration terms
+data integration
+integrative analysis
+multi-view
+latent factor
+network integration
+cross-platform integration
+fusion
+joint analysis
+
+# Common omics combinations (pairwise; RNA-Seq as transcriptomics synonym)
+genomics transcriptomics
+genomics proteomics
+genomics metabolomics
+transcriptomics proteomics
+transcriptomics metabolomics
+proteomics metabolomics
+genomics RNASeq
+RNASeq proteomics
+RNASeq metabolomics
+single-cell multiomics
+spatial multiomics
+spatial omics
+epigenomics transcriptomics
+proteogenomics
