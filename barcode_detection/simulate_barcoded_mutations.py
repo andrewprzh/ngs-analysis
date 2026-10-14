@@ -7,7 +7,8 @@
 # Generates error-free barcoded templates (as simulate_barcoded.py) with somatic variants
 # (SNVs, insertions, deletions) introduced into the cDNA part.
 # Variants are placed in genomic coordinates within the exons of expressed transcripts, so all isoforms covering
-# a variant carry it. Each variant is assigned to a random subset of barcodes (carriers); every template from a carrier
+# a variant carry it. Each variant is assigned to a set of carrier barcodes: a random subset of the whitelist or,
+# if --barcode_coords is given, all barcodes within a vertical stripe of the slide. Every template from a carrier
 # barcode that covers the variant carries the alternative allele with probability --allele_fraction.
 #
 # Notes:
@@ -26,16 +27,25 @@ from traceback import print_exc
 import numpy
 import pysam
 
-from simulate_barcoded import (create_template_10x, create_template_visiumhd, load_counts, load_barcodes,
-                               get_random_seq, reverese_complement, BARCODE_LEN_10X, UMI_LEN_10X, UMI_LEN_10X_V2,
-                               VISIUM_HD_BC_LEN, VISIUM_HD_UMI_LEN)
+import simulate_barcoded
+from simulate_barcoded import (create_template_10x, create_template_visiumhd, create_template_stereo, load_counts,
+                               load_barcodes, get_random_seq, BARCODE_LEN_10X, UMI_LEN_10X, UMI_LEN_10X_V2,
+                               VISIUM_HD_BC_LEN, STEREO_BC_LEN, STEREO_UMI_LEN)
 
+
+# Visium HD UMI is 9 bp (spaceranger chemistry SPATIAL-HD-v1, confirmed on real R1 reads),
+# followed directly by the barcode and 2 non-T bases before polyT
+VISIUM_HD_UMI_LEN = 9
 
 MODES = {"10x": (BARCODE_LEN_10X, UMI_LEN_10X, create_template_10x),
          "10x_v2": (BARCODE_LEN_10X, UMI_LEN_10X_V2, create_template_10x),
-         "visium_hd": (VISIUM_HD_BC_LEN, VISIUM_HD_UMI_LEN, create_template_visiumhd)}
+         "visium_hd": (VISIUM_HD_BC_LEN, VISIUM_HD_UMI_LEN, create_template_visiumhd),
+         "stereo": (STEREO_BC_LEN, STEREO_UMI_LEN, create_template_stereo)}
 
 NUCLS = "ACGT"
+COMPLEMENT = str.maketrans("ACGTN", "TGCAN")
+ALT_UNIT = 1 << 32
+MAX_RANDOM_CARRIER_BYTES = 10 ** 10
 SNV, INS, DEL = "SNV", "INS", "DEL"
 BIN_SIZE = 10000
 MAX_ATTEMPTS_PER_VARIANT = 1000
@@ -267,12 +277,81 @@ class VariantSampler:
         return variants
 
 
-def assign_carriers(variants, barcode_count, args):
-    for v in variants:
-        v.carrier_fraction = random.uniform(args.min_carrier_fraction, args.max_carrier_fraction)
-        carrier_count = max(1, round(v.carrier_fraction * barcode_count))
-        v.carriers = numpy.zeros(barcode_count, dtype=bool)
-        v.carriers[random.sample(range(barcode_count), carrier_count)] = True
+def fast_reverse_complement(seq):
+    return seq.translate(COMPLEMENT)[::-1]
+
+
+# template functions from simulate_barcoded.py reverse-complement the whole cDNA, use a faster implementation
+simulate_barcoded.reverese_complement = fast_reverse_complement
+
+
+class RandomCarriers:
+    # each variant is carried by a random subset of barcodes
+    header = "#variant_id\tbarcodes\n"
+
+    def __init__(self, variants, barcodes, args):
+        self.barcodes = barcodes
+        if len(barcodes) * len(variants) > MAX_RANDOM_CARRIER_BYTES:
+            print("Too many barcodes for random carriers, provide --barcode_coords")
+            exit(-1)
+        for v in variants:
+            carrier_count = max(1, round(random.uniform(args.min_carrier_fraction, args.max_carrier_fraction) *
+                                         len(barcodes)))
+            v.carriers = numpy.zeros(len(barcodes), dtype=bool)
+            v.carriers[random.sample(range(len(barcodes)), carrier_count)] = True
+            v.carrier_fraction = carrier_count / len(barcodes)
+
+    def is_carrier(self, v, bc_index):
+        return v.carriers[bc_index]
+
+    def carrier_count(self, v):
+        return int(v.carriers.sum())
+
+    def describe(self, v):
+        return ",".join(self.barcodes[i] for i in numpy.flatnonzero(v.carriers))
+
+
+class StripeCarriers:
+    # each variant is carried by barcodes with x_from <= x < x_to, the stripe covers the variant's carrier fraction
+    header = "#variant_id\tx_from\tx_to\n"
+
+    def __init__(self, variants, barcode_x, args):
+        self.barcode_x = barcode_x
+        self.sorted_x = numpy.sort(barcode_x[~numpy.isnan(barcode_x)])
+        n = len(self.sorted_x)
+        for v in variants:
+            fraction = random.uniform(args.min_carrier_fraction, args.max_carrier_fraction)
+            x_from = self.sorted_x[min(n - 1, int(random.uniform(0, 1 - fraction) * n))]
+            start = numpy.searchsorted(self.sorted_x, x_from, 'left')
+            end = start + max(1, round(fraction * len(barcode_x)))
+            if end < n and self.sorted_x[end] == x_from:
+                end = numpy.searchsorted(self.sorted_x, x_from, 'right')
+            v.carriers = (float(x_from), float(self.sorted_x[end]) if end < n else numpy.inf)
+            v.carrier_fraction = self.carrier_count(v) / len(barcode_x)
+
+    def is_carrier(self, v, bc_index):
+        return v.carriers[0] <= self.barcode_x[bc_index] < v.carriers[1]
+
+    def carrier_count(self, v):
+        return int(numpy.searchsorted(self.sorted_x, v.carriers[1], 'left') -
+                   numpy.searchsorted(self.sorted_x, v.carriers[0], 'left'))
+
+    def describe(self, v):
+        return "%g\t%g" % v.carriers
+
+
+def load_barcode_x(inf, barcodes):
+    x_dict = {}
+    for l in open(inf):
+        if l.startswith("#"):
+            continue
+        v = l.split("\t")
+        x_dict[v[0]] = float(v[1])
+    barcode_x = numpy.array([x_dict.get(bc, numpy.nan) for bc in barcodes])
+    missing = int(numpy.isnan(barcode_x).sum())
+    if missing:
+        print("Warning: %d barcodes have no coordinates and will never carry variants" % missing)
+    return barcode_x
 
 
 def transcript_sequence(genome, transcript):
@@ -292,7 +371,7 @@ def apply_variants(seq, edits):
     return seq
 
 
-def write_vcf(fname, variants, transcripts, genome, args):
+def write_vcf(fname, variants, carriers, transcripts, genome, args):
     contig_order = {c: i for i, c in enumerate(genome.references)}
     with open(fname, "w") as vcf:
         vcf.write("##fileformat=VCFv4.2\n")
@@ -314,7 +393,7 @@ def write_vcf(fname, variants, transcripts, genome, args):
             t_ids = [t_id for t_id, _ in v.transcripts]
             genes = sorted(set(transcripts[t_id].gene_name for t_id in t_ids))
             info = "TYPE=%s;LEN=%d;CF=%.4f;NCARRIERS=%d;TRANSCRIPTS=%s;GENES=%s;ALT_MOL=%d;COV_MOL=%d" % \
-                   (v.vtype, v.length(), v.carrier_fraction, int(v.carriers.sum()), ",".join(t_ids), ",".join(genes),
+                   (v.vtype, v.length(), v.carrier_fraction, carriers.carrier_count(v), ",".join(t_ids), ",".join(genes),
                     v.alt_templates, v.covering_templates)
             vcf.write("%s\t%d\t%s\t%s\t%s\t.\tPASS\t%s\n" % (v.chrom, pos, v.variant_id, ref, alt, info))
 
@@ -327,7 +406,9 @@ def parse_args():
     parser.add_argument("--genome", help="reference genome (indexed FASTA)", required=True, type=str)
     parser.add_argument("--gtf", help="gene annotation in GTF format", required=True, type=str)
     parser.add_argument("--counts", "-c", help="expression table", type=str, required=True)
-    parser.add_argument("--barcodes", "-b", help="barcode whitelist; for Visium HD pass a subset", type=str, required=True)
+    parser.add_argument("--barcodes", "-b", help="barcode whitelist", type=str, required=True)
+    parser.add_argument("--barcode_coords", help="TSV with barcode and x coordinate (more columns are ignored); "
+                                                 "carriers are then vertical stripes instead of random barcodes", type=str)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--mode", help="[%s]" % " | ".join(MODES.keys()), type=str, default="10x")
     parser.add_argument("--template_count", help="total number of templates to generate", type=int, default=100000)
@@ -342,6 +423,8 @@ def parse_args():
                         type=float, default=0.5)
     parser.add_argument("--min_site_templates", help="minimal number of templates covering a variant site",
                         type=int, default=0)
+    parser.add_argument("--parts", help="split templates into this many files (to limit read simulator memory)",
+                        type=int, default=1)
     parser.add_argument("--seed", help="random seed", type=int, default=0)
 
     args = parser.parse_args()
@@ -361,7 +444,7 @@ def main():
     args = parse_args()
     random.seed(args.seed)
     numpy.random.seed(args.seed)
-    bc_len, umi_len, template_func = MODES[args.mode]
+    _, umi_len, template_func = MODES[args.mode]
 
     genome = pysam.FastaFile(args.genome)
     barcodes = load_barcodes(args.barcodes)
@@ -391,7 +474,10 @@ def main():
     for i, v in enumerate(variants):
         v.index = i
         v.variant_id = "VAR_%d" % i
-    assign_carriers(variants, len(barcodes), args)
+    if args.barcode_coords:
+        carriers = StripeCarriers(variants, load_barcode_x(args.barcode_coords, barcodes), args)
+    else:
+        carriers = RandomCarriers(variants, barcodes, args)
 
     # transcript -> list of (genomic offset, variant)
     transcript_variants = defaultdict(list)
@@ -407,62 +493,73 @@ def main():
             expr_table.write("%s\t%d\t%.4f\n" % (t_id, count_dict[t_id], scale_factor * count_dict[t_id]))
     print("Saved templates counts to %s" % counts_file)
 
-    # (variant index, barcode index) -> [alt templates, covering templates]
-    cell_counts = defaultdict(lambda: [0, 0])
-    template_fname = args.output + ".templates.fasta"
-    output_fasta = open(template_fname, "w")
-    output_counts = open(args.output + ".template_counts.tsv", "w")
+    # variant index * barcode count + barcode index -> alt templates * ALT_UNIT + covering templates
+    cell_counts = defaultdict(int)
+    barcode_count = len(barcodes)
+    if args.parts == 1:
+        part_prefixes = [args.output]
+    else:
+        part_prefixes = ["%s.part%d" % (args.output, k + 1) for k in range(args.parts)]
+    output_fastas = [open(prefix + ".templates.fasta", "w") for prefix in part_prefixes]
+    output_counts = [open(prefix + ".template_counts.tsv", "w") for prefix in part_prefixes]
     output_template_variants = open(args.output + ".template_variants.tsv", "w")
     output_template_variants.write("#template_id\tvariant_id\ttranscript_id\ttranscript_pos\ttype\n")
     mutated_templates = 0
+    template_number = 0
     for t_id in count_dict:
         transcript = transcripts[t_id]
         reference_seq = transcript_sequence(genome, transcript)
         assert len(reference_seq) == transcript.length
         for i in range(count_dict[t_id]):
-            bc_index = random.randrange(len(barcodes))
+            bc_index = random.randrange(barcode_count)
             bc = barcodes[bc_index]
-            umi = get_random_seq(umi_len, 0)
+            umi = "".join(random.choices(NUCLS, k=umi_len))
             seq_id = "READ_%d_%s_%s_%s_+" % (i, t_id, bc, umi)
 
             edits = []
             for offset, v in transcript_variants.get(t_id, []):
-                counts = cell_counts[(v.index, bc_index)]
-                counts[1] += 1
+                key = v.index * barcode_count + bc_index
+                cell_counts[key] += 1
                 v.covering_templates += 1
-                if v.carriers[bc_index] and random.random() < args.allele_fraction:
-                    counts[0] += 1
+                if carriers.is_carrier(v, bc_index) and random.random() < args.allele_fraction:
+                    cell_counts[key] += ALT_UNIT
                     v.alt_templates += 1
                     edits.append((offset, v))
                     output_template_variants.write("%s\t%s\t%s\t%d\t%s\n" % (seq_id, v.variant_id, t_id,
                                                                             v.transcript_pos(transcript, offset), v.vtype))
             seq = apply_variants(reference_seq, edits)
             if transcript.strand == '-':
-                seq = reverese_complement(seq)
+                seq = fast_reverse_complement(seq)
             if edits:
                 mutated_templates += 1
 
-            output_fasta.write(">%s\n%s\n" % (seq_id, template_func(seq, bc, umi)))
-            output_counts.write("%s\t%d\t%.4f\n" % (seq_id, 1, scale_factor))
-    output_fasta.close()
-    output_counts.close()
+            part = template_number % args.parts
+            template_number += 1
+            output_fastas[part].write(">%s\n%s\n" % (seq_id, template_func(seq, bc, umi)))
+            output_counts[part].write("%s\t%d\t%.4f\n" % (seq_id, 1, scale_factor))
+    for f in output_fastas + output_counts:
+        f.close()
     output_template_variants.close()
-    print("Saved %d templates (%d with variants) to %s" % (sum(count_dict.values()), mutated_templates, template_fname))
+    print("Saved %d templates (%d with variants) to %s.templates.fasta" %
+          (template_number, mutated_templates, args.output if args.parts == 1 else args.output + ".part*"))
 
     vcf_fname = args.output + ".variants.vcf"
-    write_vcf(vcf_fname, variants, transcripts, genome, args)
+    write_vcf(vcf_fname, variants, carriers, transcripts, genome, args)
     print("Saved %d variants to %s" % (len(variants), vcf_fname))
 
     with open(args.output + ".variant_carriers.tsv", "w") as outf:
-        outf.write("#variant_id\tbarcodes\n")
+        outf.write(carriers.header)
         for v in variants:
-            outf.write("%s\t%s\n" % (v.variant_id, ",".join(barcodes[i] for i in numpy.flatnonzero(v.carriers))))
+            outf.write("%s\t%s\n" % (v.variant_id, carriers.describe(v)))
 
     with open(args.output + ".variant_cell_counts.tsv", "w") as outf:
         outf.write("#variant_id\tbarcode\tis_carrier\talt_templates\tcovering_templates\n")
-        for (v_index, bc_index), (alt, cov) in sorted(cell_counts.items()):
+        for key in sorted(cell_counts.keys()):
+            v_index, bc_index = divmod(key, barcode_count)
             v = variants[v_index]
-            outf.write("%s\t%s\t%d\t%d\t%d\n" % (v.variant_id, barcodes[bc_index], int(v.carriers[bc_index]), alt, cov))
+            alt, cov = divmod(cell_counts[key], ALT_UNIT)
+            outf.write("%s\t%s\t%d\t%d\t%d\n" % (v.variant_id, barcodes[bc_index], int(carriers.is_carrier(v, bc_index)),
+                                                  alt, cov))
     print("Saved ground truth to %s.{variant_carriers,variant_cell_counts,template_variants}.tsv" % args.output)
 
 
