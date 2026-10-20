@@ -38,9 +38,9 @@ TSO5 = "CCCGCCTCTCAGTACGTCAGCAG"
 STEREO_BC_LEN = 25
 STEREO_UMI_LEN = 10
 
+# defaults for --strand_switch_prob and --concat_probabilities (P of 1, 2, 3, 4 molecules)
 CONCAT_STRAND_SWITCH_PROB = 0.4
 CONCAT_PROBABILITIES = [0.5, 0.35, 0.1, 0.05]
-CONCAT_COUNT = [1,2,3,4]
 
 NUCLS = ['A', 'C', 'G', 'T']
 VNUCLS =  ['A', 'C', 'G']
@@ -73,7 +73,7 @@ def create_template_stereo(sequence, barcode, umi):
 VISIUM_HD_3PRIMER = "CTACACGACGCTCTTCCGATCT"
 VISIUM_HD_5PRIMER = "ATGTACTCTGCGTTGATACCACTGCTT"
 VISIUM_HD_BC_LEN = 30
-VISIUM_HD_UMI_LEN = 10
+VISIUM_HD_UMI_LEN = 9
 
 
 def create_template_visiumhd(sequence: str, barcode: str, umi:str):
@@ -125,13 +125,30 @@ def parse_args():
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--mode", help="[spatial | 10x | 10x_v2 | stereo | visium_hd]", type=str, default="stereo")
     parser.add_argument("--concatenate_templates", action="store_true", help="concatenate different cDNA templates together", default=False)
+    parser.add_argument("--concat_probabilities", type=str, default=",".join(map(str, CONCAT_PROBABILITIES)),
+                        help="comma-separated probabilities of 1, 2, 3, ... molecules per template "
+                             "(with --concatenate_templates), default %(default)s")
+    parser.add_argument("--strand_switch_prob", type=float, default=CONCAT_STRAND_SWITCH_PROB,
+                        help="probability of each concatenated molecule to be reverse-complemented "
+                             "(with --concatenate_templates), default %(default)s")
+    parser.add_argument("--seed", type=int, help="random seed")
 
     args = parser.parse_args()
+    args.concat_probabilities = [float(p) for p in args.concat_probabilities.split(",")]
+    if any(p < 0 for p in args.concat_probabilities) or abs(sum(args.concat_probabilities) - 1.0) > 1e-6:
+        print("--concat_probabilities must be non-negative and sum to 1, got %s" % args.concat_probabilities)
+        exit(-1)
+    if not 0 <= args.strand_switch_prob <= 1:
+        print("--strand_switch_prob must be within [0, 1], got %f" % args.strand_switch_prob)
+        exit(-1)
     return args
 
 
 def main():
     args = parse_args()
+    if args.seed is not None:
+        random.seed(args.seed)
+        numpy.random.seed(args.seed)
     isoforms = SeqIO.to_dict(SeqIO.parse(args.transcriptome, "fasta"))
     print("Loaded %d reference sequences from %s" % (len(isoforms), args.transcriptome))
     barcodes = load_barcodes(args.barcodes) if args.barcodes else []
@@ -176,23 +193,26 @@ def main():
     template_fname = args.output + ".templates.fasta"
     output_fasta = open(template_fname, "w")
     output_counts = open(args.output + ".template_counts.tsv", "w")
+    # NanoSim treats the first line of the expression file as a header and skips it
+    output_counts.write("#template_id\tcounts\ttpm\n")
+    concat_counts = list(range(1, len(args.concat_probabilities) + 1))
     for t_id in count_dict:
         transcript_seq = isoforms[t_id]
         template_list = []
         for i in range(count_dict[t_id]):
             seq_id = "READ_%d_%s" % (i, t_id)
             if args.concatenate_templates:
-                template_count = numpy.random.choice(CONCAT_COUNT, p=CONCAT_PROBABILITIES)
+                template_count = numpy.random.choice(concat_counts, p=args.concat_probabilities)
             else:
                 template_count = 1
 
             template = ""
             for j in range(template_count):
                 bc = barcodes[random.randint(0, len(barcodes) - 1)] if barcodes else get_random_seq(bc_len)
-                umi = barcodes[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 0)
+                umi = umis[random.randint(0, len(umis) - 1)] if umis else get_random_seq(umi_len, 0)
                 sub_template = template_func(transcript_seq, bc, umi)
                 strand = "+"
-                if args.concatenate_templates and numpy.random.random() < CONCAT_STRAND_SWITCH_PROB:
+                if args.concatenate_templates and numpy.random.random() < args.strand_switch_prob:
                     strand = "-"
                     sub_template = reverese_complement(sub_template)
 
