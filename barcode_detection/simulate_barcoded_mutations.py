@@ -7,8 +7,9 @@
 # Generates error-free barcoded templates (as simulate_barcoded.py) with somatic variants
 # (SNVs, insertions, deletions) introduced into the cDNA part.
 # Variants are placed in genomic coordinates within the exons of expressed transcripts, so all isoforms covering
-# a variant carry it. Each variant is assigned to a set of carrier barcodes: a random subset of the whitelist or,
-# if --barcode_coords is given, all barcodes within a vertical stripe of the slide. Every template from a carrier
+# a variant carry it. Each variant is assigned to a set of carrier barcodes: a random subset of the whitelist,
+# all barcodes within a vertical stripe of the slide (--barcode_coords) or cells of chosen cell types
+# (--barcode_cell_types: a single type, 2-3 types exclusively or one dominant type). Every template from a carrier
 # barcode that covers the variant carries the alternative allele with probability --allele_fraction.
 #
 # Notes:
@@ -310,6 +311,101 @@ class RandomCarriers:
     def describe(self, v):
         return ",".join(self.barcodes[i] for i in numpy.flatnonzero(v.carriers))
 
+    def vcf_info(self, v):
+        return ""
+
+
+class CellTypeCarriers:
+    # each variant is carried by cells of chosen cell types:
+    # single - a fraction of cells of one type, no other cells;
+    # multi - a fraction of cells of each of 2-3 types (within one lineage if lineages are given), no other cells;
+    # dominant - a fraction of cells of one type plus a small fraction of all other cells
+    header = "#variant_id\tct_mode\tcell_types\tbarcodes\n"
+    vcf_header = ['##INFO=<ID=CT_MODE,Number=1,Type=String,Description="Carrier cell type mode: single, multi or dominant">',
+                  '##INFO=<ID=CELL_TYPES,Number=.,Type=String,Description="Cell types carrying the variant">']
+    MODES = ["single", "multi", "dominant"]
+
+    def __init__(self, variants, barcodes, barcode_types, type_lineages, args):
+        self.barcodes = barcodes
+        if len(barcodes) * len(variants) > MAX_RANDOM_CARRIER_BYTES:
+            print("Too many barcodes for cell type carriers")
+            exit(-1)
+        type_cells = defaultdict(list)
+        for i, t in enumerate(barcode_types):
+            if t is not None:
+                type_cells[t].append(i)
+        self.types = sorted(type_cells.keys())
+        lineage_types = defaultdict(list)
+        for t in self.types:
+            if t in type_lineages:
+                lineage_types[type_lineages[t]].append(t)
+        multi_type_lineages = sorted(l for l, types in lineage_types.items() if len(types) >= 2)
+        mode_weights = [float(x) for x in args.ct_mode_fractions.split(",")]
+
+        for v in variants:
+            v.ct_mode = random.choices(self.MODES, weights=mode_weights)[0]
+            if v.ct_mode == "multi":
+                type_count = random.choice([2, 3])
+                if multi_type_lineages:
+                    candidates = lineage_types[random.choice(multi_type_lineages)]
+                else:
+                    candidates = self.types
+                v.cell_types = sorted(random.sample(candidates, min(type_count, len(candidates))))
+            else:
+                v.cell_types = [random.choice(self.types)]
+
+            v.carriers = numpy.zeros(len(barcodes), dtype=bool)
+            for t in v.cell_types:
+                fraction = random.uniform(args.min_type_carrier_fraction, args.max_type_carrier_fraction)
+                carrier_count = max(1, round(fraction * len(type_cells[t])))
+                v.carriers[random.sample(type_cells[t], carrier_count)] = True
+            if v.ct_mode == "dominant":
+                other_cells = [i for t in self.types if t not in v.cell_types for i in type_cells[t]]
+                carrier_count = round(random.uniform(0, args.max_offtype_fraction) * len(other_cells))
+                v.carriers[random.sample(other_cells, carrier_count)] = True
+            v.carrier_fraction = self.carrier_count(v) / len(barcodes)
+
+    def is_carrier(self, v, bc_index):
+        return v.carriers[bc_index]
+
+    def carrier_count(self, v):
+        return int(v.carriers.sum())
+
+    def describe(self, v):
+        return "%s\t%s\t%s" % (v.ct_mode, ",".join(v.cell_types),
+                               ",".join(self.barcodes[i] for i in numpy.flatnonzero(v.carriers)))
+
+    def vcf_info(self, v):
+        return ";CT_MODE=%s;CELL_TYPES=%s" % (v.ct_mode, ",".join(v.cell_types))
+
+
+def load_barcode_types(inf, barcodes):
+    type_dict = {}
+    for l in open(inf):
+        if l.startswith("#"):
+            continue
+        v = l.rstrip("\n").split("\t")
+        if len(v) >= 2:
+            type_dict[v[0]] = v[1]
+    barcode_types = [type_dict.get(bc) for bc in barcodes]
+    missing = sum(1 for t in barcode_types if t is None)
+    if missing:
+        print("Warning: %d barcodes have no cell type and will never carry variants" % missing)
+    return barcode_types
+
+
+def load_type_lineages(inf):
+    if not inf:
+        return {}
+    lineages = {}
+    for l in open(inf):
+        if l.startswith("#"):
+            continue
+        v = l.rstrip("\n").split("\t")
+        if len(v) >= 2:
+            lineages[v[0]] = v[1]
+    return lineages
+
 
 class StripeCarriers:
     # each variant is carried by barcodes with x_from <= x < x_to, the stripe covers the variant's carrier fraction
@@ -338,6 +434,9 @@ class StripeCarriers:
 
     def describe(self, v):
         return "%g\t%g" % v.carriers
+
+    def vcf_info(self, v):
+        return ""
 
 
 def load_barcode_x(inf, barcodes):
@@ -387,6 +486,8 @@ def write_vcf(fname, variants, carriers, transcripts, genome, args):
         vcf.write('##INFO=<ID=GENES,Number=.,Type=String,Description="Genes of the covering transcripts">\n')
         vcf.write('##INFO=<ID=ALT_MOL,Number=1,Type=Integer,Description="Templates carrying the variant">\n')
         vcf.write('##INFO=<ID=COV_MOL,Number=1,Type=Integer,Description="Templates covering the variant">\n')
+        for l in getattr(carriers, "vcf_header", []):
+            vcf.write(l + "\n")
         vcf.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
         for v in sorted(variants, key=lambda x: (contig_order[x.chrom], x.pos)):
             pos, ref, alt = v.vcf_record(genome)
@@ -394,7 +495,7 @@ def write_vcf(fname, variants, carriers, transcripts, genome, args):
             genes = sorted(set(transcripts[t_id].gene_name for t_id in t_ids))
             info = "TYPE=%s;LEN=%d;CF=%.4f;NCARRIERS=%d;TRANSCRIPTS=%s;GENES=%s;ALT_MOL=%d;COV_MOL=%d" % \
                    (v.vtype, v.length(), v.carrier_fraction, carriers.carrier_count(v), ",".join(t_ids), ",".join(genes),
-                    v.alt_templates, v.covering_templates)
+                    v.alt_templates, v.covering_templates) + carriers.vcf_info(v)
             vcf.write("%s\t%d\t%s\t%s\t%s\t.\tPASS\t%s\n" % (v.chrom, pos, v.variant_id, ref, alt, info))
 
 
@@ -409,6 +510,19 @@ def parse_args():
     parser.add_argument("--barcodes", "-b", help="barcode whitelist", type=str, required=True)
     parser.add_argument("--barcode_coords", help="TSV with barcode and x coordinate (more columns are ignored); "
                                                  "carriers are then vertical stripes instead of random barcodes", type=str)
+    parser.add_argument("--barcode_cell_types", help="TSV with barcode and cell type; carriers are then chosen "
+                                                     "within cell types (see --ct_mode_fractions)", type=str)
+    parser.add_argument("--cell_type_lineages", help="TSV with cell type and lineage; variants carried by several "
+                                                     "types take them from one lineage", type=str)
+    parser.add_argument("--ct_mode_fractions", help="fractions of variants carried by a single type, by 2-3 types "
+                                                    "exclusively and by one dominant type plus a few other cells",
+                        type=str, default="0.5,0.25,0.25")
+    parser.add_argument("--min_type_carrier_fraction", help="minimal fraction of cells of a carrier type carrying "
+                                                            "the variant", type=float, default=0.3)
+    parser.add_argument("--max_type_carrier_fraction", help="maximal fraction of cells of a carrier type carrying "
+                                                            "the variant", type=float, default=1.0)
+    parser.add_argument("--max_offtype_fraction", help="maximal fraction of other cells carrying a variant with "
+                                                       "a dominant type", type=float, default=0.05)
     parser.add_argument("--output", "-o", help="output prefix", type=str, required=True)
     parser.add_argument("--mode", help="[%s]" % " | ".join(MODES.keys()), type=str, default="10x")
     parser.add_argument("--template_count", help="total number of templates to generate", type=int, default=100000)
@@ -436,6 +550,17 @@ def parse_args():
         exit(-1)
     if not 0 <= args.min_carrier_fraction <= args.max_carrier_fraction <= 1:
         print("Invalid carrier fractions")
+        exit(-1)
+    if args.barcode_coords and args.barcode_cell_types:
+        print("--barcode_coords and --barcode_cell_types cannot be used together")
+        exit(-1)
+    mode_fractions = args.ct_mode_fractions.split(",")
+    if len(mode_fractions) != 3 or any(float(x) < 0 for x in mode_fractions) or sum(map(float, mode_fractions)) <= 0:
+        print("--ct_mode_fractions needs 3 non-negative values")
+        exit(-1)
+    if not 0 < args.min_type_carrier_fraction <= args.max_type_carrier_fraction <= 1 or \
+            not 0 <= args.max_offtype_fraction <= 1:
+        print("Invalid cell type carrier fractions")
         exit(-1)
     return args
 
@@ -476,6 +601,9 @@ def main():
         v.variant_id = "VAR_%d" % i
     if args.barcode_coords:
         carriers = StripeCarriers(variants, load_barcode_x(args.barcode_coords, barcodes), args)
+    elif args.barcode_cell_types:
+        carriers = CellTypeCarriers(variants, barcodes, load_barcode_types(args.barcode_cell_types, barcodes),
+                                    load_type_lineages(args.cell_type_lineages), args)
     else:
         carriers = RandomCarriers(variants, barcodes, args)
 
