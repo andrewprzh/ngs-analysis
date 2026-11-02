@@ -36,7 +36,8 @@ call_variants.py --read_info SAMPLE.read_info.tsv.gz --umi_groups SAMPLE.UMI_fil
 ```
 - **Reads:**
   - Only reads assigned to a single gene are used (`--gene_assignment_types`).
-  - The BAM must be the original one with all reads, not the deduplicated BAM.
+  - The BAM must be the original one with all reads, not the deduplicated BAM. Several BAMs (e.g. two runs that
+    IsoQuant processed as one experiment) can be given to `--bam`; they are read as one.
   - Only primary alignments are used. Exons reached only by supplementary alignments are not seen; see the open items.
 - **Variants:**
   - SNVs, and indels up to `--max_indel_len` (10) bp.
@@ -68,8 +69,10 @@ call_variants.py --read_info SAMPLE.read_info.tsv.gz --umi_groups SAMPLE.UMI_fil
     aligned bases of an alignment end. Introns are skipped and soft clips don't count.
     - This catches adapter bases aligned past transcript ends: the TSO (ending in GGG) at the 5' end and the polyA at
       the 3' end. Nearly every full-length read then shows the "variant", so VAF approaches 100%.
-  - **`editing`:** A>G on the transcript strand in at least half of the stranded alt molecules, i.e. genomic A>G in
-    + strand molecules or T>C in − strand ones.
+  - **`editing`:** A>G (A-to-I) or C>T (C-to-U) on the transcript strand in at least half of the stranded alt
+    molecules, i.e. genomic A>G or C>T in + strand molecules, T>C or G>A in − strand ones.
+    - C>T was added on 2026-11-02, after recurring transcript C>T sites in 3′UTRs (Cpe, Pla2g7, Sparcl1) on
+      Stereo-seq. C>T is also the most common somatic substitution, so this flag marks many real candidates too.
     - The strand is that of each molecule's assigned isoform (read_info), so overlapping genes on opposite strands
       are handled per molecule. The same rule sets `editing_like`.
   - **`homopolymer`:** an indel overlapping or next to (1 bp) a reference run of at least `--homopolymer_flag_len` (5)
@@ -90,22 +93,56 @@ call_variants.py --read_info SAMPLE.read_info.tsv.gz --umi_groups SAMPLE.UMI_fil
   1. Count molecules with at least one alt read, an upper bound that selects the candidates.
   2. Compute the molecule consensus at the candidates: totals and alt molecules per barcode. Apply the cut-offs and the error test.
   3. Only for loci with reported sites: count depth per barcode, alt read positions and alt molecule strands at those sites.
+  - Reads of a UMI group can extend past the locus of their molecule (the locus span comes from the representative
+    read), so two loci can report the same allele. Their records count different molecules and are merged into one
+    when the job outputs are concatenated: UMIs and per-barcode counts are summed, and the error test and flags are
+    recomputed. This happened for 1 of 453K sites on Stereo-seq S2_AE_ONT and 3 sites in the 10x simulation.
   - Depth per barcode is left out of pass 2 on purpose. At deep loci, pass 1 keeps nearly every covered position
     (errors alone pass it), and almost every (candidate, barcode) pair is covered. Counting them all took most of the
     time and up to 50 GB per worker.
   - A full 20M-read 10x dataset takes 35–50 min on 30 threads, and the 50M-read Visium HD dataset about 2 h.
 
 ## 2. Phase 2 filters
+- **All three filters take `--restrict_to SITES`:** only the variants also present in another call set are tested,
+  and the correction runs over their tests only.
+  - It is used for sites called on both PacBio and ONT of the same Stereo-seq slide, which sequenced the same cDNA
+    (72% of S1 PacBio Cpe molecules have an exact barcode+UMI match in ONT).
+  - Requiring both calls removes platform-specific sequencing errors and 25–45x of the ONT tests. On the first
+    Stereo-seq run, this recovered 3–13 more region passers per ONT sample.
 - **`celltype_filter.py`:** `--sites --barcode_counts --cell_types barcode_types.tsv -o PREFIX`.
   - For each variant and type: a one-sided Fisher's exact test of alt vs ref UMIs in the type against all other typed
     barcodes. BH correction is across all variant × type tests.
   - Outputs: `PREFIX.celltype_tests.tsv` and `PREFIX.celltype_sites.tsv` (best type and the significant types).
+- **`region_filter.py`:** `--sites --barcode_counts --barcode_regions TSV [--region_column N] [--cell_types TSV --types A,B] -o PREFIX`.
+  - The same one-sided Fisher test as the cell-type filter, for pre-defined tissue regions: each region against all
+    other regions. UMIs are pooled over the region, so it has more power than Moran's I.
+  - The test is run once over all barcodes with a region, and once within each cell type: the type's barcodes in the
+    region against the type's barcodes elsewhere. The within-type test keeps a region from standing out only because
+    of its cell-type mix.
+  - Only variants that pass over all cells are tested within types (hierarchical testing). Testing every variant
+    within types gave up to 11M tests per Stereo-seq sample, too many for BH to pass consistent but moderate signals.
+  - BH correction runs separately over the all-cells tests and over the within-type tests.
+  - Outputs: `PREFIX.region_tests.tsv`, `PREFIX.region_sites.tsv` (best region, significant regions) and
+    `PREFIX.region_type_sites.tsv` (the same, written as `type:region`).
 - **`spatial_filter.py`:** `--sites --barcode_counts --barcode_to_cell map.tsv (--cell_coords | --barcode_coords) -o PREFIX`.
   - Barcodes are summed per cell, and every covering cell gets alt / depth.
-  - The test is Spl-IsoFind's `moransI_sparse`: kNN Moran's I, a permutation p-value and a BY q-value.
-  - The Spl-IsoFind parameters `--k --nperm --mincells --mincellspergroup --imb` keep the package defaults unless set.
-    The default `mincellspergroup=20` means a variant needs at least 20 cells with alt fraction above 0.5 to be tested.
-  - Output: `PREFIX.spatial_sites.tsv`.
+  - **Which variants are tested:** those passing Spl-IsoFind's filters. A variant needs at least `--mincells` (50)
+    covering cells and values that vary. When cells lie on both sides of 0.5, each side needs at least
+    `--mincellspergroup` (20) cells and a share of at least `--imb` (0.05).
+  - **Analytic test:** Moran's I over Spl-IsoFind's kNN graph (`--k` 10), computed by esda, with a one-sided
+    analytic p-value: the z-score under randomisation, so there is no permutation floor. BH runs over the tested
+    variants.
+  - **Permutation check:** variants with analytic q < `--fdr` are rerun with Spl-IsoFind's `moransI_sparse` and
+    `--check_perm` (1M) permutations. Those p-values replace the analytic ones, BH is recomputed, and `pass` means
+    checked and final q < `--fdr`.
+  - **Why (2026-11-02):** Spl-IsoFind's 100K permutations floor p at 1e-5. BY over 2–15K tests then needs dozens of
+    variants at that floor before any passes, so nothing passed on Stereo-seq. Analytic p-values are too optimistic in
+    the tail for our skewed values: on S1_AE_PB, 15 passed analytically and 2 after the check. The Moran's I values
+    are identical to Spl-IsoFind's.
+  - **Memory and speed:** the barcode counts are streamed one variant at a time (each variant's lines must be
+    consecutive), and only testable variants are kept. S1_AE_PB takes 2 min and 2 GB; the old version needed more
+    than 340 GB on S1_AE_ONT.
+  - Output: `PREFIX.spatial_sites.tsv` with Moran's I, z, analytic p and q, permutation p, final q and pass.
 - **`make_bin_cells.py`:** groups grid barcodes into square bins as pseudo-cells, e.g. Visium HD 2 µm into 8 µm when
   there is no segmentation.
 
@@ -194,10 +231,6 @@ These are debugging and benchmark scripts for the simulated datasets, with hard-
   coordinates.
 
 ## 6. Open items
-- **Duplicate rows:** a few sites are reported twice in `sites.tsv`, once from each of two adjacent loci whose reads
-  cover the same position: 6–38 rows per dataset, mostly false calls.
-  - The phase 2 filters sum the barcode rows per variant, which is correct because the loci's molecules are disjoint.
-    Only the sites table has the duplicate rows.
 - **Supplementary alignments** are ignored, both here and in IsoQuant, which loses exons of very long genes.
 - **Paralog mismapping** has no flag. Candidate signals from the simulation: alt reads noisier than ref reads, and
   low MAPQ.

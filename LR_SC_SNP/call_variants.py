@@ -27,15 +27,17 @@ Molecules with several reads need a read majority, so their error rate is lower 
 All reported sites are kept; the column `unreliable` lists reasons to doubt a site (or "."):
   read_end     in at least --end_fraction of the alt reads the site is within --end_distance aligned bases of the
                alignment end (adapter bases aligned past transcript ends, e.g. the TSO GGG or the polyA);
-  editing      A>G on the transcript strand (A>G in + strand molecules, T>C in - strand ones) in at least half of the
-               stranded alt molecules; the strand of a molecule is that of its assigned isoform (read_info);
+  editing      A>G or C>T on the transcript strand (A>G / C>T in + strand molecules, T>C / G>A in - strand ones) in
+               at least half of the stranded alt molecules; the strand of a molecule is that of its assigned isoform
+               (read_info);
   homopolymer  an indel overlapping or next to (1 bp) a reference run of at least --homopolymer_flag_len bases.
 
 Each locus (overlapping genes merged) is read up to three times: the first pass counts molecules with at least one
 alt read per allele (an upper bound for the consensus count, used to select candidates), the second pass computes the
 molecule consensus at the candidate sites (totals and alt molecules per barcode) and applies the cut-offs, and the
 third pass, for loci with reported sites, counts depth per barcode, alt read positions and alt molecule strands
-at those sites only.
+at those sites only. Reads of a UMI group can extend past the locus of their molecule, so two loci can report the
+same allele; such records count different molecules and are merged into one.
 
 Outputs:
   PREFIX.sites.tsv              one line per variant allele;
@@ -45,6 +47,7 @@ Outputs:
 
 import argparse
 import gzip
+import heapq
 import logging
 import os
 import shutil
@@ -92,6 +95,9 @@ MIN_CLASS_ALT = 100
 
 # reference runs at most this far from an indel count for the homopolymer flag
 HOMOPOLYMER_FLAG_DISTANCE = 1
+
+# genome change -> isoform strand on which it is A>G or C>T on the transcript (editing-like)
+EDITING_CHANGES = {"A>G": "+", "C>T": "+", "T>C": "-", "G>A": "-"}
 
 
 def open_text(fname):
@@ -379,6 +385,29 @@ class Molecules:
         self.barcode_list = [None] * len(barcode_index)
         for b, i in barcode_index.items():
             self.barcode_list[i] = b
+
+
+class BamSet:
+    """Several indexed BAMs read as one (e.g. two runs of one library): fetch() merges them by position."""
+
+    def __init__(self, fnames):
+        self.bams = [pysam.AlignmentFile(f) for f in fnames]
+        self.references = self.bams[0].references
+        for f, bam in zip(fnames[1:], self.bams[1:]):
+            if bam.references != self.references:
+                raise ValueError("%s has other references than %s" % (f, fnames[0]))
+
+    def fetch(self, chr_id, start, end):
+        if len(self.bams) == 1:
+            return self.bams[0].fetch(chr_id, start, end)
+        return heapq.merge(*(b.fetch(chr_id, start, end) for b in self.bams), key=lambda aln: aln.reference_start)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        for bam in self.bams:
+            bam.close()
 
 
 def locus_alignments(bam, chr_id, start, end, molecules, locus_index):
@@ -898,27 +927,33 @@ def select_sites(cand, acc, alt_genes, molecules, ref, locus_strand, args, stats
     return selected
 
 
-def unreliable_reasons(c, acc, ref, pos, ref_bases, alt_bases, vtype, tx_change, args):
-    """Fraction of alt reads near alignment ends, editing-like (0 / 1) and the reasons to doubt the site."""
+def near_homopolymer(ref, pos, ref_bases, vtype, args):
+    # the window holds the anchor base, the deleted bases (none for insertions) and the next base
+    return vtype != "SNV" and nearby_homopolymer(ref, pos - HOMOPOLYMER_FLAG_DISTANCE, pos + len(ref_bases) - 1 +
+                                                 HOMOPOLYMER_FLAG_DISTANCE) >= args.homopolymer_flag_len
+
+
+def unreliable_reasons(counts, homopolymer, ref_bases, alt_bases, vtype, tx_change, args):
+    """Fraction of alt reads near alignment ends, editing-like (0 / 1) and the reasons to doubt the site.
+    counts: alt reads, alt reads near alignment ends, alt molecules of + and of - strand isoforms."""
+    alt_reads, near_end, alt_plus, alt_minus = counts
     reasons = []
-    end_fraction = acc.alt_reads_near_end[c] / acc.alt_reads[c] if acc.alt_reads[c] else 0.0
-    if acc.alt_reads[c] and end_fraction >= args.end_fraction:
+    end_fraction = near_end / alt_reads if alt_reads else 0.0
+    if alt_reads and end_fraction >= args.end_fraction:
         reasons.append("read_end")
     editing = 0
     if vtype == "SNV":
-        stranded = acc.alt_plus[c] + acc.alt_minus[c]
-        change = ref_bases + ">" + alt_bases
+        stranded = alt_plus + alt_minus
+        strand = EDITING_CHANGES.get(ref_bases + ">" + alt_bases)
         if stranded == 0:
-            editing = int(tx_change == "A>G")
-        elif change == "A>G":
-            editing = int(acc.alt_plus[c] >= 0.5 * stranded)
-        elif change == "T>C":
-            editing = int(acc.alt_minus[c] >= 0.5 * stranded)
+            editing = int(tx_change in ("A>G", "C>T"))
+        elif strand == "+":
+            editing = int(alt_plus >= 0.5 * stranded)
+        elif strand == "-":
+            editing = int(alt_minus >= 0.5 * stranded)
         if editing:
             reasons.append("editing")
-    elif nearby_homopolymer(ref, pos - HOMOPOLYMER_FLAG_DISTANCE,
-                            pos + len(ref_bases) - 1 + HOMOPOLYMER_FLAG_DISTANCE) >= args.homopolymer_flag_len:
-        # the window holds the anchor base, the deleted bases (none for insertions) and the next base
+    elif homopolymer:
         reasons.append("homopolymer")
     return end_fraction, editing, ",".join(reasons) if reasons else "."
 
@@ -937,13 +972,15 @@ def report_sites(chr_id, sites, acc, molecules, ref, args, sites_out, barcodes_o
         a_lo, a_hi = numpy.searchsorted(alt_cand, [c, c + 1])
         d_lo, d_hi = numpy.searchsorted(depth_cand, [c, c + 1])
         variant_id = "%s:%d:%s:%s" % (chr_id, pos, ref_bases, alt_bases)
-        end_fraction, editing, unreliable = unreliable_reasons(c, acc, ref, pos, ref_bases, alt_bases, vtype,
-                                                               tx_change, args)
+        counts = [int(x[c]) for x in (acc.alt_reads, acc.alt_reads_near_end, acc.alt_plus, acc.alt_minus)]
+        end_fraction, editing, unreliable = unreliable_reasons(
+            counts, near_homopolymer(ref, pos, ref_bases, vtype, args), ref_bases, alt_bases, vtype, tx_change, args)
+        # the raw counts (HIDDEN_COLUMNS) are kept for merging records of the same allele and dropped in main
         sites_out.write("\t".join(map(str, [
             chr_id, pos, variant_id, ref_bases, alt_bases, vtype, gene_id, ",".join(sorted(gene_counts)), strand,
             tx_change, editing, hp, alt_umis, depth, int(acc.no_call[c]), "%.4f" % (alt_umis / depth),
             a_hi - a_lo, d_hi - d_lo, cls, "%.3g" % rate, "%.3g" % pvalue, "%.3f" % end_fraction,
-            unreliable])) + "\n")
+            unreliable] + counts)) + "\n")
         alt_by_bc = dict(zip((alt_keys[a_lo:a_hi] % n_bc).tolist(), alt_counts[a_lo:a_hi].tolist()))
         for bc, d in zip((depth_keys[d_lo:d_hi] % n_bc).tolist(), depth_counts[d_lo:d_hi].tolist()):
             barcodes_out.write("%s\t%s\t%d\t%d\n" % (variant_id, molecules.barcode_list[bc], alt_by_bc.get(bc, 0), d))
@@ -967,7 +1004,7 @@ def process_job(job):
     strands = locus_strands(molecules)
     sites_file, barcodes_file = (os.devnull, os.devnull) if estimate else \
         (job_prefix + ".sites.tsv", job_prefix + ".barcodes.tsv")
-    with pysam.AlignmentFile(args.bam) as bam, pysam.FastaFile(args.reference) as fasta, \
+    with BamSet(args.bam) as bam, pysam.FastaFile(args.reference) as fasta, \
             open(sites_file, "w") as sites_out, open(barcodes_file, "w") as bc_out:
         for locus_index, (start, end) in enumerate(loci):
             if selected is not None and locus_index not in selected:
@@ -1002,6 +1039,93 @@ SITES_HEADER = ["#chrom", "pos", "variant_id", "ref", "alt", "type", "gene_id", 
                 "tx_change", "editing_like", "homopolymer_len", "alt_umis", "depth_umis", "no_call_umis", "vaf",
                 "alt_barcodes", "covered_barcodes", "error_class", "error_rate", "error_pvalue", "alt_end_fraction",
                 "unreliable"]
+# raw counts after the site columns of the job outputs, for merging records of the same allele
+HIDDEN_COLUMNS = ["alt_reads", "alt_reads_near_end", "alt_plus", "alt_minus"]
+
+
+def merge_site_records(records, barcode_counts, args):
+    """One record from the records of an allele reported by several loci, which count different molecules."""
+    col = {name.lstrip("#"): i for i, name in enumerate(SITES_HEADER + HIDDEN_COLUMNS)}
+    best = max(records, key=lambda r: int(r[col["alt_umis"]]))
+    merged = list(best)
+
+    def total(name):
+        return sum(int(r[col[name]]) for r in records)
+
+    alt, depth = total("alt_umis"), total("depth_umis")
+    merged[col["alt_genes"]] = ",".join(sorted({g for r in records for g in r[col["alt_genes"]].split(",") if g}))
+    merged[col["alt_umis"]], merged[col["depth_umis"]] = alt, depth
+    merged[col["no_call_umis"]] = total("no_call_umis")
+    merged[col["vaf"]] = "%.4f" % (alt / depth)
+    merged[col["alt_barcodes"]] = sum(1 for a, _ in barcode_counts.values() if a)
+    merged[col["covered_barcodes"]] = len(barcode_counts)
+    rate = class_rate(args.rates, best[col["error_class"]])
+    merged[col["error_pvalue"]] = "%.3g" % binom.sf(alt - 1, depth, rate)
+    # the homopolymer flag depends on the reference only, so it is the same in every record
+    homopolymer = any("homopolymer" in r[col["unreliable"]] for r in records)
+    end_fraction, editing, unreliable = unreliable_reasons(
+        [total(name) for name in HIDDEN_COLUMNS], homopolymer, best[col["ref"]], best[col["alt"]],
+        best[col["type"]], best[col["tx_change"]], args)
+    merged[col["alt_end_fraction"]] = "%.3f" % end_fraction
+    merged[col["editing_like"]], merged[col["unreliable"]] = editing, unreliable
+    return merged[:len(SITES_HEADER)]
+
+
+def write_outputs(jobs, args):
+    """Concatenate the job outputs in job order, merging the records of alleles reported by several loci.
+    Returns the number of merged alleles."""
+    seen, duplicated = set(), set()
+    for job_prefix, _, _, _ in jobs:
+        for line in open(job_prefix + ".sites.tsv"):
+            vid = line.split("\t", 3)[2]
+            (duplicated if vid in seen else seen).add(vid)
+    del seen
+    records = defaultdict(list)  # duplicated variant id -> its site records (split lines)
+    dup_jobs = set()
+    for j, (job_prefix, _, _, _) in enumerate(jobs):
+        for line in open(job_prefix + ".sites.tsv"):
+            v = line.rstrip("\n").split("\t")
+            if v[2] in duplicated:
+                records[v[2]].append(v)
+                dup_jobs.add(j)
+    barcode_counts = defaultdict(lambda: defaultdict(lambda: [0, 0]))  # variant -> barcode -> [alt, depth]
+    for j in sorted(dup_jobs):
+        for line in open(jobs[j][0] + ".barcodes.tsv"):
+            vid, barcode, alt, depth = line.rstrip("\n").split("\t")
+            if vid in duplicated:
+                counts = barcode_counts[vid][barcode]
+                counts[0] += int(alt)
+                counts[1] += int(depth)
+
+    sites_written, barcodes_written = set(), set()
+    n_columns = len(SITES_HEADER)
+    with open(args.output + ".sites.tsv", "w") as sites_out, \
+            gzip.open(args.output + ".barcode_counts.tsv.gz", "wt", compresslevel=1) as bc_out:
+        sites_out.write("\t".join(SITES_HEADER) + "\n")
+        bc_out.write("#variant_id\tbarcode\talt_umis\tdepth_umis\n")
+        for j, (job_prefix, _, _, _) in enumerate(jobs):
+            for line in open(job_prefix + ".sites.tsv"):
+                v = line.rstrip("\n").split("\t")
+                if v[2] not in duplicated:
+                    sites_out.write("\t".join(v[:n_columns]) + "\n")
+                elif v[2] not in sites_written:
+                    sites_written.add(v[2])
+                    sites_out.write("\t".join(map(str, merge_site_records(records[v[2]], barcode_counts[v[2]], args)))
+                                    + "\n")
+            with open(job_prefix + ".barcodes.tsv") as inf:
+                if j not in dup_jobs:
+                    shutil.copyfileobj(inf, bc_out)
+                    continue
+                for line in inf:
+                    vid = line.split("\t", 1)[0]
+                    if vid not in duplicated:
+                        bc_out.write(line)
+                    elif vid not in barcodes_written:
+                        # all barcodes of a merged allele at its first line, so its lines stay consecutive
+                        barcodes_written.add(vid)
+                        for barcode, (alt, depth) in barcode_counts[vid].items():
+                            bc_out.write("%s\t%s\t%d\t%d\n" % (vid, barcode, alt, depth))
+    return len(duplicated)
 
 
 def load_error_rates(fname):
@@ -1048,7 +1172,8 @@ def parse_args():
     parser.add_argument("--read_info", required=True, help="IsoQuant read_info (.tsv or .tsv.gz)")
     parser.add_argument("--umi_groups", help="IsoQuant UMI groups (--large_output umi_groups); "
                                              "without it every molecule is its representative read")
-    parser.add_argument("--bam", required=True, help="indexed BAM IsoQuant was run on (all reads, not deduplicated)")
+    parser.add_argument("--bam", required=True, nargs="+",
+                        help="indexed BAM(s) IsoQuant was run on (all reads, not deduplicated)")
     parser.add_argument("--reference", required=True, help="reference genome FASTA (indexed)")
     parser.add_argument("-o", "--output", required=True, help="output prefix")
     parser.add_argument("-t", "--threads", type=int, default=16)
@@ -1088,7 +1213,7 @@ def main():
     tmp_dir = args.output + ".tmp"
     os.makedirs(tmp_dir, exist_ok=True)
 
-    with pysam.AlignmentFile(args.bam) as bam:
+    with BamSet(args.bam) as bam:
         chr_order = {c: i for i, c in enumerate(bam.references)}
     gene_types = set(args.gene_assignment_types.split(","))
     chr_files, gene_spans = split_read_info(args.read_info, gene_types, tmp_dir)
@@ -1122,16 +1247,9 @@ def main():
             logger.info("Job %d / %d done (%s): %s" % (done, len(jobs), chr_id,
                                                         ", ".join("%s %d" % kv for kv in stats.items())))
 
-    with open(args.output + ".sites.tsv", "w") as sites_out, \
-            gzip.open(args.output + ".barcode_counts.tsv.gz", "wt", compresslevel=1) as bc_out:
-        sites_out.write("\t".join(SITES_HEADER) + "\n")
-        bc_out.write("#variant_id\tbarcode\talt_umis\tdepth_umis\n")
-        for job_prefix, _, _, _ in jobs:
-            with open(job_prefix + ".sites.tsv") as inf:
-                shutil.copyfileobj(inf, sites_out)
-            with open(job_prefix + ".barcodes.tsv") as inf:
-                shutil.copyfileobj(inf, bc_out)
+    merged = write_outputs(jobs, args)
     logger.info("Total: " + ", ".join("%s %d" % kv for kv in totals.items()))
+    logger.info("Alleles reported by two or more loci, merged into one record: %d" % merged)
     logger.info("Saved %s.sites.tsv and %s.barcode_counts.tsv.gz" % (args.output, args.output))
     if not args.keep_tmp:
         shutil.rmtree(tmp_dir)

@@ -10,7 +10,8 @@
 For every variant from call_variants.py and every cell type, alt and depth UMIs are summed over the barcodes of that
 type and compared with all other typed barcodes by a one-sided Fisher's exact test (alt vs ref UMIs, type vs rest;
 computed as the hypergeometric upper tail). P-values are corrected by Benjamini-Hochberg over all variant x type
-tests. Barcodes without a cell type are ignored.
+tests. Barcodes without a cell type are ignored. With --restrict_to only the variants also called in another call
+set are tested (e.g. sites called on both sequencing platforms), and BH runs over their tests only.
 
 Outputs:
   PREFIX.celltype_tests.tsv  one line per variant and cell type with depth in the type;
@@ -29,6 +30,21 @@ def open_text(fname):
     return gzip.open(fname, "rt") if fname.endswith(".gz") else open(fname)
 
 
+def load_variant_ids(sites, restrict_to=None):
+    """Variant ids of a sites.tsv in file order, without repeats; with restrict_to only those also in that sites.tsv."""
+    def read_ids(fname):
+        return [line.rstrip("\n").split("\t")[2] for line in open(fname) if not line.startswith("#")]
+    variant_ids = list(dict.fromkeys(read_ids(sites)))
+    if restrict_to:
+        keep = set(read_ids(restrict_to))
+        variant_ids = [v for v in variant_ids if v in keep]
+    return variant_ids
+
+
+def add_restrict_argument(parser):
+    parser.add_argument("--restrict_to", help="sites.tsv of another call set: test only the variants called there too")
+
+
 def load_cell_types(fname):
     cell_types = {}
     for line in open_text(fname):
@@ -40,8 +56,8 @@ def load_cell_types(fname):
     return cell_types
 
 
-def load_variant_type_counts(fname, cell_types, type_index):
-    """variant id -> (alt, depth) arrays over cell types."""
+def load_variant_type_counts(fname, cell_types, type_index, variants):
+    """variant id -> (alt, depth) arrays over cell types, for the variants in the set variants."""
     n_types = len(type_index)
     counts = {}
     for line in open_text(fname):
@@ -49,7 +65,7 @@ def load_variant_type_counts(fname, cell_types, type_index):
             continue
         vid, barcode, alt, depth = line.rstrip("\n").split("\t")
         t = cell_types.get(barcode)
-        if t is None:
+        if t is None or vid not in variants:
             continue
         if vid not in counts:
             counts[vid] = (numpy.zeros(n_types, dtype=numpy.int64), numpy.zeros(n_types, dtype=numpy.int64))
@@ -76,6 +92,7 @@ def main():
     parser.add_argument("--sites", required=True, help="PREFIX.sites.tsv from call_variants.py")
     parser.add_argument("--barcode_counts", required=True, help="PREFIX.barcode_counts.tsv.gz from call_variants.py")
     parser.add_argument("--cell_types", required=True, help="TSV with barcode and cell type")
+    add_restrict_argument(parser)
     parser.add_argument("--fdr", type=float, default=0.05, help="BH-adjusted p-value cut-off [%(default)s]")
     parser.add_argument("-o", "--output", required=True, help="output prefix")
     args = parser.parse_args()
@@ -83,12 +100,9 @@ def main():
     cell_types = load_cell_types(args.cell_types)
     types = sorted(set(cell_types.values()))
     type_index = {t: i for i, t in enumerate(types)}
-    counts = load_variant_type_counts(args.barcode_counts, cell_types, type_index)
-
-    variant_ids = []
-    for line in open(args.sites):
-        if not line.startswith("#"):
-            variant_ids.append(line.rstrip("\n").split("\t")[2])
+    # a site covered by two loci used to be reported twice; its barcode counts are summed
+    variant_ids = load_variant_ids(args.sites, args.restrict_to)
+    counts = load_variant_type_counts(args.barcode_counts, cell_types, type_index, set(variant_ids))
 
     # one test per variant and type with depth in the type and in the rest
     tests = []  # (variant id, type index, alt_t, depth_t, alt_rest, depth_rest)
